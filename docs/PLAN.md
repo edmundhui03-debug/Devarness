@@ -19,7 +19,7 @@
 
 ## The release gate passed before public reuse
 
-`done` · inventory, export, local checks, independent review, secret scans,
+`fixed` · inventory, export, local checks, independent review, secret scans,
 private push and hosted Windows/macOS/Linux verification passed
 
 The implementation record and done rubric are in docs/ADAPTATION.md.

@@ -43,7 +43,7 @@ and credentials are absent.
 
 ## Verification passed locally and on all three hosted platforms
 
-`done` · the privacy gate and portable checks passed before public reuse
+`fixed` · the privacy gate and portable checks passed before public reuse
 
 The repository was created private and pushed with fresh history. Remote
 main matched the reviewed local commit. GitHub Actions passed Windows,
