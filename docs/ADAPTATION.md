@@ -62,7 +62,9 @@ unavailable shell/runtime cases retain explicit test skips.
 
 The staged-content/history scanner and Gitleaks 8.30.1 reported no
 findings. Additional deny rules covered the original user's private
-identifiers and project-root names; none matched. The independent
+identifiers and project-root names. The repository's intentional GitHub
+URL is the sole cleared account-name match; credential rules scan its
+full text without an exception. No private project content matched. The independent
 review exposed index, metadata and symlink-text gaps; real Git negative
 controls now prove those rejection paths. Historical credentials removed
 from the current tree are tested too. No inherited Git history is used.
