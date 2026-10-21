@@ -1,0 +1,124 @@
+<section id="day1">
+  <div class="day-head">
+    <div><p class="kicker">Day 1</p><h2>PyroSim draws the room, FDS does the physics, and one text file passes between them</h2></div>
+    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+  </div>
+  <div class="goal"><span class="g-l">Goal</span><p>A licensed PyroSim you can drive on the office desktop, a 60-second test fire that has run from start to finish, and the one line in its output file that proves FDS got to the end.</p></div>
+
+  <p class="phase">Learn</p>
+
+  <p class="prose">You are learning two programs today, not one. PyroSim is an editor made by Thunderhead Engineering: you draw the room in it, fill in dialogs, and it writes a text file. Fire Dynamics Simulator, FDS, is written by NIST: it reads that text file, solves the flow and heat transfer, and writes the results to disk. PyroSim never works out a temperature. It prepares the question and it draws the answer.</p>
+
+  <p class="prose">The two are shipped together. PyroSim 2026.1 is, in Thunderhead's words, "designed for FDS version 6.10.1", and it installs that exact build of FDS alongside itself, plus Smokeview 6.10.1 for viewing results. So the version of PyroSim on the office desktop fixes the version of the solver your numbers come from.</p>
+
+  <p class="prose">The whole pipeline is five steps, and every day of this guide sits somewhere on it.</p>
+
+  <ul class="plain">
+    <li>You edit a model and save it as a <code>.psm</code> file. That file belongs to PyroSim alone; it is binary, not text, so no script and no text editor can read it.</li>
+    <li>When you run, PyroSim writes your model out as a <code>.fds</code> file. This one is plain text, and it is the only thing FDS ever sees.</li>
+    <li>FDS reads the <code>.fds</code> file, checks it, and computes the fire.</li>
+    <li>FDS writes its own files back into the same folder: a log of the run, a file index for the viewers, and comma-separated tables of numbers.</li>
+    <li>PyroSim Results or Smokeview reads those files and draws smoke, slices and graphs.</li>
+  </ul>
+
+  <p class="prose">The <code>.fds</code> file is written in a fixed form called namelist records. The FDS User's Guide defines it plainly: "Each namelist record begins with the ampersand character, &amp;, followed immediately by the name of the namelist group, then a comma-delimited list of the input parameters, and finally a forward slash, /." Text outside a pair of <code>&amp;</code> and <code>/</code> is ignored, which is why those files can carry comments, as long as nothing but a space comes before an ampersand. You do not have to write this language to use PyroSim, but you will read it every day from now on, because it is the only place where what PyroSim means and what FDS will do are the same thing.</p>
+
+  <details class="deeper"><summary>Why the FDS version matters more than the PyroSim version</summary><div class="d-in">
+    <p class="prose">PyroSim 2026.1 and 2026.2 ship the same solver. The bundled <code>fds.exe</code>, <code>fds_openmp.exe</code> and <code>smokeview.exe</code> are byte-for-byte identical in the two release packages; only PyroSim's own launcher differs. Both carry the revision string <code>FDS-6.10.1-0-g12efa16</code>, which is the revision on the title page of the FDS 6.10.1 User's Guide.</p>
+    <p class="prose">That matters for DATASET. A result is reproducible if someone else runs the same input file with the same solver version, so record the FDS version next to every number you keep, not the PyroSim version. FDS 6.11.0 changed flux limiters, a corner boundary condition, the 3D smoke file format and thermocouple defaults, so a newer solver reading the same input file can return different numbers, and that is not a mistake by either side.</p>
+  </div></details>
+
+  <p class="prose">Now the window. PyroSim opens on one window with the model in the middle, and the same five regions every time.</p>
+
+  <ul class="plain">
+    <li><b>The menubar</b> runs File, Edit, Model, Devices, Output, Analysis, Results, View, Help. The nouns tell you where things live: what the model is made of sits under <span class="ui">Model</span>, what you measure sits under <span class="ui">Devices</span> and <span class="ui">Output</span>, and running sits under <span class="ui">Analysis</span>.</li>
+    <li><b>The File toolbar</b> runs left to right: New, Open, Save, Import, Export, Undo, Redo, then the two unit buttons <span class="ui">SI</span> and <span class="ui">EN</span>, then the scenario editor and its drop-down showing <span class="val">Default</span>, then the green triangle <span class="ui">Run FDS</span>, then the time-history plot and the Results icon.</li>
+    <li><b>The View toolbar</b> holds the camera views, the render drop-down (<span class="val">Solid with Outlines</span> and four others), the navigation tools and a <span class="ui">Group:</span> drop-down. Beside it a filter toolbar shows and hides object types and offers <span class="ui">Preview FDS Blocks</span>, which you will use on Day 2.</li>
+    <li><b>The Navigation panel</b> on the left is a tree of everything in the model: Views, Tags, Meshes, Zones, Species, Reactions, Particles, Materials, Surfaces, Devices, Controls, Results, HVAC, Model, Model Checks. Right-clicking any item lists what PyroSim can do to it, and a large part of the software is reachable only that way.</li>
+    <li><b>The drawing toolbar</b> runs down the left edge of the model view: slab, wall, room, hole, vent, device, slice and mesh tools.</li>
+  </ul>
+
+  <p class="prose">At the bottom of the model view are three tabs: <span class="ui">3D View</span>, <span class="ui">2D View</span> and <span class="ui">Record View</span>. Add, remove or select an object in one and the others follow at once. The third tab is the one that matters most in this guide. Record View shows the FDS input file PyroSim is writing, kept up to date as you work, so you can watch a dialog turn into a line of <code>&amp;OBST</code> or <code>&amp;SURF</code>. It has two sections: <b>Model Records</b>, which is read-only because PyroSim generates it, and <b>Additional Records</b>, where you can type lines that are injected at the top of the file. PyroSim performs no validation on what you type there, and its own objects cannot refer to it, so leave it empty until Day 5.</p>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The whole PyroSim window on the office desktop with a model open: menubar, File toolbar (SI and EN buttons and the green Run FDS triangle visible), the Navigation panel tree expanded, and the three view tabs at the bottom of the model view.</p></div></div>
+
+  <p class="prose">Units next, because a wrong unit is the cheapest mistake to make and one of the hardest to spot. PyroSim can display and accept either metric or English units: click <span class="ui">SI</span> or <span class="ui">EN</span> on the File toolbar, or use the <span class="ui">Units</span> item on the <span class="ui">View</span> menu. Switching converts the values you have already entered rather than reinterpreting them. Record View is the exception that keeps you honest: it always displays values in the units FDS uses, whatever the buttons say. Work in SI, which is what FDS reads and what this guide quotes throughout: metres, seconds, kilograms, degrees Celsius, and kilowatts for heat release rate.</p>
+
+  <details class="deeper"><summary>Typing a unit into a field</summary><div class="d-in">
+    <p class="prose">Thunderhead documents typed units for PyroSim 2026.2: you enter a number with unit text after it, such as <span class="val">2.75 m</span>, <span class="val">30 cm</span> or <span class="val">22 C</span>, and the field converts when you press TAB or ENTER. The text is case-sensitive, and a composite like <span class="val">4 ft 9 in</span> is not accepted. The same page does not exist for 2026.1, so on a 2026.1 desktop treat this as untested: set the unit system first, then type plain numbers.</p>
+  </div></details>
+
+  <p class="phase">Build</p>
+
+  <p class="prose">Work through these in order. If PyroSim has to be installed or updated by your IT team rather than checked, note that installation needs administrator rights, that installing a new version removes the older one while keeping your licence and property files, and that the installer adds Windows Defender exclusions for the bundled FDS executables so runs are not slowed down.</p>
+
+  <ol class="steps">
+    <li><div><p>Start PyroSim. If the <span class="val">Licensing and Activation</span> dialog opens on its own, the machine is not licensed yet. You can open the same dialog at any time from <span class="path">Help › License</span>.</p></div></li>
+    <li><div><p>Licence the machine the way your office licence works. For a node-locked licence, either choose <span class="ui">Enter an online activation key</span> and type the 22-character key, which looks like <span class="val">AA00-BB11-CC22-DD33-EE44-F5</span>, or, if the desktop has no internet access, copy the 7 to 8 character HostID shown in the dialog, generate a <code>.lic</code> file at Thunderhead's activation page on another machine, and choose <span class="ui">Use an existing license file</span>. For an office floating licence, choose <span class="ui">Floating License Server</span>, then <span class="ui">Edit floating license settings</span>, and enter the server host name with port <span class="val">52100</span>.</p></div></li>
+    <li><div><p>Confirm which release you have, because two labels differ. Open the <span class="path">Help</span> menu: the licence item reads <span class="ui">Remove License…</span> on 2026.1 and <span class="ui">Clear License Cache…</span> on 2026.2. The same menu carries the five manuals that ship with the software, including the FDS User Guide and the FDS Technical Reference. Open the FDS User Guide once now so you know it is there; it is the reference behind most of this guide.</p></div></li>
+    <li><div><p>Set two preferences. On <span class="path">File › Preferences › General</span>, tick <span class="ui">Record Preview</span>, which adds a preview pane to many dialogs showing the text that dialog will produce in the FDS input file. On <span class="path">File › Preferences › FDS</span>, tick <span class="ui">Auto-Save PyroSim Model Before Running FDS</span>; without it, PyroSim does not save your model to disk when you run, so a crash during a run can cost the edits you made before it.</p></div></li>
+    <li><div><p>Click <span class="ui">SI</span> on the File toolbar so the whole session is metric. The equivalent menu route is <span class="path">View › Units</span>.</p></div></li>
+    <li><div><p>Make an empty model with <span class="path">File › New</span>, then open <span class="path">Analysis › Simulation Parameters</span> and look at the <span class="ui">Time</span> tab. End Time reads <span class="val">0.001 s</span>. That is PyroSim's default and it has to be changed before any model will run for a useful length of time. The corresponding line in the file is the <code>&amp;TIME</code> record, and the dialog's own preview pane shows it as <span class="val">&amp;TIME T_END=1.0E-3/</span>. Close the dialog without changing anything.</p></div></li>
+    <li><div><p>Get a model that already works. Download Thunderhead's <a href="https://www.thunderheadeng.com/docs/2026-1/pyrosim/examples/fundamentals/1-your-first-fire/">Your First Fire</a> solution file, unzip it into a plain local folder, and open <code>my_first_model-solution.psm</code> with <span class="path">File › Open</span>. It is a 660 kW fire in a 5 m × 5 m × 2.75 m room with a 1 m × 2.1 m doorway. If you would rather build it yourself, the steps are in the box below this list.</p></div></li>
+    <li><div><p>Read the model through the Navigation panel rather than the picture. Expand <span class="ui">Meshes</span>, <span class="ui">Surfaces</span> and <span class="ui">Reactions</span>, and double-click one entry in each to open the dialog behind it. You are looking at the same model three ways: the tree, the 3D view, and the file.</p></div></li>
+    <li><div><p>Click the <span class="path">Record View</span> tab and read the file top to bottom. Find the <code>&amp;MESH</code> line and its <code>IJK</code> cell counts, the <code>&amp;OBST</code> lines for the floor, walls and ceiling, the <code>&amp;SURF</code> line carrying <code>HRRPUA</code>, the <code>&amp;REAC</code> line naming the fuel, and the <code>&amp;TIME</code> line. You do not need to understand them yet. Notice only that everything you have seen in the dialogs is in here, and nothing else is.</p></div></li>
+    <li><div><p>Set the run length at <span class="path">Analysis › Simulation Parameters › Time</span>: End Time <span class="val">60 s</span>. On the same dialog's <span class="ui">Environment</span> tab, tick Ambient Temperature and enter <span class="val">22 °C</span>, which is the tutorial's value; FDS's own default would be 20 °C. Watch the <code>&amp;TIME</code> line in Record View change when you click OK.</p></div></li>
+    <li><div><p>Save with <span class="path">File › Save As</span> into a local folder on the desktop's own disk, naming the model <code>my_first_fire.psm</code>. Avoid spaces and periods in the folder name and the file name, and do not save into OneDrive or a network drive. The reason is in the Watch out box below.</p></div></li>
+    <li><div><p>Run it: <span class="path">Analysis › Run FDS</span>, or the green triangle on the File toolbar. The <span class="ui">FDS Simulation</span> dialog opens. It shows FDS's own console output in a log pane, a progress bar, <span class="ui">Time Elapsed</span> and <span class="ui">Time Remaining</span>, a <span class="ui">Show results when finished</span> tick box, and the buttons <span class="ui">Kill</span>, <span class="ui">Stop</span>, <span class="ui">Show Results</span>, <span class="ui">Open Folder</span> and <span class="ui">Save Log</span>. Thunderhead's tutorial says this run takes a few minutes. Watch the log rather than the progress bar: that text is the only place some errors ever appear.</p></div></li>
+    <li><div><p>When it finishes, open the run folder. PyroSim creates a sub-directory beside the <code>.psm</code> file and named after it, so <code>my_first_fire.psm</code> gives a folder <code>my_first_fire</code>, and every file FDS writes lands in it. Open <code>my_first_fire.out</code> in any text editor and go to the very end of the file.</p></div></li>
+  </ol>
+
+  <details class="deeper"><summary>Build the 5 m room yourself instead of opening the solution</summary><div class="d-in">
+    <p class="prose">These are the numbers from Thunderhead's own tutorial, in its order. Day 2 and Day 3 explain why each one is what it is; today you are following a recipe to reach a run.</p>
+    <ul class="plain">
+      <li>Open <span class="ui">Edit Meshes</span> from the <span class="ui">Model</span> menu and click <span class="ui">New</span>. Set the mesh boundary to Min X −3.0 m, Max X 8.0 m, Min Y −3.0 m, Max Y 8.0 m, Min Z −0.2 m, Max Z 8.2 m. Click the cell size link, which starts at 0.22 × 0.22 × 0.56 m, and enter 0.2 m. The dialog then reads 55 × 55 × 42 cells, 127,050 cells in total.</li>
+      <li>Right-click the mesh in the Navigation panel and choose <span class="ui">Open Mesh Boundaries</span>. Six mesh boundary vents appear; check that all six use the <code>OPEN</code> surface. Without this the box is sealed, which is Day 2's main lesson.</li>
+      <li>Draw the floor with the <span class="ui">Slab</span> tool from (0, 0, 0) to (5, 5, 0) m; the default slab is 0.2 m thick with its top at Z = 0 m. For the ceiling, right-click the tool, choose <span class="ui">Tool Properties</span>, set Z Location to 2.75 m, and draw the same rectangle.</li>
+      <li>Draw the walls with the <span class="ui">Room</span> tool, whose defaults are Z-location 0 m, Height 2.75 m and Wall Thickness 0.2 m.</li>
+      <li>Cut the door with the <span class="ui">Wall Hole</span> tool. In Tool Properties set Height to 2.1 m. Press TAB, type <span class="val">0,3,0</span>, press ENTER, move 1 m along the left wall and click, then press ENTER to finish.</li>
+      <li>Place the fire with the <span class="ui">Vent</span> tool: press TAB, type <span class="val">2,2,0</span>, press ENTER, draw 1 m × 1 m, and rename the vent <span class="val">Fire</span>.</li>
+      <li>Open <span class="ui">Edit Reactions</span> from the <span class="ui">Model</span> menu, click <span class="ui">Add From Library</span>, select <span class="val">SFPE WOOD_OAK</span>, move it across with the arrow button, then Close and OK. Without a reaction FDS refuses to run a burner at all.</li>
+      <li>Open <span class="ui">Edit Surfaces</span> from the <span class="ui">Model</span> menu, click <span class="ui">New</span>, name the surface <span class="val">Fire</span>, set Surface Type to <span class="val">Burner</span>, and enter <span class="val">660</span> in the HRRPUA field, which is the heat release rate per unit area in kW/m². The vent is 1 m², so the fire is 660 kW.</li>
+      <li>Double-click the vent, and on <span class="ui">Vent Properties</span> set Surface to <span class="val">Fire</span>.</li>
+    </ul>
+  </div></details>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The FDS Simulation window a moment after the run ends: the last dozen lines of the log pane readable, the Progress bar full, and the Kill, Stop, Show Results and Save Log buttons visible.</p></div></div>
+
+  <p class="phase">Check</p>
+
+  <p class="prose">FDS tells you how it ended in its last line, and that line is the only reliable check. The message you want is <span class="val">STOP: FDS completed successfully</span>, and FDS appends the job name to it, so the line reads <span class="val">STOP: FDS completed successfully (CHID: my_first_fire)</span>. It is written both to the run log you watched and to the end of <code>CHID.out</code>, where CHID is the job name, here <code>my_first_fire</code>. Two habits follow from how FDS behaves. First, FDS returns an exit status of 0 even when it has stopped on an error, so on Day 7, when runs are scripted, the completion line is what a script must test for, not the exit code. Second, an error found while reading the input file can stop FDS before it opens <code>CHID.out</code> at all; that message exists only in the console text, which is the run window's log pane, and <span class="ui">Save Log</span> is how you keep it.</p>
+
+  <p class="prose">The Results viewer opens by itself at the end of a run by default; the <span class="ui">Show results when finished</span> box in the run dialog and <span class="ui">Run Results When FDS Simulation Completes</span> on <span class="path">File › Preferences › FDS</span> are what control it. If it does not open, use <span class="ui">View Results</span> on the <span class="ui">Results</span> menu. It uses the same licence as PyroSim. Smokeview never opens by itself; it is <span class="ui">Open Smokeview</span> on the same menu. Looking at the smoke is Day 5's work, so a quick look now is enough.</p>
+
+  <div class="check"><h4>Check your result</h4><p class="prose">In the run folder you should find <code>my_first_fire.fds</code> alongside files written by FDS, and the last line of <code>my_first_fire.out</code> should read <span class="val">STOP: FDS completed successfully (CHID: my_first_fire)</span>. Open <code>my_first_fire.fds</code> in a text editor as well, and confirm it is the same text you read in Record View. If both hold, you have driven the whole pipeline once, and the rest of this guide is about what to put in that file.</p></div>
+
+  <div class="scroll"><table>
+    <thead><tr><th>File</th><th>Written by</th><th>What it holds</th></tr></thead>
+    <tbody>
+      <tr><td><b>my_first_fire.psm</b></td><td>PyroSim</td><td>Your model. Binary, so no text editor and no script can read or write it.</td></tr>
+      <tr><td><b>my_first_fire.fds</b></td><td>PyroSim</td><td>The input file, in plain text. The only thing FDS reads.</td></tr>
+      <tr><td><b>my_first_fire.out</b></td><td>FDS</td><td>The run's own diary: what FDS made of your input, a diagnostic block for each of the first ten time steps, then one every tenth step to step 100 and one every hundredth step after that, and the final status line.</td></tr>
+      <tr><td><b>my_first_fire.smv</b></td><td>FDS</td><td>The index the viewers open. It points at the smoke, slice and boundary files beside it.</td></tr>
+      <tr><td><b>my_first_fire_hrr.csv</b></td><td>FDS</td><td>Heat release rate and the energy budget, one row per output interval. This is how you check the fire is the size you asked for.</td></tr>
+      <tr><td><b>my_first_fire_devc.csv</b></td><td>FDS</td><td>One column per device. It appears once you add devices, on Day 4.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="watch"><h4>Watch out</h4><p class="prose">Where you save the model decides where the run happens, so choose the folder carefully today. PyroSim runs FDS in a sub-directory beside the <code>.psm</code> file, and the FDS User's Guide warns that saving into a network share or a folder controlled by a cloud service such as OneDrive can fail a simulation part-way, because a file lock during an automated backup stops Windows letting FDS write. Names matter too: no periods or spaces are allowed in the job name, so a period stops the run with <span class="val">ERROR(108): No periods allowed in CHID</span>, blank spaces in directory or file names break multi-computer runs, and non-English characters in names that reach FDS get converted to numbers. Keep to a local folder, plain English letters, digits and underscores.</p></div>
+
+  <details class="deeper"><summary>The file you will be able to read by Day 5</summary><div class="d-in">
+    <p class="prose">This is the reference case for this guide: the ISO 9705 room you will build in PyroSim over the next four days, written in the same language you glanced at in Record View. Today it is a wall of text. By Day 5 you will be able to read every line of it, and by Day 7 you will be generating variants of it by the hundred. Skim it once now and move on.</p>
+<!--FDSBLOCK:iso9705_room-->
+  </div></details>
+
+  <div class="quiz">
+    <details class="q"><summary><span class="qt">PyroSim is showing your room on screen. Which program works out the temperatures, and what does it get from PyroSim?</span></summary><div class="qa">FDS 6.10.1 does. It receives one plain-text input file, the <code>.fds</code>, written by PyroSim from your model. PyroSim prepares that file and later draws the results; it computes nothing.</div></details>
+    <details class="q"><summary><span class="qt">You click the EN button instead of SI. Do the numbers FDS receives change?</span></summary><div class="qa">No. The unit buttons change how PyroSim displays and accepts values, and it converts what you already entered. Record View always shows the units FDS uses, whichever button is pressed, and the file is written in those units.</div></details>
+    <details class="q"><summary><span class="qt">You make a new model, press Run FDS, and it is over almost at once with next to nothing written. What do you check first?</span></summary><div class="qa">End Time, on the Time tab of Simulation Parameters. A new PyroSim model starts at 0.001 s and must be changed before any run is useful.</div></details>
+    <details class="q"><summary><span class="qt">Where does PyroSim put the FDS input file and the results?</span></summary><div class="qa">In a sub-directory beside the saved <code>.psm</code> file and named after it, so <code>my_first_fire.psm</code> gives a folder <code>my_first_fire</code>. Everything FDS writes goes there too, which is why the model belongs in a local, non-synced folder.</div></details>
+    <details class="q"><summary><span class="qt">The run window has closed and you want to know whether FDS finished or stopped. What do you look for, and why is "it did not crash" not an answer?</span></summary><div class="qa">Look for <code>STOP: FDS completed successfully</code> as the last line of <code>CHID.out</code> and of the run log. FDS returns an exit status of 0 even after an error, so a run that ends quietly can still have failed. An error found while reading the input can stop FDS before <code>CHID.out</code> exists at all, and then the message is only in the log.</div></details>
+  </div>
+
+  <div class="done-row"><input type="checkbox" id="done-day1" data-done="day1"><label for="done-day1">Day 1 done</label></div>
+</section>

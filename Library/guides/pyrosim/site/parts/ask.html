@@ -1,0 +1,29 @@
+<div class="ask-launch">
+  <button class="btn" type="button" data-ask-open aria-expanded="false" aria-controls="ask-panel">Ask Peter</button>
+</div>
+
+<div class="ask-panel" id="ask-panel" role="dialog" aria-label="Ask Peter about this guide" hidden>
+  <div class="ask-head">
+    <span class="ah-t">Ask Peter</span>
+    <button class="btn" type="button" data-ask-close>Close</button>
+  </div>
+  <div class="ask-body">
+    <p class="ask-ctx">Reading: <span data-ask-context></span></p>
+    <div data-ask-on hidden>
+      <p class="ask-ctx">Answers come from this page's text. Your question and the section you are reading are sent to Claude, which uses your own claude.ai account and asks your permission the first time.</p>
+      <label class="ask-ctx" for="ask-q">Your question</label>
+      <textarea id="ask-q" placeholder="Why is my smoke layer higher than the reference run?"></textarea>
+      <div class="ask-row">
+        <button class="btn primary" type="button" data-ask-send>Ask</button>
+        <span class="ask-ctx">or press Ctrl + Enter</span>
+      </div>
+      <div class="suggest">
+        <button class="btn" type="button" data-suggest>What does this section want me to do first?</button>
+        <button class="btn" type="button" data-suggest>My run finished but the HRR column is zero. Why?</button>
+        <button class="btn" type="button" data-suggest>Explain D* and cell size to someone who has never meshed anything.</button>
+      </div>
+      <div class="ask-answer" id="ask-answer" aria-live="polite"></div>
+    </div>
+    <p class="ask-off" data-ask-off>Asking is not available in this view. Everything the answer would draw on is already on the page: the day you are reading, the reference run and the error finder.</p>
+  </div>
+</div>

@@ -1,0 +1,33 @@
+{
+  "name": "devarness",
+  "version": "0.1.0",
+  "description": "A Claude Code harness development workspace with Harness2 improvement methods and optional Codex/Pi adapters.",
+  "author": {
+    "name": "Devarness contributors"
+  },
+  "keywords": [
+    "skills",
+    "workflow",
+    "grilling",
+    "retrospective",
+    "library",
+    "documentation"
+  ],
+  "skills": [
+    "./.claude/skills/archify",
+    "./.claude/skills/bilingual-page",
+    "./.claude/skills/delegate",
+    "./.claude/skills/grill-first",
+    "./.claude/skills/library",
+    "./.claude/skills/library-intake",
+    "./.claude/skills/markdown-format",
+    "./.claude/skills/markitdown",
+    "./.claude/skills/ponytail",
+    "./.claude/skills/prompt-master",
+    "./.claude/skills/retro-last",
+    "./.claude/skills/tieitup",
+    "./Library/shared-skills/browser-docs",
+    "./Library/shared-skills/pyrosim",
+    "./Library/task-support/task-support"
+  ]
+}

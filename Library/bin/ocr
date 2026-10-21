@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Local Docling OCR with page-marked Markdown. Does not replace md-pages."""
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+library = Path(__file__).resolve().parents[1]
+runtime = library / '.runtime/docling'
+python = runtime / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+if not python.is_file():
+    raise SystemExit('Run python3 %s --install' % (library / 'setup-browser-docs.py').as_posix())
+env = dict(os.environ, HF_HOME=str(runtime / 'models'), OMP_NUM_THREADS='4',
+           HF_HUB_DISABLE_XET='1', HF_HUB_DISABLE_TELEMETRY='1')
+raise SystemExit(subprocess.call([str(python), str(library / 'ocr-convert.py'), *sys.argv[1:]], env=env))

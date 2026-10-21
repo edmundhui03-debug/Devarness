@@ -1,0 +1,27 @@
+<section id="glossary">
+  <p class="kicker">Glossary</p>
+  <h2>The words this field uses, and the ones that stay in English</h2>
+
+  <p class="prose">Tool names, FDS keywords, file names and the vocabulary a Hong Kong fire engineer says in English stay in English in both versions of this page: PyroSim, FDS, Smokeview, HRR, mesh, <code>SURF</code>, <code>DEVC</code>, <code>SLCF</code>, CSV. The Chinese terms below follow the DATASET pages already written under the same house rule.</p>
+
+  <div class="gloss">
+    <dl>
+      <div class="g"><dt>Heat release rate<span class="en">HRR · 放熱率</span></dt><dd>How much power the fire is putting out, in kilowatts. In this guide it is prescribed, not predicted: you tell FDS what the burner does.</dd></div>
+      <div class="g"><dt>HRRPUA<span class="en">單位面積放熱率</span></dt><dd>Heat release rate per unit area, in kW/m². Multiply by the burner's area to get the fire's power. The commonest beginner error is typing kilowatts here.</dd></div>
+      <div class="g"><dt>Mesh, cell size<span class="en">網格 · 格距</span></dt><dd>The grid of boxes FDS solves on. Everything smaller than a cell is invisible to the simulation, so the cell size sets what the answer can possibly show.</dd></div>
+      <div class="g"><dt>Smoke layer, layer height<span class="en">煙層 · 煙層高度</span></dt><dd>The hot smoky region under the ceiling and the height of its lower edge. FDS does not compute a layer directly; it estimates one from a temperature profile along a line.</dd></div>
+      <div class="g"><dt>Visibility<span class="en">能見度</span></dt><dd>How far a person could see an exit sign through the smoke, in metres. FDS caps it at 30 m and derives it from the smoke's optical density.</dd></div>
+      <div class="g"><dt>Optical density<span class="en">光學密度</span></dt><dd>How much light the smoke absorbs per metre. This, not visibility, is the channel DATASET consumes, because a sensor measures it directly.</dd></div>
+      <div class="g"><dt>Obscuration<span class="en">遮光度</span></dt><dd>The same idea as a percentage of light lost per metre. Smoke detectors are rated in these units.</dd></div>
+    </dl>
+    <dl>
+      <div class="g"><dt>Flashover<span class="en">flashover · 閃燃</span></dt><dd>The moment a room fire becomes a fire of the whole room. ISO 9705 defines it as 1000 kW; in practice people also use a 600 °C upper layer or 20 kW/m² at the floor.</dd></div>
+      <div class="g"><dt>Tenability<span class="en">可維生性</span></dt><dd>Whether a person could still survive and escape: enough visibility, low enough heat, a low enough dose of gas.</dd></div>
+      <div class="g"><dt>FED<span class="en">有效劑量分數</span></dt><dd>Fractional effective dose. A running total of the gas exposure a person at that point would have taken, where 1.0 means incapacitation.</dd></div>
+      <div class="g"><dt>Soot yield, CO yield<span class="en">煙塵產率 · 一氧化碳產率</span></dt><dd>The fraction of burnt fuel mass that becomes smoke particles or carbon monoxide. Both default to zero in FDS, which is why smoke and CO can stay flat all run.</dd></div>
+      <div class="g"><dt>Device<span class="en">量測裝置</span></dt><dd>A virtual sensor in the model. A gas-phase device reads the centre of the cell it sits in, whatever its exact coordinates.</dd></div>
+      <div class="g"><dt>Scenario<span class="en">情景</span></dt><dd>A variation of one model. PyroSim's Scenarios feature only turns objects on and off, which is why Day 7 uses a text template instead.</dd></div>
+      <div class="g"><dt>Simulation case<span class="en">個案</span></dt><dd>One run: one input file, one CHID, one folder of results. A dataset is many cases.</dd></div>
+    </dl>
+  </div>
+</section>

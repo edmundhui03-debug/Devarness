@@ -1,0 +1,28 @@
+{
+  "_frozen": "Written by Peter at 2026-10-09 00:10, before any ranking work; the agent that tunes the library may not edit it. A prompt passes when any expected name appears (case-insensitive substring of the entry id or path) among the top 3 picks. Pass mark: 20 of 23 overall, 5 of the 6 marked cold_start, and both reverse prompts.",
+  "prompts": [
+    {"q": "cite a page number from a scanned PDF datasheet", "any": ["md-pages", "ocr", "browser-docs", "markitdown"], "cold_start": true},
+    {"q": "work out how this Android APK implements its login screen", "any": ["reverse-skill", "reverse-engineer-anything", "rea"], "cold_start": true, "reverse": true},
+    {"q": "analyse a Windows exe to see how one feature works", "any": ["reverse-engineer-anything", "rea", "reverse-skill"], "reverse": true},
+    {"q": "build an HTML report page for the owner", "any": ["bilingual-page"], "cold_start": true},
+    {"q": "draw an architecture diagram of the system", "any": ["archify", "diagram-design"]},
+    {"q": "review a KiCad schematic for errors", "any": ["kicad-happy"], "cold_start": true},
+    {"q": "simulate this circuit with spice", "any": ["kicad-happy", "ngspice"]},
+    {"q": "fan out a reading task to three subagents", "any": ["delegate"], "cold_start": true},
+    {"q": "the owner pasted a GitHub link to a skills repository, add it", "any": ["library-intake"], "cold_start": true},
+    {"q": "write a markdown spec document in the house format", "any": ["markdown-format", "md-format"]},
+    {"q": "convert a Word document to markdown", "any": ["markitdown"]},
+    {"q": "set up a PyroSim fire simulation of a room", "any": ["pyrosim"]},
+    {"q": "study a video lecture from its audio and its slides", "any": ["video-study"]},
+    {"q": "write a better prompt for Midjourney", "any": ["prompt-master"]},
+    {"q": "simplify this code before the final review", "any": ["tieitup"]},
+    {"q": "make an interactive knowledge graph of this codebase", "any": ["understand"]},
+    {"q": "stress test my plan by asking me hard questions", "any": ["grill-first", "grilling", "grill-me"]},
+    {"q": "what happened to this project and what is next", "any": ["task-recall"]},
+    {"q": "send a phone alert to the owner when the task is done", "any": ["notify"]},
+    {"q": "run every checker before calling the round done", "any": ["dev-check"]},
+    {"q": "decide yes or no whether this log shows a failure", "any": ["laya"]},
+    {"q": "find literature and draft a research paper", "any": ["scholar"]},
+    {"q": "test a web page in the browser and take a screenshot", "any": ["browser-docs", "browser", "playwright"]}
+  ]
+}

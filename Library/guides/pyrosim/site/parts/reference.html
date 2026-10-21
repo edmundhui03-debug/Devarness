@@ -1,0 +1,73 @@
+<section id="reference">
+  <p class="kicker">Reference run</p>
+  <h2>Every number in this guide came out of this run</h2>
+
+  <p class="prose">This is the room the whole guide builds: the ISO 9705 test room, 3.6 × 2.4 × 2.4 m, with a 0.8 × 2.0 m door in one end wall and a propane burner in the far corner. The burner holds 100 kW for ten minutes, steps to 300 kW, and holds that for ten more. It is the standard's own ignition programme.</p>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 720 330" role="img" aria-labelledby="plan-t plan-d" preserveAspectRatio="xMidYMid meet">
+        <title id="plan-t">Plan of the reference room and its sensors</title>
+        <desc id="plan-d">A 3.6 by 2.4 metre room with a burner in the far corner, a door centred in the near wall, a sensor node at the room centre, a second node near the door, a thermocouple tree in the near corner and a heat flux gauge at the floor centre.</desc>
+        <g>
+          <rect x="60" y="40" width="450" height="300" fill="none"/>
+          <rect x="60" y="46" width="450" height="240" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>
+          <rect x="60" y="46" width="25" height="25" fill="var(--heat-soft)" stroke="var(--heat)" stroke-width="1.5"/>
+          <line x1="510" y1="96" x2="510" y2="196" stroke="var(--bg)" stroke-width="6"/>
+          <line x1="510" y1="96" x2="510" y2="196" stroke="var(--gas)" stroke-width="2.5"/>
+          <circle cx="290" cy="166" r="5" fill="var(--gas)"/>
+          <circle cx="466" cy="166" r="5" fill="var(--gas)"/>
+          <circle cx="290" cy="166" r="10" fill="none" stroke="var(--gas)" stroke-dasharray="2,2"/>
+          <rect x="462" y="254" width="8" height="8" fill="none" stroke="var(--ink-2)" stroke-width="1.5"/>
+          <path d="M285 161 l10 10 M295 161 l-10 10" stroke="var(--ink-2)" stroke-width="1.2"/>
+        </g>
+        <g font-family="var(--mono)" font-size="11" fill="var(--muted)">
+          <text x="72" y="88" fill="var(--heat)">burner</text>
+          <text x="530" y="150" fill="var(--gas)">door</text>
+          <text x="530" y="166">0.8 m wide</text>
+          <text x="530" y="182">2.0 m high</text>
+          <text x="258" y="196" fill="var(--gas)">S1</text>
+          <text x="452" y="196" fill="var(--gas)">S2</text>
+          <text x="424" y="250">TC tree</text>
+          <text x="246" y="146">flux gauge</text>
+          <text x="285" y="312" text-anchor="middle">3.6 m</text>
+          <text x="36" y="170" text-anchor="middle" transform="rotate(-90 36 170)">2.4 m</text>
+        </g>
+        <g stroke="var(--line)" stroke-width="1">
+          <line x1="60" y1="300" x2="510" y2="300"/><line x1="60" y1="296" x2="60" y2="304"/><line x1="510" y1="296" x2="510" y2="304"/>
+          <line x1="46" y1="46" x2="46" y2="286"/><line x1="42" y1="46" x2="50" y2="46"/><line x1="42" y1="286" x2="50" y2="286"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption><b>Where the sensors sit.</b> S1 and S2 are DATASET zone nodes: temperature, CO and optical density 5 cm below the ceiling, and visibility, FED, O₂ and CO₂ at head height, 1.85 m. The thermocouple tree in the near corner carries seven beads from 0.25 m to 2.35 m, and the same vertical line reports the smoke-layer height.</figcaption>
+  </figure>
+
+  <h3>What the run did</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Time</th><th class="num">HRR</th><th class="num">Ceiling TC</th><th class="num">Upper layer</th><th class="num">Layer height</th><th class="num">CO at S1</th><th class="num">Visibility</th><th class="num">Floor flux</th></tr></thead>
+      <tbody>
+        <tr><td><b>60 s</b></td><td class="num">109 kW</td><td class="num">121 °C</td><td class="num">113 °C</td><td class="num">0.92 m</td><td class="num">22 ppm</td><td class="num">4.8 m</td><td class="num">0.36 kW/m²</td></tr>
+        <tr><td><b>300 s</b></td><td class="num">102 kW</td><td class="num">138 °C</td><td class="num">122 °C</td><td class="num">0.93 m</td><td class="num">25 ppm</td><td class="num">5.2 m</td><td class="num">0.52 kW/m²</td></tr>
+        <tr><td><b>590 s</b> end of stage one</td><td class="num">106 kW</td><td class="num">147 °C</td><td class="num">135 °C</td><td class="num">0.83 m</td><td class="num">22 ppm</td><td class="num">5.1 m</td><td class="num">0.64 kW/m²</td></tr>
+        <tr><td><b>620 s</b> just after the step</td><td class="num">255 kW</td><td class="num">246 °C</td><td class="num">236 °C</td><td class="num">0.84 m</td><td class="num">53 ppm</td><td class="num">3.0 m</td><td class="num">1.49 kW/m²</td></tr>
+        <tr><td><b>900 s</b></td><td class="num">323 kW</td><td class="num">311 °C</td><td class="num">279 °C</td><td class="num">0.81 m</td><td class="num">58 ppm</td><td class="num">2.9 m</td><td class="num">2.94 kW/m²</td></tr>
+        <tr><td><b>1195 s</b> end</td><td class="num">317 kW</td><td class="num">342 °C</td><td class="num">297 °C</td><td class="num">0.87 m</td><td class="num">61 ppm</td><td class="num">3.1 m</td><td class="num">3.73 kW/m²</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Measured from <code>iso9705_room_20cm.fds</code> on a MacBook Air M1, FDS 6.10.1, 20 cm cells, two MPI processes, 8868 s of wall clock for 1200 s of fire. The ceiling thermocouple is the corner tree's top bead at 2.35 m; the upper-layer temperature and layer height come from the layer-zoning device on that same vertical line.</p>
+
+  <h3>Four things to notice before you build it yourself</h3>
+  <ul class="plain">
+    <li><b>The heat release rate is an input, not a result.</b> It tracks the programme because you prescribed it. If your HRR column does not, something is wrong with the burner, not with the fire.</li>
+    <li><b>The smoke layer forms fast and then barely moves.</b> It is down to about 0.9 m within a minute and stays near there for the rest of the run, because the door lets out as much as the fire makes.</li>
+    <li><b>Visibility fails long before heat does.</b> At the room centre it is under 5 m in the first minute, while the floor is still taking well under 1 kW/m² and the exposure dose is negligible. In a real building the smoke is what stops people leaving.</li>
+    <li><b>This run reads cool.</b> Dillon measured about 305 °C at 2.35 m for a 100 kW corner burner in a real ISO room, and about 615 °C at 300 kW. This one gives 147 °C and 342 °C. Day 6 is about that gap.</li>
+  </ul>
+
+  <div class="check">
+    <h4>The case files</h4>
+    <p class="prose">Four files come with this guide. <code>iso9705_room.fds</code> is the reference case on 10 cm cells; <code>iso9705_room_20cm.fds</code> is the same room on 20 cm cells, which is what produced the table above; <code>day6_broken.fds</code> is the Day 6 exercise; <code>iso9705_template.fds</code> is what Day 7's script fills in. Copy any of them from the listings in this guide, save it with a <code>.fds</code> extension, and open it in PyroSim with <span class="ui">File › Import FDS/CAD File</span>.</p>
+  </div>
+</section>

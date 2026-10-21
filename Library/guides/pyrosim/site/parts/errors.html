@@ -1,0 +1,137 @@
+<section id="errors">
+  <p class="kicker">Error finder</p>
+  <h2>The failures that say nothing are the ones that cost you a day</h2>
+
+  <p class="prose">FDS returns a success status even when it fails, and several of the worst beginner mistakes produce no error at all. The table below is the working list. The rows marked <span class="chip bad">silent</span> finish with <code>STOP: FDS completed successfully</code> and a wrong answer; those are the ones to learn by heart.</p>
+
+  <p class="prose">Type any part of a message, a symptom or a keyword to filter. Every message shown here was either produced on a real run or read from the FDS source at the 6.10.1 release tag.</p>
+
+  <div class="finder">
+    <label for="err-filter">Filter</label>
+    <input type="text" id="err-filter" placeholder="sealed, HRRPUA, mesh, licence, instability…" autocomplete="off">
+    <span class="finder-count" data-err-count>0 / 0</span>
+  </div>
+
+  <div class="scroll">
+    <table class="errtab">
+      <thead><tr><th>What you see</th><th>Why</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr data-tags="silent sealed pressure zone open vent door hole">
+          <td><b>The run finishes, but a pressure zone appears</b><span class="msg">Pressure Zone Information — 1 Volume: 2.0732E+01 m3</span><span class="chip bad">silent</span></td>
+          <td>The room has no path to the outside. FDS treats the domain edge as a solid wall unless an OPEN vent says otherwise, and it treats a sealed space as genuinely sealed, so the pressure climbs instead of the smoke leaving.</td>
+          <td>Right-click the mesh and choose <span class="ui">Open Mesh Boundaries</span>, and check the door actually cuts through. A volume close to the room's own volume in that line means the room is the sealed zone.</td>
+        </tr>
+        <tr data-tags="silent hole door wall thickness sealed">
+          <td><b>The door is drawn but the room is still sealed</b><span class="chip bad">silent</span></td>
+          <td>The hole is shallower than the wall, so it does not punch through. In FDS a <code>HOLE</code> must overlap both faces of the <code>OBST</code>; in PyroSim the <span class="ui">Wall Hole</span> tool has its own Wall Thickness, which defaults to 0.2 m and must be at least as thick as the wall.</td>
+          <td>Set the tool's Wall Thickness to match the wall, or in the text file extend the hole a centimetre past each face, as the reference case does with <code>XB=3.59,3.71</code> through a wall at 3.6 to 3.7.</td>
+        </tr>
+        <tr data-tags="silent hrrpua kw units burner fire small">
+          <td><b>The fire is far too small</b><span class="chip bad">silent</span></td>
+          <td><code>HRRPUA</code> is a heat release rate <em>per square metre</em>. Typing the total kilowatts into it makes the fire smaller by the burner's area in square metres.</td>
+          <td>Divide: the ISO burner is 0.17 × 0.17 m, so 100 kW is 3460 kW/m². Check the <code>HRR</code> column of <code>CHID_hrr.csv</code> against what you intended before trusting anything else in the run.</td>
+        </tr>
+        <tr data-tags="silent burner vent zero hrr grid snap">
+          <td><b>The burner is visible but HRR stays at zero</b><span class="chip bad">silent</span></td>
+          <td>The vent is smaller than a cell, or its edges round to the same grid line, so FDS drops it. It does not appear in the vent list in the <code>.smv</code> file either.</td>
+          <td>Draw the burner on cell boundaries and at least one cell across. Use <span class="ui">Snap to Model Grids</span> and check the burner in <span class="ui">FDS Block Preview</span>.</td>
+        </tr>
+        <tr data-tags="silent device outside mesh devc csv column missing warning">
+          <td><b>A sensor column is missing from the CSV</b><span class="msg">WARNING: DEVC S2_T is not within any mesh.</span><span class="chip bad">silent</span></td>
+          <td>The device sits outside every mesh. FDS skips it and carries on, and the warning goes to the console only — there is no line in the <code>.out</code> file.</td>
+          <td>Move it inside the mesh. Read the run log rather than only the CSV; in PyroSim the log is the text in the <span class="ui">FDS Simulation</span> dialog, and <span class="ui">Save Log</span> keeps it.</td>
+        </tr>
+        <tr data-tags="silent soot co yield zero visibility flat propane reaction library">
+          <td><b>CO and smoke stay at zero all run</b><span class="chip bad">silent</span></td>
+          <td>The reaction has no yields. FDS defaults <code>CO_YIELD</code> and <code>SOOT_YIELD</code> to zero, and the library's FDS6 fuel entries, propane included, set only the fuel. Visibility then sits at its 30 m cap and part of the exposure dose never accumulates.</td>
+          <td>Open <span class="ui">Model › Edit Reactions</span>, go to the Byproducts tab and set both. The reference case uses 0.024 soot and 0.005 CO for propane, the values the FDS Validation Guide adopts from Tewarson's measurements.</td>
+        </tr>
+        <tr data-tags="silent inert wall temperature ambient surface">
+          <td><b>A wall or ceiling stays exactly at room temperature</b><span class="chip bad">silent</span></td>
+          <td>Its surface is still <code>INERT</code>, the default, which holds the surface at the ambient temperature.</td>
+          <td>Give it a layered surface with real materials. Do not reach for <code>ADIABATIC</code> instead: the FDS guide says it is for testing only.</td>
+        </tr>
+        <tr data-tags="instability error 374 cfl crash big fire">
+          <td><b>The run stops part way</b><span class="msg">ERROR(374): Numerical Instability - FDS stopped</span></td>
+          <td>The time step collapsed below one ten-thousandth of its initial value. Documented causes include a sudden large change in heat release, cells with an aspect ratio worse than 2:1, a resolution jump at a mesh interface, high-speed flow through a small opening, and a fire too large for the room's ventilation.</td>
+          <td>Read the last time-step block in <code>CHID.out</code> for the mesh where the CFL number or divergence explodes, then open the final Plot3D file FDS writes in Smokeview and look for the spurious velocities. Ramp the fire instead of stepping it, and keep the domain open beyond the door.</td>
+        </tr>
+        <tr data-tags="error 101 typo keyword syntax surf line number">
+          <td><b>FDS stops while reading the file</b><span class="msg">ERROR(101): Problem with SURF number 2, line number 49</span></td>
+          <td>A misspelt or invalid keyword, a missing closing slash, a wrong quote, or a non-ASCII character. FDS names the record type and the line.</td>
+          <td>Go to that line. Note that an unused <code>RAMP</code> with a typo is never read and never complains, so the fault can be in a line you thought was inactive.</td>
+        </tr>
+        <tr data-tags="error 314 reac hrrpua reaction missing">
+          <td><span class="msg">ERROR(314): SURF BURNER Must have a REAC line when using HRRPUA or MLRPUA.</span></td>
+          <td>A burner surface with no reaction defined.</td>
+          <td><span class="ui">Model › Edit Reactions › Add From Library</span>, then set the yields.</td>
+        </tr>
+        <tr data-tags="error 819 open vent interior boundary">
+          <td><span class="msg">ERROR(819): VENT null is OPEN, MIRROR OR PERIODIC and must be on an exterior boundary.</span></td>
+          <td>An OPEN vent was drawn inside the domain, often on an interior wall where a door was meant.</td>
+          <td>OPEN belongs only on the outside faces of a mesh. Model a door as a hole through the wall.</td>
+        </tr>
+        <tr data-tags="error 820 vent solid backing ior floating">
+          <td><span class="msg">ERROR(820): VENT 1 has no solid backing or an orientation index (IOR) is needed.</span></td>
+          <td>The vent is floating in air. A vent must sit on a solid face or a mesh boundary.</td>
+          <td>Put it on the face of an obstruction, or give it an orientation. The 6.11 wording differs: <span class="msg">VENT &lt;id&gt; is not attached to any solid surface.</span></td>
+        </tr>
+        <tr data-tags="error 431 mesh alignment multiple meshes">
+          <td><span class="msg">ERROR(431): MESH 2 is out of alignment with MESH 1</span></td>
+          <td>Abutting meshes whose cells do not match in cross-section or in an integer ratio.</td>
+          <td>Make the shared face line up. To check without running, set the end time to zero — the alignment error still prints, and the run ends with <code>STOP: Set-up only</code>.</td>
+        </tr>
+        <tr data-tags="error 112 mpi processes meshes parallel">
+          <td><span class="msg">ERROR(112): The number of MPI processes, 2, exceeds the number of meshes, 1</span></td>
+          <td>A parallel run asks for more processes than there are meshes. One mesh takes one process.</td>
+          <td>Split the model into more meshes, or run fewer processes. Keep the fire inside one mesh.</td>
+        </tr>
+        <tr data-tags="error 108 chid period name spaces">
+          <td><span class="msg">ERROR(108): No periods allowed in CHID</span></td>
+          <td>The job name contains a full stop. Spaces are out too, and the same rule applies to the folder name.</td>
+          <td>Use underscores: <code>room_v1</code>, not <code>room.v1</code>.</td>
+        </tr>
+        <tr data-tags="error 109 stop file resume">
+          <td><span class="msg">ERROR(109): Remove the file, case.stop, from the current directory</span></td>
+          <td>A previous run was stopped and left its <code>.stop</code> file behind.</td>
+          <td>Delete it, or resume the run with <span class="ui">Analysis › Resume FDS</span>, which restarts from the checkpoint.</td>
+        </tr>
+        <tr data-tags="pyrosim end time 0.001 nothing happens run">
+          <td><b>The run ends immediately with nothing in it</b></td>
+          <td>A new PyroSim model has a simulation end time of 0.001 s, which must be changed before anything happens. FDS's own default is 1 s.</td>
+          <td><span class="ui">Analysis › Simulation Parameters › Time</span>, set the end time.</td>
+        </tr>
+        <tr data-tags="pyrosim slow defender antivirus windows performance">
+          <td><b>FDS runs far slower than expected on Windows</b></td>
+          <td>Windows Defender scanning the solver. The installer adds exclusions for the bundled FDS, but not for an FDS you point at yourself.</td>
+          <td>Add file and process exclusions for <code>fds.exe</code> and <code>fds_openmp.exe</code> in Windows Security.</td>
+        </tr>
+        <tr data-tags="pyrosim licence activation key host id floating">
+          <td><b>The licensing dialog opens at start-up</b></td>
+          <td>PyroSim cannot find a licence.</td>
+          <td><span class="ui">Help › License</span>. A node-locked licence takes a 22-character activation key, or a licence file generated from the host ID shown in the dialog. A floating licence takes the server name and port 52100.</td>
+        </tr>
+        <tr data-tags="pyrosim mpi password parallel register windows">
+          <td><b>Parallel runs ask for a password, repeatedly</b></td>
+          <td>MPI on Windows needs a password-protected account.</td>
+          <td>Set an account password, then in the install's <code>fds\mpi</code> folder run <code>mpiexec -remove</code>, <code>mpiexec -register</code> and <code>mpiexec -validate</code>.</td>
+        </tr>
+        <tr data-tags="batch exit status 0 scripting success grep">
+          <td><b>A batch reports success for runs that failed</b></td>
+          <td>FDS returns exit status 0 after set-up errors and after a numerical instability. The status tells you nothing.</td>
+          <td>Search each log for the exact line <code>STOP: FDS completed successfully</code>, and flag any <code>ERROR(</code>, any device warning and any unexpected pressure zone.</td>
+        </tr>
+        <tr data-tags="batch overwrite results chid scenarios">
+          <td><b>Every variant overwrites the last one's results</b></td>
+          <td>Output files are named from the CHID, so two runs with the same CHID share files.</td>
+          <td>One CHID per variant, and one folder per variant. In PyroSim use <span class="ui">File › Export › Export Scenarios</span> rather than running scenarios one at a time.</td>
+        </tr>
+        <tr data-tags="disk space slices smoke3d storage">
+          <td><b>The disk fills during a batch</b></td>
+          <td>Slice, boundary and 3D smoke files are written a thousand times per run by default, whatever the run length.</td>
+          <td>Set the output intervals explicitly on the Output tab, keep only the slices you need, and turn 3D smoke off for data runs.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>

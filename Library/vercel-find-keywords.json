@@ -1,0 +1,22 @@
+{
+  "react": ["react", "jsx"],
+  "nextjs": ["nextjs", "next.js"],
+  "typescript": ["typescript"],
+  "python": ["python"],
+  "testing": ["testing", "test", "tests", "pytest", "測試"],
+  "code review": ["code review", "review code", "審查程式"],
+  "debugging": ["debug", "debugging", "traceback", "除錯"],
+  "refactoring": ["refactor", "refactoring", "重構"],
+  "web design": ["website", "frontend", "web design", "網頁", "網站"],
+  "accessibility": ["accessibility", "wcag", "無障礙"],
+  "deployment": ["deploy", "deployment", "部署"],
+  "docker": ["docker", "container"],
+  "git": ["git", "github", "pull request"],
+  "documentation": ["documentation", "readme", "markdown", "文檔"],
+  "pdf": ["pdf"],
+  "spreadsheets": ["spreadsheet", "spreadsheets", "excel", "xlsx", "試算表"],
+  "presentations": ["presentation", "slides", "powerpoint", "簡報"],
+  "diagram": ["diagram", "architecture", "流程圖", "架構圖"],
+  "security": ["security", "安全"],
+  "agent skills": ["skill", "skills", "find-skills", "技能"]
+}

@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""notify — push a phone alert through ntfy when an agent finishes work.
+
+  notify done <agent> <task> <what to review...>   a task the owner assigned is done
+  notify needs-owner <agent> <task> <what...>      stopped: the owner must decide
+  notify test [agent]                              one test alert
+  notify check                                     topic configured? (no network)
+  notify hook claude|codex|pi                      turn-end hook; the client sends JSON on stdin
+
+The agents are Peter (Claude Code), Aster (Codex) and May (Pi); a hook names
+the agent from its client. Any agent name works for done and needs-owner, so a
+new agent joins by calling it with its own name; the rule that every agent must
+is in the root CLAUDE.md.
+
+The hooks alert automatically when one turn ran DEVARNESS_NOTIFY_MINUTES (default 10)
+or longer, unless the agent already sent `done` or `needs-owner` during it.
+
+The topic is a key: anyone who knows it can read and post. It lives outside
+git, in ~/.config/devarness/ntfy-topic (or DEVARNESS_NTFY_TOPIC); never put a secret in a
+message. Server: DEVARNESS_NTFY_SERVER, default https://ntfy.sh.
+
+Standard-library Python 3.9 or later. A hook never fails the agent's turn.
+"""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import platform
+import sys
+import time
+from datetime import datetime
+import urllib.request
+
+# Standalone, not common.config_dir(): a hook run from a copy of this file must still load.
+CONF = Path.home() / ".config" / "devarness"
+TOPIC_FILE = CONF / "ntfy-topic"
+DEVICE = {"Windows": "Windows", "Darwin": "Mac"}.get(platform.system(), platform.system())
+PRIORITY = {"done": 4, "needs-owner": 5, "auto": 4, "test": 3}
+TAGS = {"done": ["white_check_mark"], "needs-owner": ["warning"],
+        "auto": ["hourglass_flowing_sand"], "test": ["bell"]}
+AGENTS = {"claude": "Peter", "codex": "Aster", "pi": "May"}   # the client each agent runs in
+
+
+def topic() -> str:
+    t = os.environ.get("DEVARNESS_NTFY_TOPIC", "").strip()
+    if not t and TOPIC_FILE.is_file():
+        t = TOPIC_FILE.read_text(encoding="utf-8").strip()
+    return t
+
+
+def send(kind: str, agent: str, message: str) -> None:
+    t = topic()
+    if not t:
+        raise RuntimeError(f"no ntfy topic: write it to {TOPIC_FILE} or set DEVARNESS_NTFY_TOPIC")
+    body = {"topic": t, "title": f"{agent} · {DEVICE}", "message": message,
+            "priority": PRIORITY[kind], "tags": TAGS[kind]}
+    server = os.environ.get("DEVARNESS_NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+    req = urllib.request.Request(server, data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        if r.status != 200:
+            raise RuntimeError(f"ntfy answered {r.status}")
+    if kind in ("done", "needs-owner"):
+        reported(agent)
+
+
+def last_sent(agent: str) -> Path:
+    """Per agent: one agent's report must not silence another's alert (Aster, 2026-10-03)."""
+    return CONF / ("ntfy-last-sent-" + agent.lower())
+
+
+def reported(agent: str) -> None:
+    CONF.mkdir(parents=True, exist_ok=True)
+    last_sent(agent).write_text(str(time.time()), encoding="utf-8")
+
+
+def task_message(kind: str, agent: str, task: str, what: str) -> str:
+    if kind == "done":
+        return f'{agent} has done the running of "{task}" on the {DEVICE} device, please review {what}'
+    return f'{agent} stopped on "{task}" on the {DEVICE} device and needs you: {what}'
+
+
+def auto(agent: str, started: float | None, summary: str) -> None:
+    """Alert for a long turn, unless the agent already reported it."""
+    if started is None:
+        return
+    minutes = (time.time() - started) / 60
+    if minutes < float(os.environ.get("DEVARNESS_NOTIFY_MINUTES", "10")):
+        return
+    try:
+        if float(last_sent(agent).read_text(encoding="utf-8")) >= started:
+            return
+    except (OSError, ValueError):
+        pass
+    summary = " ".join(summary.split())
+    if len(summary) > 200:
+        summary = summary[:197] + "..."
+    msg = f"{agent} has finished a {minutes:.0f}-minute run on the {DEVICE} device"
+    send("auto", agent, msg + (f": {summary}" if summary else ", please review."))
+
+
+def iso(ts: str) -> float:
+    return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+
+
+def typed(content) -> bool:
+    """A prompt the owner typed: text, or blocks of text and images (a pasted image);
+    never a tool result or a notice the client injects."""
+    if isinstance(content, list):
+        kinds = {block.get("type") for block in content if isinstance(block, dict)}
+        if not kinds or not kinds <= {"text", "image"}:
+            return False
+        content = " ".join(block.get("text", "") for block in content if block.get("type") == "text")
+    return isinstance(content, str) and not content.lstrip().startswith(
+        ("<task-notification>", "<local-command", "<command-"))
+
+
+def claude_turn(transcript: Path) -> tuple[float | None, str]:
+    """Start of the last prompt the owner typed, and the last reply's text.
+
+    Claude's transcript types each entry user or assistant; Pi's session file
+    types it message and puts the role inside, so both read the same way."""
+    started, reply = None, ""
+    for line in transcript.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        message = r.get("message") or {}
+        kind = message.get("role") if r.get("type") == "message" else r.get("type")
+        content = message.get("content")
+        if kind == "user" and not r.get("isMeta") and typed(content):
+            started, reply = iso(r["timestamp"]), ""
+        elif kind == "assistant" and isinstance(content, list):
+            text = " ".join(c.get("text", "") for c in content if c.get("type") == "text")
+            reply = text or reply
+    return started, reply
+
+
+def codex_turn(transcript: Path) -> float | None:
+    """Start of the last turn: the rollout's last task_started event."""
+    started = None
+    for line in transcript.read_text(encoding="utf-8", errors="replace").splitlines():
+        if '"task_started"' in line:
+            started = iso(json.loads(line)["timestamp"])
+    return started
+
+
+def main(argv: list[str]) -> int:
+    cmd = argv[0] if argv else "--help"
+    if cmd in ("done", "needs-owner") and len(argv) >= 4:
+        send(cmd, argv[1], task_message(cmd, argv[1], argv[2], " ".join(argv[3:])))
+        print(f"sent: {cmd} from {argv[1]}")
+        return 0
+    if cmd == "test":
+        agent = argv[1] if len(argv) > 1 else "Peter"
+        send("test", agent, f"Test alert from {agent} on the {DEVICE} device. notify works.")
+        print(f"sent: test from {agent}")
+        return 0
+    if cmd == "check":
+        t = topic()
+        print(f"notify: topic set ({len(t)} characters)" if t
+              else f"notify: FAILED no topic in {TOPIC_FILE} or DEVARNESS_NTFY_TOPIC")
+        return 0 if t else 1
+    if cmd == "hook" and len(argv) >= 2:
+        try:  # a hook reports a problem and never fails the agent's turn
+            data = json.load(sys.stdin)  # both clients send the same Stop shape
+            transcript = Path(data["transcript_path"])
+            if data.get("stop_hook_active"):
+                pass
+            elif argv[1] in ("claude", "pi"):
+                started, reply = claude_turn(transcript)
+                auto(AGENTS[argv[1]], started, data.get("last_assistant_message") or reply)
+            elif argv[1] == "codex":
+                auto(AGENTS["codex"], codex_turn(transcript), data.get("last_assistant_message") or "")
+        except Exception as e:  # noqa: BLE001
+            print(f"notify hook: {e}", file=sys.stderr)
+        return 0
+    print(__doc__)
+    return 0 if cmd in ("--help", "-h") else 2
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Exception as e:  # noqa: BLE001
+        print(f"notify: FAILED {e}", file=sys.stderr)
+        sys.exit(1)

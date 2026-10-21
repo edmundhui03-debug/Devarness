@@ -1,0 +1,1064 @@
+[
+  {
+    "collection": "superpowers",
+    "kind": "skill",
+    "root": "Library/superpowers",
+    "pattern": "skills/*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Process gates",
+    "scope": ".",
+    "mode": "always-on"
+  },
+  {
+    "collection": "ecc",
+    "kind": "skill",
+    "root": "Library/ECC/skills",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Specialist agents",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "ecc",
+    "kind": "command",
+    "root": "Library/ECC/commands",
+    "pattern": "**/*.md",
+    "owner_ref": "CLAUDE.md|Specialist agents",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "ecc",
+    "kind": "agent",
+    "root": "Library/ECC/agents",
+    "pattern": "*.md",
+    "owner_ref": "CLAUDE.md|Specialist agents",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pocock",
+    "kind": "skill",
+    "root": "Library/skills/skills/engineering",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Grilling a plan",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pocock",
+    "kind": "skill",
+    "root": "Library/skills/skills/productivity",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Grilling a plan",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pocock",
+    "kind": "skill",
+    "root": "Library/skills/skills/misc",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Grilling a plan",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pocock",
+    "kind": "skill",
+    "root": "Library/skills/skills/in-progress",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Grilling a plan",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "codex",
+    "kind": "skill",
+    "root": "Library/codex-plugin-cc/plugins/codex/skills",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Review or a second opinion",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "codex",
+    "kind": "command",
+    "root": "Library/codex-plugin-cc/plugins/codex/commands",
+    "pattern": "*.md",
+    "owner_ref": "CLAUDE.md|Review or a second opinion",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/archify",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Technical diagrams",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/diagram-design",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Other editorial diagrams",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/browser-docs",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Browser interaction",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/delegate",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Delegating",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/grill-first",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Process gates",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/markdown-format",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Writing or editing any Markdown",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/bilingual-page",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Building any HTML page",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/pyrosim",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Fire simulation",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/retro-last",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Grilling a plan",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/harness-step",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Improving the agent harness",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/task-support",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Concise task output",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/library",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Finding a specialist tool",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/library-intake",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|An owner-pasted",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/markitdown",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Reading PDF",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/ponytail",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Simplicity",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/tieitup",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Simplicity",
+    "scope": ".",
+    "mode": "always-on"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": ".claude/skills/prompt-master",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Writing or fixing a prompt",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "archify",
+    "owner_ref": "CLAUDE.md|Technical diagrams",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "books",
+    "owner_ref": "CLAUDE.md|An optional local book collection",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "browser",
+    "owner_ref": "CLAUDE.md|Browser interaction",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "dev-check",
+    "owner_ref": "CLAUDE.md|Checking a reusable release",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "claude-start",
+    "owner_ref": "CLAUDE.md|The start check",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "codex-start",
+    "owner_ref": "CLAUDE.md|The start check",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "diagram",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "fds-setup",
+    "owner_ref": "CLAUDE.md|Fire simulation",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "i18n",
+    "owner_ref": "CLAUDE.md|Building any HTML page",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "laya-service",
+    "owner_ref": "CLAUDE.md|A short closed decision",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "learn-claude",
+    "owner_ref": "CLAUDE.md|Agent harness",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "library",
+    "owner_ref": "CLAUDE.md|Finding a specialist tool",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "md-format",
+    "owner_ref": "CLAUDE.md|Writing or editing any Markdown",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "agent-memory",
+    "owner_ref": "CLAUDE.md|Checking optional client memory files",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "new-device",
+    "owner_ref": "CLAUDE.md|Bringing up the portable workspace",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "ngspice-setup",
+    "owner_ref": "CLAUDE.md|PCB circuit simulation",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "notify",
+    "owner_ref": "CLAUDE.md|Telling the owner's phone",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "ocr",
+    "owner_ref": "CLAUDE.md|OCR",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "start-check",
+    "owner_ref": "CLAUDE.md|The start check",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "statusline",
+    "owner_ref": "CLAUDE.md|The statusline",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "task-recall",
+    "owner_ref": "CLAUDE.md|What happened to a project",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "tieitup",
+    "owner_ref": "CLAUDE.md|Simplicity",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "understand",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "update-tools",
+    "owner_ref": "CLAUDE.md|Keeping clones",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "video-study",
+    "owner_ref": "CLAUDE.md|Studying a video",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "md-pages",
+    "owner_ref": "CLAUDE.md|Reading PDF",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "rea",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "reverse",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "dashboard",
+    "owner_ref": "CLAUDE.md|The developer's dashboard",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "command",
+    "root": "Library/bin",
+    "pattern": "taskboard",
+    "owner_ref": "CLAUDE.md|The developer's dashboard",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "guide",
+    "root": "Library/dashboard",
+    "pattern": "AGENTS.md",
+    "owner_ref": "CLAUDE.md|The developer's dashboard",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "mcp",
+    "root": "Library/setup/mcp",
+    "pattern": "laya.md",
+    "owner_ref": "CLAUDE.md|A short closed decision",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "mcp",
+    "root": "Library/setup/mcp",
+    "pattern": "rea.md",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "guide",
+    "root": "Library/guides",
+    "pattern": "learn-claude-code.md",
+    "owner_ref": "CLAUDE.md|Agent harness",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "guide",
+    "root": "Library/guides",
+    "pattern": "managed-agents.md",
+    "owner_ref": "CLAUDE.md|Building on the Claude API",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pyrosim",
+    "kind": "guide",
+    "root": "Library/guides/pyrosim",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Fire simulation",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "setup",
+    "kind": "guide",
+    "root": "Library/setup",
+    "pattern": "*.md",
+    "owner_ref": "CLAUDE.md|Finding a specialist tool",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-chat",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-dashboard",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-diff",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-domain",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-explain",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-figma",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-knowledge",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "dev",
+    "kind": "skill",
+    "root": "Library/Understand-Anything/understand-anything-plugin/skills/understand-onboard",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "understand",
+    "kind": "agent",
+    "root": "Library/Understand-Anything/understand-anything-plugin/agents",
+    "pattern": "*.md",
+    "owner_ref": "CLAUDE.md|Codebase or knowledge graphs",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "research-ideation/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "citation-verification/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "ml-paper-writing/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "paper-self-review/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "writing-anti-ai/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "nature-polishing/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "results-analysis/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "results-report/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "publication-chart-skill/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "review-response/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "post-acceptance/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "latex-conference-template-organizer/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "daily-paper-generator/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "scholar",
+    "kind": "skill",
+    "root": "Library/claude-scholar/skills",
+    "pattern": "expression-skill/SKILL.md",
+    "owner_ref": "CLAUDE.md|Literature",
+    "scope": "Projects",
+    "mode": "library-only"
+  },
+  {
+    "collection": "rea",
+    "kind": "skill",
+    "root": "Library/rea/skills/reverse-engineer-anything",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "rea",
+    "kind": "guide",
+    "root": "Library/rea",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "reverse-skill",
+    "kind": "skill",
+    "root": "Library/reverse-skill/plugins/reverse-skill/skills/reverse-skill-router",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "task-triggered"
+  },
+  {
+    "collection": "reverse-skill",
+    "kind": "guide",
+    "root": "Library/reverse-skill",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Reverse-engineering",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "kicad-happy",
+    "kind": "skill",
+    "root": "Library/pcb/kicad-happy/skills",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "konnect",
+    "kind": "guide",
+    "root": "Library/pcb/Konnect",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "kicad-mcp",
+    "kind": "guide",
+    "root": "Library/pcb/KiCAD-MCP-Server",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pcb-designer",
+    "kind": "guide",
+    "root": "Library/pcb/pcb-designer-ai-agent",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "playwright",
+    "kind": "skill",
+    "root": "Library/playwright-cli/skills/playwright-cli",
+    "pattern": "SKILL.md",
+    "owner_ref": "CLAUDE.md|Browser interaction",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "archify",
+    "kind": "guide",
+    "root": "Library/archify",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Technical diagrams",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "cship",
+    "kind": "guide",
+    "root": "Library/cship",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|The statusline",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "docling",
+    "kind": "guide",
+    "root": "Library/docling",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|OCR",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "i-have-adhd",
+    "kind": "guide",
+    "root": "Library/i-have-adhd",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Concise task output",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "learn-claude-code",
+    "kind": "guide",
+    "root": "Library/learn-claude-code",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Agent harness",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "harness2",
+    "kind": "guide",
+    "root": "Library/harness2",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Improving the agent harness",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "markitdown",
+    "kind": "guide",
+    "root": "Library/markitdown",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Reading PDF",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "ponytail",
+    "kind": "guide",
+    "root": "Library/ponytail",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Simplicity",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "prompt-master",
+    "kind": "guide",
+    "root": "Library/prompt-master",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Writing or fixing a prompt",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "laya",
+    "kind": "guide",
+    "root": "Library/laya",
+    "pattern": "LOCAL_SETUP.md",
+    "owner_ref": "CLAUDE.md|A short closed decision",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "karpathy",
+    "kind": "skill",
+    "root": "Library/karpathy-skills/skills",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|How code is written",
+    "scope": ".",
+    "mode": "always-on"
+  },
+  {
+    "collection": "karpathy",
+    "kind": "guide",
+    "root": "Library/karpathy-skills",
+    "pattern": "EXAMPLES.md",
+    "owner_ref": "CLAUDE.md|How code is written",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "anthropic-design",
+    "kind": "skill",
+    "root": "Library/anthropic-design/skills",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|Optional static artwork",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "vercel",
+    "kind": "skill",
+    "root": "Library/vercel-skills/skills",
+    "pattern": "*/SKILL.md",
+    "owner_ref": "CLAUDE.md|External skill discovery",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "heypcb",
+    "kind": "guide",
+    "root": "Library/pcb/heypcb-mcp",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "heypcb",
+    "kind": "mcp",
+    "root": "Library/setup/mcp",
+    "pattern": "heypcb.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "konnect",
+    "kind": "mcp",
+    "root": "Library/setup/mcp",
+    "pattern": "konnect.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "kicad-mcp",
+    "kind": "mcp",
+    "root": "Library/setup/mcp",
+    "pattern": "kicad-mcp.md",
+    "owner_ref": "CLAUDE.md|KiCad schematic",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pstack",
+    "kind": "skill",
+    "root": "Library/pstack",
+    "pattern": "**/SKILL.md",
+    "owner_ref": "CLAUDE.md|Supplementary engineering",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pstack",
+    "kind": "agent",
+    "root": "Library/pstack/agents",
+    "pattern": "*.md",
+    "owner_ref": "CLAUDE.md|Supplementary engineering",
+    "scope": ".",
+    "mode": "library-only"
+  },
+  {
+    "collection": "pstack",
+    "kind": "guide",
+    "root": "Library/pstack",
+    "pattern": "README.md",
+    "owner_ref": "CLAUDE.md|Supplementary engineering",
+    "scope": ".",
+    "mode": "library-only"
+  }
+]

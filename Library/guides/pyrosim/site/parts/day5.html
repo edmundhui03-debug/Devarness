@@ -1,0 +1,210 @@
+<section id="day5">
+  <div class="day-head">
+    <div><p class="kicker">Day 5</p><h2>Today you start the solver, watch it work, and read what it wrote down</h2></div>
+    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+  </div>
+  <div class="goal"><span class="g-l">Goal</span><p>One finished FDS run of your own room, plus enough of its log and its CSV files read to say whether the run is worth keeping.</p></div>
+
+  <p class="phase">Learn</p>
+
+  <p class="prose">PyroSim has been building an FDS input file for four days. Today it hands that file to FDS, and FDS does the physics. Everything you watch from now on is FDS talking; PyroSim starts it, shows you its log, and opens the results afterwards.</p>
+
+  <p class="prose">There are two launchers, and they are not the same thing. <span class="ui">Run FDS</span> starts one FDS process. Thunderhead's own wording is that simulations launched this way can use multiple OpenMP threads, but will not use multiple MPI processes. <span class="ui">Run FDS Parallel</span> starts several FDS processes and gives each one its own mesh.</p>
+
+  <p class="prose">The rule that decides between them is short: one MPI process per mesh, and never more processes than meshes. Ask for more and FDS stops before it starts, with <code>ERROR(112)</code> and the message "The number of MPI processes, 2, exceeds the number of meshes, 1". That message was reproduced on the Mac used for this guide. The second half of the rule is about the machine rather than the model: do not ask for more processes than the desktop has logical processors.</p>
+
+  <ul class="plain">
+    <li>The room you built has two meshes — the room and the box outside the door — so <span class="ui">Run FDS Parallel</span> can use two MPI processes.</li>
+    <li>A model with one mesh gains nothing from the parallel launcher. Use <span class="ui">Run FDS</span>.</li>
+    <li>Spare cores go to OpenMP threads instead. The FDS User's Guide is blunt about what that buys: "Typically, the use of OpenMP speeds the calculation by at most factor of 2."</li>
+  </ul>
+
+  <p class="prose">More processes is not automatically faster, and the ceiling is set by your machine rather than by your model. The guide's own Mac was measured on exactly this case, 10 cm cells and 46,656 of them, changing nothing but the number of meshes:</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Meshes</th><th>MPI processes</th><th class="num">Wall clock for 4 s of fire</th><th>Against two</th></tr></thead>
+    <tbody>
+      <tr><td>2</td><td class="num">2</td><td class="num">21 s</td><td>the configuration this guide ships</td></tr>
+      <tr><td><b>4</b></td><td class="num">4</td><td class="num">15 s</td><td><b>1.4× faster</b></td></tr>
+      <tr><td>6</td><td class="num">6</td><td class="num">19 s</td><td>slower than four</td></tr>
+      <tr><td>8</td><td class="num">8</td><td class="num">24 s</td><td>slower than two</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="prose">That machine reports eight cores, but four of them are efficiency cores and four are performance cores. MPI processes advance in step and exchange data at every time step, so the moment one process lands on a slow core it sets the pace for all of them. Eight processes came out worse than two. The number to match is the count of <em>real</em> cores, and the only way to know it is to measure.</p>
+
+  <div class="check">
+    <h4>If you split a mesh for speed</h4>
+    <p class="prose">Splitting a mesh to get more processes is a change to the model, not only to the schedule. On this case the four-mesh split read about 3 % hotter at the ceiling than the two-mesh original, at every sample over two minutes — small, well inside the model uncertainty FDS itself reports, and far smaller than a change of cell size, but consistent and therefore real. If you split for speed, say so when you report the result, and do not compare a split run against an unsplit one as though only the clock had changed.</p>
+  </div>
+
+  <details class="deeper"><summary>What MPI and OpenMP actually split</summary><div class="d-in">
+    <p class="prose">MPI splits the model. Each process owns whole meshes, holds them in its own memory, and swaps boundary data with its neighbours at every time step. That is why the count is tied to meshes and not to cores: a process with no mesh has nothing to do.</p>
+    <p class="prose">OpenMP splits the work inside one process across threads on the same machine. It needs no extra meshes, and it helps much less. PyroSim sets the counts itself — up to four threads for <span class="ui">Run FDS</span> and one for <span class="ui">Run FDS Parallel</span> — and Thunderhead recommends not changing them.</p>
+    <p class="prose">There is a consequence worth remembering on a shared office desktop. Thunderhead's own advice is that you may get more total work finished faster by running four simultaneous four-mesh problems on sixteen cores than by throwing everything at one job. On Day 7, when you want many runs rather than one fast run, that is the whole game.</p>
+  </div></details>
+
+  <p class="prose">Where the run lands is decided by where you saved the model. PyroSim creates a sub-directory of the current PyroSim file: the documentation's example is that a model saved as <code>C:\pyrosim_files\switchgear.psm</code> puts its results in <code>C:\pyrosim_files\switchgear</code>. The exported <code>.fds</code> file, the geometry files and every output FDS writes all go there. The slice and 3-D smoke files dwarf everything else in that folder, so choose the disk deliberately rather than by accident.</p>
+
+  <div class="watch"><h4>Watch out</h4>
+    <p class="prose">Do not save the model inside OneDrive, or on a network drive. The FDS User's Guide states it plainly: "Saving files to a network share or a folder controlled by a cloud service (e.g. OneDrive) can result in simulation failures if a network issue or a file lock during automated backup results in Windows preventing FDS from writing data to a file." The run is writing to those files continuously for hours, so a single lock during a sync can end it.</p>
+    <p class="prose">On a managed office build, <code>Documents</code> is often redirected into OneDrive without saying so. Check the real path before you run, not after. The related symptom is <code>forrtl: severe (47)</code>, a write to a read-only file; the documented answers are to run from a folder on a drive physically attached to the machine and outside system folders, and, as a last resort, to add <code>FLUSH_FILE_BUFFERS=F</code> to the <code>&amp;DUMP</code> line.</p>
+  </div>
+
+  <p class="prose">The window that opens when the run starts is titled <code>FDS Simulation - &lt;your file&gt;.fds</code>. The Fundamentals tutorial calls it "the Run dialog"; the title bar is the software's own name, and where the two disagree the software wins. It carries a log pane that repeats what FDS prints, a Progress bar, Time Elapsed, Time Remaining, a <span class="ui">Show results when finished</span> checkbox, and the buttons <span class="ui">Kill</span>, <span class="ui">Stop</span>, <span class="ui">Show Results</span>, <span class="ui">Save Log</span> and <span class="ui">Open Folder</span>. You can minimise it and carry on using PyroSim, and you can even start another simulation.</p>
+
+  <p class="prose"><span class="ui">Stop</span> and <span class="ui">Kill</span> are not two words for the same button. <span class="ui">Stop</span> writes a <code>.stop</code> file that signals FDS to stop and also writes a checkpoint file, which often takes a noticeable moment; <span class="ui">Resume FDS</span> on the Analysis menu can then continue the run with a restart flag. <span class="ui">Kill</span> terminates FDS immediately and you will not be able to resume. Use <span class="ui">Stop</span> unless the run is producing nonsense and you want it gone. One trap follows from it: a <code>.stop</code> file left in the folder stops the next run with <code>ERROR(109)</code>, telling you to remove that file. Delete it, or resume instead of starting again.</p>
+
+  <details class="deeper"><summary>Treat a resumed run as a convenience, not a guarantee</summary><div class="d-in">
+    <p class="prose">The FDS User's Guide describes restart as "a fragile construct". It works, and it has saved long jobs, but a resumed run is not the same object as a run that went from start to end in one go. For the reference case in this guide, and for anything you will report, prefer one uninterrupted run.</p>
+  </div></details>
+
+  <p class="phase">Build</p>
+
+  <p class="prose">Run the short pilot first, then the real thing. The FDS User's Guide gives the same order for a different reason: "Initial calculations ought to be meshed coarsely so that the run times are less than an hour and corrections can easily be made without wasting too much time."</p>
+
+  <ol class="steps">
+    <li><div><p><span class="path">File › Save</span> — save the model into a folder on a local drive, outside any synced folder, with no spaces in the folder names. Keep the file name to letters, digits and underscores: a period in the job name stops FDS at set-up with <code>ERROR(108)</code>, "No periods allowed in CHID". A space is not caught by that check, but the FDS User's Guide asks for none either, in the job name or in any directory above it. If the model is already sitting in a synced folder, close PyroSim, move the folder in Windows Explorer, and open it from its new home.</p></div></li>
+    <li><div><p><span class="path">File › Preferences › FDS</span> — confirm <span class="ui">Auto-Save PyroSim Model Before Running FDS</span> is ticked, so a crash cannot take the last hour of edits with it. On the same tab, Parallel Execution Settings decides how many MPI processes the parallel launcher asks for: <span class="ui">Create Process for Each Mesh</span>, or <span class="ui">Limit Processes Based on Logical Processor Count</span>, which is the default.</p></div></li>
+    <li><div><p><span class="path">Analysis › Simulation Parameters › Time</span> — set End Time to <span class="val">60</span> s for the pilot. PyroSim's own default is 0.001 s and has to be changed for any run to do anything.</p></div></li>
+    <li><div><p><span class="path">Analysis › Run Model Checks</span> — read what it reports before you start the solver. It costs seconds and it catches things the input file would only complain about later.</p></div></li>
+    <li><div><p><span class="path">Analysis › Run FDS Parallel</span> — for the two-mesh room. With a single mesh use <span class="path">Analysis › Run FDS</span> instead. Either one is also on the green play button on the File toolbar and its drop-down.</p></div></li>
+    <li><div><p>Watch the FDS Simulation window while the pilot runs. Read the log rather than the progress bar: FDS prints a diagnostics block every 100 time steps, and warnings appear there first. Time Remaining is PyroSim's estimate rather than a measurement, so size the long run from the pilot below rather than from that field.</p></div></li>
+    <li><div><p>When it finishes, press <span class="ui">Save Log</span> and keep the text file beside the run. Then press <span class="ui">Open Folder</span> and open <code>&lt;job&gt;.out</code>. The last two lines before the status line give Time Stepping Wall Clock Time and Total Elapsed Wall Clock Time, both in seconds. That number, not the progress bar, is what you scale from.</p></div></li>
+    <li><div><p>Set End Time to <span class="val">1200</span> s and run again. Expect the estimate from the pilot to be rough: FDS changes its time step as the flow speeds up, and the fire is three times larger in the second half of this programme than in the first.</p></div></li>
+  </ol>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The FDS Simulation window about halfway through the pilot run, with the title bar, the last few lines of the log, Progress, Time Elapsed and Time Remaining all visible in one frame.</p></div></div>
+
+  <p class="prose">The honest cost, so nobody is surprised. The reference run for this guide — the same room, 20 cm cells, the full 1200 s programme, two MPI processes — took 8868 s of total elapsed wall clock on the Mac that produced the numbers below. That is about 2 hours 28 minutes for 20 minutes of fire. A different machine will not match it, and refining the mesh does not cost proportionally: Thunderhead puts the price of halving the cell size at roughly sixteen times the run time, not twice. Time your own desktop with the 60 s pilot before you commit an afternoon to a long run.</p>
+
+  <p class="phase">Learn</p>
+
+  <p class="prose">A finished run leaves a folder with dozens of files in it. Six of them matter today.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>File</th><th>What it holds</th></tr></thead>
+    <tbody>
+      <tr><td><b>&lt;job&gt;.out</b></td><td>The diagnostics log. What FDS thought you asked for, a block every 100 time steps, and the final status line.</td></tr>
+      <tr><td><b>&lt;job&gt;_devc.csv</b></td><td>Every device, one column each, one row per device output interval.</td></tr>
+      <tr><td><b>&lt;job&gt;_hrr.csv</b></td><td>Heat release rate and the energy budget, plus one pressure column for each pressure zone if any exist.</td></tr>
+      <tr><td><b>&lt;job&gt;_steps.csv</b></td><td>Time Step, Wall Time, Step Size, Simulation Time and CPU Time — one row per printed diagnostics block, not one per step. The reference run wrote 508 rows for 48,968 time steps.</td></tr>
+      <tr><td><b>&lt;job&gt;_cpu.csv</b></td><td>Where the wall clock went, per MPI rank and per routine.</td></tr>
+      <tr><td><b>&lt;job&gt;.smv</b></td><td>The index file. This is what Results and Smokeview open; the slice, smoke and boundary files beside it are the bulk.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="prose">Two viewers can open that <code>.smv</code> file, and they are different programs. PyroSim Results is Thunderhead's viewer and needs a PyroSim or Pathfinder licence; it opens on its own at the end of a run when <span class="ui">Show results when finished</span> is ticked, or when <span class="ui">Run Results When FDS Simulation Completes</span> is on in the FDS preferences. Otherwise open it from the <span class="ui">Results</span> menu with <span class="ui">View Results</span> and pick the <code>.smv</code>. Smokeview is NIST's viewer, it ships with FDS, and it never opens by itself — use <span class="ui">Open Smokeview</span> on the <span class="ui">Results</span> menu. One asymmetry catches people out: the <code>.pyrogeom</code> geometry file PyroSim writes is not viewable in Smokeview.</p>
+
+  <p class="prose">In Results, the device and HRR CSVs are loaded for you, under the XY Plot Data group, so the curves are there without importing anything. For plots without leaving PyroSim, use <span class="ui">View Time History Results</span> on the <span class="ui">Results</span> menu and choose the CSV, or the drop-down arrow beside the plot icon on the File toolbar, which offers <span class="ui">Plot Device Results</span>, <span class="ui">Plot Thermal Results</span> and <span class="ui">Plot Control Results</span>. Only <code>&lt;job&gt;_devc.csv</code>, <code>&lt;job&gt;_hrr.csv</code> and <code>&lt;job&gt;_ctrl.csv</code> are expected to work there; <code>&lt;job&gt;_cpu.csv</code> does not display. In the plot window, <span class="ui">Image Capture</span> on the <span class="ui">File</span> menu saves a picture for your notes.</p>
+
+  <details class="deeper"><summary>The tutorial and the software disagree on one menu name</summary><div class="d-in">
+    <p class="prose">The Basic Data Output tutorial calls the action "View Time History Plots". No such string exists in the 2026.1 software; the action is <span class="ui">View Time History Results</span>. Where a document and the program disagree, follow the program. The same tutorial series has a handful of these slips; where this guide gives a click-path, it gives the software's string.</p>
+  </div></details>
+
+  <p class="prose">Both CSV files have the same two-row header, and it surprises every spreadsheet on first contact. Row 1 is units. Row 2 is names. Data starts at row 3. These are the first eight columns of the reference run's device file, exactly as FDS wrote them.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Row</th><th>What FDS writes there</th></tr></thead>
+    <tbody>
+      <tr><td><b>Row 1</b></td><td><code>s,C,ppm,1/m,m,,%,%</code></td></tr>
+      <tr><td><b>Row 2</b></td><td><code>Time,"S1_T","S1_CO","S1_OD","S1_VIS","S1_FED","S1_O2","S1_CO2"</code></td></tr>
+      <tr><td><b>Row 3 onward</b></td><td>One row per output interval, first column the time in seconds.</td></tr>
+    </tbody>
+  </table></div>
+
+  <ul class="plain">
+    <li>The empty field between the two commas in row 1 is real. FED has no unit, so FDS writes nothing there.</li>
+    <li>Your spreadsheet will treat row 1 as the header and the names you want will sit in the first data row. Name your series from row 2 by hand, and keep row 1 for the axis label.</li>
+    <li>The reference case sets a device interval of 1 s, so it writes one row per second. Each value is time-averaged over the preceding interval by default, not sampled at that instant.</li>
+    <li>Past 254 columns FDS splits the file into <code>&lt;job&gt;_1_devc.csv</code>, <code>&lt;job&gt;_2_devc.csv</code> and so on. If a device you expected is missing, look for a second file before you blame the model.</li>
+  </ul>
+
+  <p class="prose">Now the <code>.out</code> file, which is where an experienced modeller looks first. Three things, in this order.</p>
+
+  <p class="prose"><b>One: the last line.</b> It is a single sentence and it tells you whether anything else in the folder is worth reading.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Last line of &lt;job&gt;.out</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><b>STOP: FDS completed successfully</b></td><td>FDS reached your End Time and shut down cleanly. This is the only line that means the run finished.</td></tr>
+      <tr><td><b>STOP: Set-up only</b></td><td>End Time was 0 s. FDS built the model, checked it and stopped. Useful on purpose, confusing by accident.</td></tr>
+      <tr><td><b>STOP: FDS stopped by user</b></td><td>The <span class="ui">Stop</span> button, or a <code>.stop</code> file. A checkpoint exists, so the run can be resumed.</td></tr>
+      <tr><td><b>ERROR: FDS was improperly set-up - FDS stopped</b></td><td>The input file was rejected. Often there is no <code>.out</code> file at all, and the reason is only in the log.</td></tr>
+      <tr><td><b>ERROR(374): Numerical Instability - FDS stopped</b></td><td>The solver gave up part-way. Day 6 covers how to find where and why.</td></tr>
+      <tr><td><b>ERROR: Unrealizable mass density - FDS stopped</b></td><td>Another stop while the run was in progress. Do not treat it as a completed run.</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="prose">Read that line rather than trusting the program's exit status. On the Mac used for this guide, FDS returned an exit status of zero for a successful run, for set-up failures and for a numerical instability alike. Windows exit codes were not tested for this guide, so treat them with the same caution. And when FDS rejects the input while reading it, it writes no <code>.out</code> file: the message went to the run window only, which is the reason <span class="ui">Save Log</span> is worth pressing every time.</p>
+
+  <p class="prose"><b>Two: the last time-step block.</b> FDS prints one every 100 steps. It gives the step number, the step size in seconds, the total simulated time in seconds, the pressure iterations, the maximum velocity and pressure errors with the mesh and cell where they occurred, and then, per mesh, the maximum CFL number, the maximum and minimum divergence and the maximum VN number. A healthy last block has the total time equal to your End Time, a step size close to the value the run settled on rather than orders of magnitude below it, and a maximum CFL number below about 1 — FDS adjusts the step to hold CFL between 0.8 and 1. Do not expect the settled step to match the initial time step printed near the top of the file: the reference run starts at 0.184 s, falls to about 0.03 s within the first ten seconds, and ends at 0.015 s, which is normal. A step size that has collapsed by orders of magnitude, next to a CFL number in the hundreds, is the signature of the instability on Day 6.</p>
+
+  <p class="prose"><b>Three: search the file for "Pressure Zone".</b> In a room with a door to the outside, there should be nothing to find; the 20 cm reference run has no such section. If you do find a Pressure Zone Information heading with a volume in cubic metres and a cell count, FDS has decided part of your model is sealed. FDS assumes any space is perfectly sealed unless you tell it otherwise, so the pressure inside rises, air stops flowing through the door, and an extra pressure column appears in <code>&lt;job&gt;_hrr.csv</code> — and none of this raises an error. The usual causes are a door hole that did not cut all the way through the wall, and an outside mesh with no open boundary vents.</p>
+
+  <details class="deeper"><summary>The rest of the header is worth ninety seconds</summary><div class="d-in">
+    <p class="prose">The top of <code>&lt;job&gt;.out</code> repeats what FDS believes you asked for: the FDS revision string, the number of MPI processes, the cell counts and physical dimensions of every mesh, the total number of grid cells, the maximum cell aspect ratio, the initial time step, the end time and the ambient temperature. Comparing that against what you meant to build catches a wrong mesh or a forgotten parameter before you spend two hours computing with it.</p>
+  </div></details>
+
+  <p class="phase">Build</p>
+
+  <ol class="steps">
+    <li><div><p><span class="path">Results › View Time History Results</span> — open <code>&lt;job&gt;_hrr.csv</code> and plot the HRR column first. Nothing else matters until the fire is the size you specified.</p></div></li>
+    <li><div><p>Open <code>&lt;job&gt;_devc.csv</code> the same way and plot the corner thermocouple tree, then the layer height and the upper and lower layer temperatures.</p></div></li>
+    <li><div><p>Open <code>&lt;job&gt;.out</code> in a plain text editor. Press the End key, read the final line, then read the block above it.</p></div></li>
+    <li><div><p>Search that file for <span class="val">Pressure Zone</span>. Finding nothing is the result you want.</p></div></li>
+    <li><div><p>Open both CSV files in a spreadsheet and look at the two header rows with your own eyes, so the layout is familiar before Day 7 asks a script to read them.</p></div></li>
+    <li><div><p>In the plot window, <span class="path">File › Image Capture</span> — save the HRR plot and the tree plot into the run folder. They are your record of what this run said on this day.</p></div></li>
+  </ol>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The last screen of <code>&lt;job&gt;.out</code> in a text editor: the final time-step block, the two wall clock lines, and the STOP line with your job name in brackets.</p></div></div>
+
+  <p class="phase">Check</p>
+
+  <p class="prose">Here is the run to compare against. Same room, same burner programme, 20 cm cells, FDS 6.10.1, the full 1200 s. The burner holds 100 kW to 600 s, ramps to 300 kW over the ten seconds after that, and holds 300 kW to the end, so 590 s is the last reading of the small fire and 620 s is ten seconds after the new level is reached.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>Time</th><th class="num">HRR (kW)</th><th class="num">Ceiling TC, 2.35 m (°C)</th><th class="num">Upper layer (°C)</th><th class="num">Layer height (m)</th><th class="num">S1 CO (ppm)</th><th class="num">S1 visibility (m)</th><th class="num">Floor flux (kW/m²)</th></tr></thead>
+    <tbody>
+      <tr><td><b>60 s</b></td><td class="num">109</td><td class="num">121</td><td class="num">113</td><td class="num">0.92</td><td class="num">22</td><td class="num">4.8</td><td class="num">0.36</td></tr>
+      <tr><td><b>300 s</b></td><td class="num">102</td><td class="num">138</td><td class="num">122</td><td class="num">0.93</td><td class="num">25</td><td class="num">5.2</td><td class="num">0.52</td></tr>
+      <tr><td><b>590 s</b></td><td class="num">106</td><td class="num">147</td><td class="num">135</td><td class="num">0.83</td><td class="num">22</td><td class="num">5.1</td><td class="num">0.64</td></tr>
+      <tr><td><b>620 s</b></td><td class="num">255</td><td class="num">246</td><td class="num">236</td><td class="num">0.85</td><td class="num">53</td><td class="num">3.0</td><td class="num">1.5</td></tr>
+      <tr><td><b>900 s</b></td><td class="num">323</td><td class="num">311</td><td class="num">279</td><td class="num">0.81</td><td class="num">58</td><td class="num">2.9</td><td class="num">2.9</td></tr>
+      <tr><td><b>1195 s</b></td><td class="num">317</td><td class="num">342</td><td class="num">297</td><td class="num">0.87</td><td class="num">61</td><td class="num">3.1</td><td class="num">3.7</td></tr>
+    </tbody>
+  </table></div>
+
+  <p class="prose">Those are six sampled seconds out of 1200. The run's own <code>_devc.csv</code> file carries every column at every second, and that is what to plot against.</p>
+
+  <p class="prose">Read the heat release rate first. It reports the heat actually released by combustion in the gas, not the number you typed, so it wanders a little around the value you asked for: 109 kW and 102 kW against a nominal 100 kW, and 323 kW and 317 kW against 300 kW. If your own HRR sits at a third of the nominal, or at three times it, the burner area or the value per unit area is wrong, and Day 3 is where to fix it. Notice also how much the reported value swings once the fire is large: 255 kW at 620 s, 338 kW at 630 s, 359 kW at 800 s. That is turbulence, not a lag — the prescribed fuel flow is already at its full rate by 610 s, and the mean from 700 s to 1200 s is 298 kW against the 300 kW asked for. Judge the size of a fire from a few minutes of the curve, never from one second of it.</p>
+
+  <!--CHART:tree-->
+
+  <p class="prose">The tree is the clearest picture of what a compartment fire does. Within the first minute the four traces separate and stay separated: hot gas collects under the ceiling, while the 0.25 m trace near the floor has moved from the 20 °C ambient to only 24 °C by 60 s. That separation is the hot layer. At 600 s every trace steps up and the upper ones step most, which is what you expect when the fire triples and the extra heat goes into a layer that is already there. By 1195 s the floor trace has reached 51 °C against the ceiling's 342 °C — a rise of 31 K against 322 K — and that gap is the sign that cool air is still flowing in under the door, which is the other half of the same flow.</p>
+
+  <p class="prose">The ceiling thermocouple keeps climbing after the heat release rate flattens: 246 °C at 620 s, 311 °C at 900 s, 342 °C at 1195 s, while the fire holds near its 300 kW setting. Nothing is wrong. The lining is still warming up, and 0.1 m of aerated concrete absorbs heat for a long time, so the gas keeps warming with it. This run has not reached a steady state by 1200 s, and saying so is part of reporting it honestly.</p>
+
+  <!--CHART:layer-->
+
+  <p class="prose">The layer height falls in the first minute and then sits around 0.89 m above the floor for the rest of the run, wandering between 0.70 m and 1.05 m and showing no lasting change at the step at 600 s. It holds because the doorway vents more as the layer gets hotter, not because the fire stopped making smoke. Treat that number with care, though: FDS does not compute a layer interface. It integrates temperature along the vertical line you placed and reduces it to a height and two temperatures, using a method built for two-zone models. The FDS Validation Guide says as much — a layer height and a hot gas layer temperature are constructs of two-zone models, not things a CFD model calculates directly.</p>
+
+  <p class="prose">The floor heat flux is the number that grows fastest: 0.36 kW/m² at the start, 0.64 kW/m² at the end of the 100 kW stage, then 2.9 and 3.7 kW/m² in the second half. Radiation from a hot layer rises roughly with the fourth power of its absolute temperature, so doubling the layer temperature does far more than double what the floor feels. Meanwhile the tenability numbers move slowly: FED, which is the fraction of an incapacitating dose accumulated so far, reaches 0.03 at 900 s and 0.04 at 1195 s, and oxygen is still 18.2 % at 1195 s. Both sit at the 1.85 m node, not at the ceiling, and so does the visibility. Visibility is the one that degrades early: it holds at the 30 m clear-air maximum FDS reports by default until about 12 s, is below 5 m by 38 s, and drops to about 3 m after the step.</p>
+
+  <p class="prose">One honest caveat before you compare. These are 20 cm results, and 20 cm is coarse for this fire: the ratio of characteristic fire diameter to cell size is about 1.9 at 100 kW and 3.0 at 300 kW, below the 3.8 to 14 range NIST itself used when validating FDS against ISO 9705 room tests. The run reads low because of it. The MQH hand calculation for this room puts the 100 kW layer at 229 °C to 251 °C with a corner burner, Dillon measured about 305 °C at 2.35 m in a real ISO room at 100 kW, and this run gives 147 °C. At 300 kW those three figures are 555 °C to 621 °C calculated, about 615 °C measured, and 342 °C here. So use this table to check that your curves have the right shape and the right order of magnitude, and let Day 6 settle what the mesh is doing to the numbers.</p>
+
+  <div class="check"><h4>Check your result</h4>
+    <p class="prose">You are done for today when four things are true. The last line of <code>&lt;job&gt;.out</code> reads that FDS completed successfully. The last time-step block reaches your End Time with a sensible step size. A search for "Pressure Zone" finds nothing. And the HRR column sits near the value you specified, with the step at 600 s in the right place.</p>
+    <p class="prose">A run that passes all four can still be wrong — wrong lining, wrong yields, a device in the wrong cell. Day 6 is about that gap. What today buys you is the ability to tell a run that finished from a run that worked.</p>
+  </div>
+
+  <div class="quiz">
+    <details class="q"><summary><span class="qt">Your model has two meshes and the desktop has sixteen logical processors. How many MPI processes can you use, and what do the other cores do?</span></summary><div class="qa"><p>Two, one per mesh. Asking for more stops FDS with <code>ERROR(112)</code>, "The number of MPI processes, 2, exceeds the number of meshes, 1", with your own counts in place of those. The spare cores can only be used as OpenMP threads, which the FDS User's Guide says speed a calculation by at most a factor of two.</p></div></details>
+    <details class="q"><summary><span class="qt">Your PyroSim file sits in Documents, which is synced to OneDrive. What goes wrong, and where would the run have written its files?</span></summary><div class="qa"><p>PyroSim writes the run into a sub-directory beside the model file, so every output would have landed inside the synced folder. A file lock during an automatic backup can stop Windows letting FDS write, and the run fails part-way through with no fault in the model. Move the model to a folder on a drive physically attached to the machine.</p></div></details>
+    <details class="q"><summary><span class="qt">The last line of the log says FDS completed successfully. Name two things that can still be wrong with the run.</span></summary><div class="qa"><p>Several are possible: a Pressure Zone listed in the <code>.out</code> file, meaning the room is sealed and the door never opened; an HRR column nowhere near the fire you specified; soot and carbon monoxide yields left at zero, so visibility and CO never move; a device placed outside every mesh. None of these raises an error, and the program's exit status is zero either way.</p></div></details>
+    <details class="q"><summary><span class="qt">In <code>&lt;job&gt;_devc.csv</code>, what is in row 1, row 2 and row 3?</span></summary><div class="qa"><p>Row 1 is the units, starting with <code>s</code> for the time column, and a field can be empty where a quantity has no unit, as FED does. Row 2 is the names: <code>Time</code>, then each device ID in quotes. Row 3 is the first data row.</p></div></details>
+    <details class="q"><summary><span class="qt">You need the machine for something else. Which button lets you carry on later, and what does it leave behind?</span></summary><div class="qa"><p><span class="ui">Stop</span>. It writes a <code>.stop</code> file and a checkpoint, and <span class="ui">Resume FDS</span> on the <span class="ui">Analysis</span> menu continues from there. <span class="ui">Kill</span> ends the run immediately with no way back. Remember to clear the <code>.stop</code> file afterwards, or the next run stops with <code>ERROR(109)</code>.</p></div></details>
+  </div>
+
+  <div class="done-row"><input type="checkbox" id="done-day5" data-done="day5"><label for="done-day5">Day 5 done</label></div>
+</section>

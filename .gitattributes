@@ -1,0 +1,69 @@
+* text=auto eol=lf
+
+# Shell, python and JS must be LF on every platform, or Git for Windows checks
+# them out with CRLF and every script dies with "bad interpreter". This is not
+# dependent on the user's global line-ending configuration.
+*.sh  text eol=lf
+*.py  text eol=lf
+*.js  text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+# The manifests bootstrap.sh reads with bash: a CR would end up in a pin.
+Library/*.txt text eol=lf
+
+# Extensionless launchers in Library/bin. *.sh does NOT catch these, and i18n
+# is what enforces the bilingual house rule.
+# A pattern with no slash matches the basename at any depth. gitattributes has
+# no way to escape spaces in a pattern, so match the basename.
+# Library/tests/test_line_endings.py keeps this list and Library/bin in step,
+# both ways: agent-memory and new-device were once added and missed here, and
+# four dropped tools once kept their lines.
+agent-memory    text eol=lf
+archify         text eol=lf
+books           text eol=lf
+browser         text eol=lf
+claude-start    text eol=lf
+codex-start     text eol=lf
+dashboard       text eol=lf
+dev-check       text eol=lf
+diagram         text eol=lf
+fds-setup       text eol=lf
+i18n            text eol=lf
+laya-service    text eol=lf
+learn-claude    text eol=lf
+library         text eol=lf
+md-format       text eol=lf
+md-pages        text eol=lf
+new-device      text eol=lf
+ngspice-setup   text eol=lf
+notify          text eol=lf
+ocr             text eol=lf
+rea             text eol=lf
+reverse         text eol=lf
+start-check     text eol=lf
+statusline      text eol=lf
+taskboard       text eol=lf
+task-recall     text eol=lf
+tieitup         text eol=lf
+understand      text eol=lf
+update-tools    text eol=lf
+video-study     text eol=lf
+
+# Binary: never normalise.
+*.kicad_pcb -text
+*.kicad_sch -text
+*.kicad_pro -text
+*.kicad_prl -text
+*.pdf  -text
+*.png  -text
+*.jpg  -text
+*.jpeg -text
+*.gif  -text
+*.gbr  -text
+*.drl  -text
+*.step -text
+*.stp  -text
+*.xlsx -text
+*.docx -text
+*.zip  -text
+*.tar  -text

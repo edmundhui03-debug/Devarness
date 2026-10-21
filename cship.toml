@@ -1,0 +1,90 @@
+# cship statusline for the dev workspace — the upstream "Hero / Recommended"
+# config from https://github.com/stephenleo/cship (docs/showcase.md §1).
+#
+# cship walks UP from the session's working directory looking for cship.toml,
+# so this one file serves dev and every project under it (Projects/). Nothing
+# is written to ~/.config; the statusline is registered in
+# .claude/settings.json, so it appears only when Claude Code is started
+# inside dev.
+#
+# Row 1 is Starship via the passthrough token — Catppuccin Powerline preset,
+# config at .claude/hooks/starship.toml, pointed at by STARSHIP_CONFIG on the
+# statusLine command.
+# Row 2 is cship's own modules, read from Claude Code's live session JSON.
+#
+# ── Font ──────────────────────────────────────────────────────────────────
+# This config uses Nerd Font glyphs. Ghostty supplies them by default, which is
+# why the plain-Unicode fallback of the previous config is no longer needed.
+# If you switch terminals and see boxes, set the terminal font to
+# JetBrainsMono Nerd Font Mono (already installed in ~/Library/Fonts).
+# Row-2 icons stay inside the BMP (U+E000–U+F8FF) since 2026-09-24: cmux-windows
+# truncates code points above U+FFFF, so the plane-15 Material icons drew wrong
+# glyphs there whatever the font.
+#
+# ── Cost ──────────────────────────────────────────────────────────────────
+# $cship.usage_limits costs 0.5–2 s on a cold fetch and is cached for `ttl`
+# seconds (300 since 2026-09-24; cship's default is 60), keyed on
+# transcript_path. With the real path Claude Code supplies, a render
+# is ~100 ms. Measuring it with a fake or absent transcript path gives the
+# uncached number and looks broken.
+
+[cship]
+lines = [
+  "$starship_prompt",
+  "$cship.model $cship.effort $cship.cost $cship.context_bar $cship.usage_limits $cship.peak_usage",
+]
+
+[cship.model]
+# 2026-09-24: nf-oct-hubot U+F477 replaces nf-md-robot U+F06A9 — BMP only, see Font above.
+symbol = " "
+style  = "bold cyan"
+
+[cship.effort]
+# 2026-09-24: nf-fa-bolt U+F0E7 replaces U+26A1 (the lightning emoji): one cell, not two.
+symbol      = " "
+style       = "fg:#7dcfff"
+high_style  = "fg:#e0af68"
+xhigh_style = "bold fg:#e0af68"
+max_style   = "bold fg:#f7768e"
+
+[cship.context_bar]
+# 2026-09-24: nf-fa-tachometer U+F0E4 (a gauge) replaces U+F00CA — BMP only.
+symbol             = " "
+filled_char        = "●"
+empty_char         = "○"
+format             = "[$symbol$value]($style)"
+# 2026-09-24: 8 dots, not 10 — row 2 must fit ~70 columns; the percentage is the number.
+width              = 8
+style              = "fg:#7dcfff"
+warn_threshold     = 40.0
+warn_style         = "fg:#e0af68"
+critical_threshold = 70.0
+critical_style     = "bold fg:#f7768e"
+
+[cship.cost]
+# 2026-09-24: nf-fa-money U+F0D6 replaces U+1F4B0 (money bag), which the Nerd Font lacks.
+symbol             = " "
+style              = "fg:#a9b1d6"
+warn_threshold     = 10
+warn_style         = "fg:#e0af68"
+critical_threshold = 50
+critical_style     = "bold fg:#f7768e"
+
+[cship.usage_limits]
+# 2026-09-24: the OAuth usage fetch fails on the Windows PC and costs 0.5–2 s each
+# time; refresh once per 5 min instead of cship's 60 s default.
+ttl                = 300
+# 2026-09-24: nf-fa-clock_o U+F017 and nf-fa-calendar U+F073 replace U+F0109 and
+# U+F00F0 — BMP only; the parentheses around {reset} went for width (~70 columns).
+five_hour_format   = " 5h {pct}% {reset}"
+seven_day_format   = " 7d {pct}% {reset}"
+separator          = " "
+warn_threshold     = 50.0
+warn_style         = "fg:#e0af68"
+critical_threshold = 80.0
+critical_style     = "bold fg:#f7768e"
+
+[cship.peak_usage]
+# 2026-09-24: nf-fa-bell U+F0F3 replaces U+23F0 (alarm clock) — BMP, and in the Nerd Font.
+symbol = " "
+style  = "fg:#e0af68"

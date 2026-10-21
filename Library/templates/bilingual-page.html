@@ -1,0 +1,146 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page Name</title>
+<!--
+  House page template.
+  Consult .claude/skills/archify/SKILL.md before creating or editing a page.
+  Archify owns its five technical diagram types; bilingual-page owns this shell.
+
+  Every HTML page produced in this workspace carries an English / Cantonese
+  toggle. Build the page in English, then run:
+
+      i18n extract page.html -o page.en.json     # tags the text, dumps English
+      # translate page.en.json -> page.zh.json      (Hong Kong written Chinese)
+      i18n inject  page.html --zh page.zh.json   # adds the toggle and dictionary
+      i18n check   page.html                     # must report full coverage
+
+  Do NOT hand-write data-i18n keys. i18n assigns stable content-hashed keys
+  and is idempotent, so re-running after an edit only adds the new strings.
+
+  The tokens below are the house palette. Keep them: pages across dev should
+  look like one set. Delete the blocks you do not use.
+-->
+
+<style>
+:root{
+  --bg:#E9EBEE; --surface:#FDFDFE; --sunk:#DFE2E7;
+  --ink:#14181D; --ink-2:#39424D; --muted:#616B77;
+  --line:#CBD1D8; --line-soft:#DDE1E6;
+  --copper:#9F4E1C; --probe:#1C6675;
+  --ok:#1C6675; --warn:#8A6408; --bad:#A83226;
+  --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --serif:"Literata",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --measure:66ch;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1216; --surface:#171B21; --sunk:#12161B;
+    --ink:#E6E9ED; --ink-2:#C2C9D1; --muted:#98A1AC;
+    --line:#2A313A; --line-soft:#222831;
+    --copper:#DE8748; --probe:#57ADBC;
+    --ok:#57ADBC; --warn:#D9A93C; --bad:#E4715F;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1216; --surface:#171B21; --sunk:#12161B;
+  --ink:#E6E9ED; --ink-2:#C2C9D1; --muted:#98A1AC;
+  --line:#2A313A; --line-soft:#222831;
+  --copper:#DE8748; --probe:#57ADBC;
+  --ok:#57ADBC; --warn:#D9A93C; --bad:#E4715F;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px 96px}
+
+.mast{border-bottom:1px solid var(--line);padding:44px 0 26px;margin-bottom:34px}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--copper);margin:0 0 14px}
+h1{font-weight:700;font-size:clamp(32px,5vw,50px);line-height:1.05;letter-spacing:-.025em;margin:0 0 16px;text-wrap:balance;max-width:16ch}
+.standfirst{font-family:var(--serif);font-size:18px;line-height:1.62;color:var(--ink-2);max-width:var(--measure);margin:0 0 8px}
+.mast-meta{display:flex;flex-wrap:wrap;gap:8px 26px;margin-top:22px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.mast-meta b{color:var(--ink-2);font-weight:500}
+
+section{margin-bottom:58px;scroll-margin-top:22px}
+h2{font-size:13px;font-family:var(--mono);font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--copper);margin:0 0 4px}
+.h2sub{font-weight:700;font-size:clamp(22px,2.5vw,28px);letter-spacing:-.02em;line-height:1.15;margin:0 0 16px;text-wrap:balance}
+h3{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:28px 0 8px}
+p{max-width:var(--measure);margin:0 0 14px}
+.prose{font-family:var(--serif);font-size:16px;line-height:1.68;color:var(--ink-2)}
+.prose strong{color:var(--ink);font-weight:500}
+.note{font-family:var(--serif);font-size:14.5px;color:var(--muted);max-width:var(--measure);margin:0 0 14px}
+
+/* Wide content must scroll inside its own box; the page never scrolls sideways. */
+.scroll{overflow-x:auto;margin:0 0 16px;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:11px 13px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 13px;border-bottom:1px solid var(--line-soft);vertical-align:top;color:var(--ink-2)}
+tr:last-child td{border-bottom:0}
+td b{color:var(--ink);font-weight:600}
+.mono{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+
+.chip{font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;border-radius:2px;white-space:nowrap;border:1px solid currentColor;font-weight:500}
+.chip.ok{color:var(--ok)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)}
+
+details.d{border-bottom:1px solid var(--line)}
+details.d:first-of-type{border-top:1px solid var(--line)}
+details.d>summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:baseline;padding:15px 2px;cursor:pointer;list-style:none}
+details.d>summary::-webkit-details-marker{display:none}
+details.d>summary:focus-visible{outline:2px solid var(--probe);outline-offset:-2px}
+.d-t{font-weight:600;font-size:16.5px;letter-spacing:-.012em}
+.d-t span{display:block;font-weight:400;font-size:13.5px;color:var(--muted);margin-top:3px;max-width:60ch;line-height:1.45;font-family:var(--serif)}
+.d-x{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+details.d[open] .d-x::after{content:" ▲"} details.d:not([open]) .d-x::after{content:" ▼"}
+.d-body{padding:0 0 20px}
+.d-body p{font-family:var(--serif);font-size:15px;color:var(--ink-2);line-height:1.65}
+
+/* A diagram is a picture of the mechanism, not decoration. Draw it as inline
+   SVG using the tokens above so it survives the theme and the language toggle;
+   put every label in its own <text> so i18n can translate it. */
+figure{margin:0 0 22px}
+figure svg{display:block;width:100%;height:auto;max-width:900px;border:1px solid var(--line);border-radius:3px;background:var(--surface)}
+figcaption{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:8px}
+
+footer{border-top:1px solid var(--line);margin-top:70px;padding-top:22px;font-family:var(--mono);font-size:11.5px;color:var(--muted);line-height:1.9}
+footer b{color:var(--ink-2);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Section label</p>
+    <h1>The page name</h1>
+    <p class="standfirst">One or two sentences saying what this page is and who it is for. Lead with the finding, not the method.</p>
+    <div class="mast-meta">
+      <span>8 September 2026</span>
+      <span>Source · <b>where this came from</b></span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Section</h2>
+    <p class="h2sub">What this section settles</p>
+    <p class="prose">Body text. Keep it to one idea per paragraph and let the tables carry the detail.</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Thing</th><th>State</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td><b>An item</b></td><td><span class="chip ok">ok</span></td><td>Why it is ok</td></tr>
+          <tr><td><b>Another</b></td><td><span class="chip warn">warning</span></td><td>What to watch</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">A caveat the table cannot carry.</p>
+  </section>
+
+  <footer>
+    <b>Source</b> · the file or folder this was built from<br>
+    <b>Standing</b> · what is verified and what is not
+  </footer>
+
+</div>
+
+<style>@media(max-width:640px){details.d>summary{grid-template-columns:minmax(0,1fr)}.d-x{white-space:normal}.mast-meta span{overflow-wrap:anywhere}}</style>

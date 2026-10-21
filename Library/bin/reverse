@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""reverse — run reverse-skill's local static tools (JADX, Apktool, the JDK's java) from the runtime.
+
+  reverse jadx --version
+  reverse apktool --version
+  reverse java -version
+  reverse jadx -d <outdir> <target.apk>     decompile an owner-named APK to a folder outside the clone
+
+It shares rea's environment (local Node, JDK bin, Ghidra support, GHIDRA_INSTALL_DIR, JAVA_HOME) and
+adds the JADX and Apktool folders to PATH for the child only, so reverse-skill's own scripts resolve the
+local tools through Get-Command and never fall back to a global install or the upstream bootstrap.
+reverse-skill's MCP-registration probes read the user profile, where bootstrap registers rea for every
+folder; dev's own folder holds no MCP registration. Inherited stdio,
+the child's exit code returned, nothing on reverse's own stdout, no console pop-up. Runtime missing for
+the requested tool: one line to stderr naming the installer, exit 3.
+
+Boundary: static analysis of a target the owner named and has the right to analyse. This launcher never
+runs reverse-skill's bootstrap-reverse.ps1, never searches the web and never writes back into the clone.
+"""
+import importlib.machinery
+import importlib.util
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+LIBRARY = Path(__file__).resolve().parents[1]
+
+
+def _load_rea():
+    path = Path(__file__).resolve().parent / "rea"
+    loader = importlib.machinery.SourceFileLoader("rea", str(path))
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader("rea", loader))
+    loader.exec_module(mod)
+    return mod
+
+
+rea = _load_rea()
+
+TOOLS = ("jadx", "apktool", "java")
+USAGE = "usage: reverse <jadx|apktool|java> [args...]\n"
+
+
+def reverse_env(parts):
+    extra = []
+    if parts.get("jadx"):
+        extra.append(parts["jadx"].parent)                 # jadx\bin
+    if parts.get("apktool_jar"):
+        extra.append(parts["apktool_jar"].parent)          # apktool\ (holds apktool.bat)
+    return rea.build_env(parts, extra_path=extra)
+
+
+def _missing(tool):
+    sys.stderr.write("reverse: %s is not installed in the runtime; "
+                     "run 'python %s --from <dir>' first\n" % (tool, (LIBRARY / "setup-reverse.py").as_posix()))
+    return 3
+
+
+def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args in (["-h"], ["--help"]):
+        sys.stdout.write(__doc__ + "\n" + USAGE)
+        return 0
+    if not args or args[0] not in TOOLS:
+        sys.stderr.write(USAGE)
+        return 2
+    tool, rest = args[0], args[1:]
+    parts = rea.resolve()
+    env = reverse_env(parts)
+
+    if tool == "jadx":
+        if not parts.get("jadx") or not parts.get("java"):
+            return _missing("jadx (needs jadx and the JDK)")
+        if os.name == "nt":
+            cmd = ["cmd", "/c", str(parts["jadx"]), *rest]
+        else:
+            cmd = [str(parts["jadx"]), *rest]
+    elif tool == "apktool":
+        if not parts.get("java") or not parts.get("apktool_jar"):
+            return _missing("apktool (needs the JDK and apktool.jar)")
+        cmd = [str(parts["java"]), "-jar", str(parts["apktool_jar"]), *rest]
+    else:  # java
+        if not parts.get("java"):
+            return _missing("java (the JDK)")
+        cmd = [str(parts["java"]), *rest]
+
+    return rea.run_child(cmd, env)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

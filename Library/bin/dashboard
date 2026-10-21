@@ -1,0 +1,457 @@
+#!/usr/bin/env python3
+"""dashboard — write the snapshot the developer's dashboard reads.
+
+  dashboard export [--out PATH] [--quiet]
+  dashboard serve [--port 47900] [--allow-origin URL]...
+  dashboard wait ID [--questions FILE] [--interval 2] [--timeout 0]
+  dashboard ask --project P --task TEXT --asked-by NAME QUESTION [--questions FILE]
+  dashboard used ID --by NAME --note TEXT [--questions FILE]
+
+The dashboard in Library/dashboard/ reads snapshot.json and nothing else of the
+workspace. This writes it: for PCB, DATASET and Research, every section
+`md-format status` marks blocked, needs-owner, open or partial; for the
+library, the entries of the index the library tool writes. Nothing runs it on
+a schedule: run `dashboard export` by hand whenever the page should catch up.
+
+It reads the workspace's records and writes one file, whole or not at all. A
+missing or unreadable input gives empty lists and a note in the snapshot,
+never a crash. Standard-library Python 3.9 or later. No network.
+Design: Library/dashboard/DESIGN.md.
+"""
+from __future__ import annotations
+
+import argparse
+import contextlib
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = Path(__file__).resolve().parents[2]
+MD_FORMAT = Path(__file__).resolve().with_name("md-format")
+SNAPSHOT = Path("Library") / "dashboard" / "snapshot.json"
+# Each project is every file under any of its prefixes.
+PROJECTS = (("PCB", ("PCB Tools/", "Projects/PCB")), ("DATASET", ("DATASET/", "Projects/DATASET")),
+            ("Research", ("Research/", "Projects/Research")))
+# md-format's own order, most urgent first; the lists keep it.
+LIVE = ("blocked", "needs-owner", "open", "partial")
+LIBRARY_CAP = 1000
+SUMMARY_WIDTH = 160
+# A slow index still leaves a snapshot.
+STATUS_TIMEOUT = 45
+# Run from a windowless parent, md-format would otherwise flash a console.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def projects():
+    """Each project's live sections from md-format's own index, and a note when there is none."""
+    grouped = {name: [] for name, _ in PROJECTS}
+    try:
+        done = subprocess.run([sys.executable, str(MD_FORMAT), "status", "--json"], cwd=str(ROOT),
+                              capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              stdin=subprocess.DEVNULL, timeout=STATUS_TIMEOUT, creationflags=NO_WINDOW,
+                              env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+        sections = json.loads(done.stdout)["sections"]
+        if not isinstance(sections, list):
+            raise ValueError("sections is not a list")
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        return grouped, "projects: md-format status gave no index ({})".format(type(exc).__name__)
+    live = [s for s in sections if isinstance(s, dict) and s.get("status") in LIVE]
+    for section in sorted(live, key=lambda s: LIVE.index(s["status"])):
+        for name, prefixes in PROJECTS:
+            if str(section.get("file", "")).startswith(prefixes):
+                grouped[name].append({"title": section.get("heading"), "status": section["status"],
+                                      "file": section["file"], "line": section.get("line")})
+    return grouped, None
+
+
+def one_line(text):
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= SUMMARY_WIDTH else text[:SUMMARY_WIDTH - 1].rstrip() + "…"
+
+
+def portable(text):
+    """A path that names no machine: relative inside the workspace, ~/ under the home folder.
+
+    The index holds plugin caches by absolute path, and the snapshot is shown in
+    a browser, so neither a drive nor the user's name may reach it.
+    """
+    text = str(text or "")
+    path = Path(text)
+    if not path.is_absolute():
+        return text.replace("\\", "/")
+    for base, prefix in ((ROOT, ""), (Path.home(), "~/")):
+        try:
+            return prefix + path.relative_to(base).as_posix()
+        except ValueError:
+            pass
+    # Anywhere else: the folder and file name identify an entry; never the drive.
+    return "…/" + "/".join(path.parts[1:][-2:])
+
+
+def library():
+    """The library index's entries in five fields, at most LIBRARY_CAP of them, and a note."""
+    empty = {"count": 0, "entries": []}
+    # The index sits in a library folder beside the session hooks
+    # (.claude/hooks/library/index.json); found by that shape.
+    found = sorted((ROOT / ".claude").glob("*/library/index.json"))
+    if not found:
+        return empty, "library: no index yet; the library tool's refresh writes it"
+    try:
+        entries = json.loads(found[0].read_text(encoding="utf-8"))["entries"]
+        if not isinstance(entries, list):
+            raise ValueError("entries is not a list")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return empty, "library: index unreadable ({})".format(type(exc).__name__)
+    entries = [e for e in entries if isinstance(e, dict)]
+    if not entries:
+        return empty, "library: index holds no entries"
+    return {"count": len(entries), "entries": [
+        {"name": str(e.get("name", "")), "kind": str(e.get("kind", "")),
+         "collection": str(e.get("collection", "")), "summary": one_line(e.get("purpose")),
+         "path": portable(e.get("path"))} for e in entries[:LIBRARY_CAP]]}, None
+
+
+def snapshot():
+    grouped, project_note = projects()
+    shelf, library_note = library()
+    data = {"version": 1, "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "projects": grouped, "library": shelf}
+    notes = [note for note in (project_note, library_note) if note]
+    if notes:
+        data["note"] = "; ".join(notes)
+    return data
+
+
+def write_atomic(path, data, indent=1):
+    """Whole or not at all: the page may read the file while an export writes it.
+
+    Windows refuses a replace over a file another process has open, such as a
+    `dashboard wait` poll, so the replace is tried 20 times, 50 ms apart,
+    before its PermissionError is raised.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, scratch = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=indent)
+            fh.write("\n")
+        for tries in range(1, 21):
+            try:
+                os.replace(scratch, path)
+                break
+            except PermissionError:
+                if tries == 20 or not os.access(str(path), os.W_OK):  # read-only: refused for good
+                    raise
+                time.sleep(0.05)
+    except BaseException:
+        try:
+            os.unlink(scratch)
+        except OSError:
+            pass
+        raise
+
+
+SERVER = ROOT / "Library" / "dashboard" / "server" / "server.mjs"
+QUESTIONS = ROOT / "Library" / "dashboard" / "questions.json"
+
+
+def serve(args):
+    """Run the dashboard server in this terminal until Ctrl+C."""
+    node = shutil.which("node")
+    if not node:
+        print("dashboard: node is not on PATH", file=sys.stderr)
+        return 2
+    cmd = [node, str(SERVER), "--port", str(args.port)]
+    for origin in args.allow_origin:
+        cmd += ["--allow-origin", origin]
+    # The Tasks page runs md-format with this same Python (plan R3-10).
+    env = dict(os.environ, DEVARNESS_PYTHON=sys.executable)
+    try:
+        return subprocess.call(cmd, cwd=str(ROOT), env=env)
+    except KeyboardInterrupt:
+        return 0
+
+
+def positive_seconds(text):
+    value = float(text)
+    if not value > 0:  # also refuses nan
+        raise argparse.ArgumentTypeError("must be greater than 0, not {}".format(text))
+    return value
+
+
+def wait(args):
+    """Block until question ID is answered, then print the answer."""
+    # The answer is the owner's own words: UTF-8 whatever the console's code page.
+    sys.stdout.reconfigure(encoding="utf-8")
+    deadline = time.monotonic() + args.timeout if args.timeout else None
+    unreadable = False
+    try:
+        while True:
+            try:
+                # utf-8-sig: PowerShell 5.1 saves UTF-8 with a byte order mark.
+                doc = json.loads(args.questions.read_text(encoding="utf-8-sig"))
+                found = [q for q in doc.get("questions", []) if isinstance(q, dict) and q.get("id") == args.id]
+            except (OSError, ValueError, AttributeError, TypeError) as exc:
+                found = None  # mid-write or briefly unreadable: look again, and say so once
+                if not unreadable:
+                    unreadable = True
+                    print("dashboard: cannot read {}: {}; still waiting".format(args.questions, exc), file=sys.stderr)
+            if found == []:
+                print("dashboard: no question {}".format(args.id), file=sys.stderr)
+                return 2
+            if found and found[0].get("status") in ("answered", "used"):
+                print(found[0].get("answer", ""))
+                return 0
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                print("dashboard: {} is still open".format(args.id), file=sys.stderr)
+                return 3
+            time.sleep(args.interval if remaining is None else min(args.interval, remaining))
+    except KeyboardInterrupt:
+        return 130
+
+
+# The mailbox's rules, as server/questions.mjs checks them (Library/dashboard/AGENTS.md).
+QUESTION_PROJECTS = ("PCB", "DATASET", "Research", "Library", "General")
+FIELDS = ("id", "project", "task", "asked_by", "asked_at", "question", "status", "answer",
+          "answered_at", "used_by", "used_at", "used_note")
+STATUSES = ("open", "answered", "used")
+# The lock the server shares; read when it is taken, so the tests can shorten them.
+LOCK_STALE = 10.0   # seconds: an older lock was left by a writer that stopped
+LOCK_WAIT = 5.0     # seconds to wait before the mailbox counts as busy
+
+
+class Busy(Exception):
+    """Another writer held the mailbox's lock for the whole wait."""
+
+
+class Refused(Exception):
+    """The change cannot be made; the message says why."""
+
+
+@contextlib.contextmanager
+def mailbox_lock(path):
+    """<questions.json>.lock, created exclusively and held from the read to the rename.
+
+    The server takes the same lock (server/questions.mjs), so neither writer
+    loses the other's update. Only this writer's own lock is removed.
+    """
+    lock = Path(str(path) + ".lock")
+    mine = "{} {}".format(os.getpid(), datetime.now().astimezone().isoformat(timespec="seconds"))
+    give_up = time.monotonic() + LOCK_WAIT
+    while True:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except (FileExistsError, PermissionError):  # PermissionError: Windows, while another writer removes it
+            pass
+        try:
+            if time.time() - lock.stat().st_mtime > LOCK_STALE:
+                lock.unlink()
+                continue
+        except OSError:
+            pass  # let go meanwhile, or a folder that refuses files: wait as for any lock
+        if time.monotonic() >= give_up:
+            raise Busy()
+        time.sleep(0.05)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(mine)
+    except BaseException:
+        # Ours, but without its token no one could tell: let it go, closing it first if fdopen never took it.
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        with contextlib.suppress(OSError):
+            lock.unlink()
+        raise
+    try:
+        yield
+    finally:
+        try:
+            if lock.read_text(encoding="utf-8") == mine:
+                lock.unlink()
+        except OSError:
+            pass
+
+
+def js_blank(c):
+    """What JavaScript's trim() takes off: Python's whitespace with U+FEFF, less five isspace() adds."""
+    return c == chr(0xFEFF) or (c.isspace() and c not in "\x1c\x1d\x1e\x1f\x85")
+
+
+def trimmed(text):
+    """text without what JavaScript's trim() takes off its ends, one pass from each end."""
+    start, end = 0, len(text)
+    while start < end and js_blank(text[start]):
+        start += 1
+    while end > start and js_blank(text[end - 1]):
+        end -= 1
+    return text[start:end]
+
+
+def invalid_at(doc):
+    """Where questions.json breaks the server's validateQuestions, or None."""
+    if not isinstance(doc, dict):
+        return "$"
+    if isinstance(doc.get("version"), bool) or doc.get("version") != 1:
+        return "version"
+    if not isinstance(doc.get("questions"), list):
+        return "questions"
+    seen = set()
+    for i, q in enumerate(doc["questions"]):
+        at = "questions[{}]".format(i)
+        if not isinstance(q, dict):
+            return at
+        if not isinstance(q.get("id"), str) or not q["id"] or q["id"] in seen:
+            return at + ".id"
+        seen.add(q["id"])
+        if q.get("project") not in QUESTION_PROJECTS:
+            return at + ".project"
+        if not isinstance(q.get("question"), str) or not trimmed(q["question"]):
+            return at + ".question"
+        if q.get("status") not in STATUSES:
+            return at + ".status"
+        for field in FIELDS[2:]:  # every other field, when present, is text
+            if field in q and not isinstance(q[field], str):
+                return "{}.{}".format(at, field)
+    return None
+
+
+def edit_questions(path, change):
+    """Apply change(questions) under the lock, write the file back whole, print what change returns.
+
+    Every other entry and field stays as JSON round-trips it: two-space indent,
+    characters as they are, a final newline, as the server writes it.
+    """
+    # Agents' names and questions may be any language: UTF-8 whatever the console's code page.
+    sys.stdout.reconfigure(encoding="utf-8")
+    try:
+        with mailbox_lock(path):
+            doc = json.loads(path.read_text(encoding="utf-8-sig"))
+            where = invalid_at(doc)
+            if where:
+                raise ValueError("not valid at " + where)
+            out = change(doc["questions"])
+            try:
+                write_atomic(path, doc, indent=2)
+            except PermissionError:
+                if not os.access(str(path), os.W_OK):
+                    raise  # marked read-only: no reader is to blame, and trying again will not help
+                raise Busy()  # a reader held the file through every try
+    except Busy:
+        print("dashboard: the mailbox is busy, try again", file=sys.stderr)
+        return 4
+    except Refused as exc:
+        print("dashboard: {}".format(exc), file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:
+        print("dashboard: cannot change {}: {}".format(path, exc), file=sys.stderr)
+        return 1
+    print(out)
+    return 0
+
+
+def now_with_offset():
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def ask(args):
+    """Add an open question and print its id."""
+    question, asked_by = trimmed(args.question), trimmed(args.asked_by)
+    if not question or not asked_by:
+        print("dashboard: --asked-by and the question must not be empty", file=sys.stderr)
+        return 2
+    asked_at = now_with_offset()
+    prefix = "q-{}-{}-".format(asked_at[:10], args.project.lower())
+
+    def add(questions):
+        taken = [int(q["id"][len(prefix):]) for q in questions
+                 if re.fullmatch(re.escape(prefix) + r"\d+", q["id"])]
+        entry = dict.fromkeys(FIELDS, "")
+        entry.update(id="{}{:03d}".format(prefix, max(taken, default=0) + 1), project=args.project,
+                     task=trimmed(args.task), asked_by=asked_by, asked_at=asked_at, question=question,
+                     status="open")
+        questions.append(entry)
+        return entry["id"]
+    return edit_questions(args.questions, add)
+
+
+def used(args):
+    """Mark an answered question used, with who used it and what changed."""
+    by, note = trimmed(args.by), trimmed(args.note)
+    if not by or not note:
+        print("dashboard: --by and --note must not be empty", file=sys.stderr)
+        return 2
+
+    def mark(questions):
+        q = next((q for q in questions if q["id"] == args.id), None)
+        if q is None:
+            raise Refused("no question {}".format(args.id))
+        if q["status"] != "answered":
+            raise Refused("{} is {}, not answered".format(args.id, q["status"]))
+        q.update(status="used", used_by=by, used_at=now_with_offset(), used_note=note)
+        return "{} is marked used".format(args.id)
+    return edit_questions(args.questions, mark)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="dashboard", description=__doc__.splitlines()[0])
+    commands = parser.add_subparsers(dest="command", required=True)
+    exporting = commands.add_parser("export", help="write the dashboard's snapshot.json")
+    exporting.add_argument("--out", type=Path, default=ROOT / SNAPSHOT, help="default: " + SNAPSHOT.as_posix())
+    exporting.add_argument("--quiet", action="store_true")
+    serving = commands.add_parser("serve", help="run the dashboard on http://127.0.0.1:47900")
+    serving.add_argument("--port", type=int, default=47900)
+    serving.add_argument("--allow-origin", action="append", default=[])
+    waiting = commands.add_parser("wait", help="print a question's answer once the owner gives it")
+    waiting.add_argument("id")
+    waiting.add_argument("--questions", type=Path, default=QUESTIONS)
+    waiting.add_argument("--interval", type=positive_seconds, default=2.0)
+    waiting.add_argument("--timeout", type=float, default=0.0)
+    asking = commands.add_parser("ask", help="add an open question to questions.json and print its id")
+    asking.add_argument("--project", required=True, choices=QUESTION_PROJECTS)
+    asking.add_argument("--task", required=True)
+    asking.add_argument("--asked-by", required=True)
+    asking.add_argument("question")
+    asking.add_argument("--questions", type=Path, default=QUESTIONS)
+    using = commands.add_parser("used", help="mark an answered question used")
+    using.add_argument("id")
+    using.add_argument("--by", required=True)
+    using.add_argument("--note", required=True)
+    using.add_argument("--questions", type=Path, default=QUESTIONS)
+    args = parser.parse_args(argv)
+    if args.command == "serve":
+        return serve(args)
+    if args.command == "wait":
+        return wait(args)
+    if args.command == "ask":
+        return ask(args)
+    if args.command == "used":
+        return used(args)
+    data = snapshot()
+    try:
+        write_atomic(args.out, data)
+    except OSError as exc:
+        print("dashboard: cannot write {}: {}".format(args.out, exc), file=sys.stderr)
+        return 1
+    if not args.quiet:
+        try:
+            where = args.out.resolve().relative_to(ROOT).as_posix()
+        except ValueError:
+            where = str(args.out)
+        print("Wrote {}: open work PCB {}, DATASET {}, Research {}; library {} entries.".format(
+            where, *(len(data["projects"][name]) for name, _ in PROJECTS), data["library"]["count"]))
+        if "note" in data:
+            print("Note: " + data["note"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

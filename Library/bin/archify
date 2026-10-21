@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Pinned Archify: --install links this device; --check verifies; other args forward."""
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def revision(repo):
+    try:
+        return subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'],
+                                       text=True, stderr=subprocess.DEVNULL, timeout=5).strip()
+    except (OSError, subprocess.SubprocessError):
+        return ''
+
+
+def problems(root):
+    repo = root / 'Library/archify'
+    issues = []
+    try:
+        pin = next(row.split('\t')[2] for row in
+                   (root / 'Library/repos.txt').read_text().splitlines()
+                   if row.startswith('Library/archify\t'))
+    except (OSError, StopIteration, IndexError):
+        return ['Archify manifest pin missing']
+    for name in ('archify/bin/archify.mjs', 'archify/SKILL.md'):
+        if not (repo / name).is_file():
+            issues.append('missing ' + name + '; restore Library/repos.txt clone')
+    if not issues and revision(repo) != pin:
+        issues.append('Archify pin mismatch; restore manifest revision')
+    if not shutil.which('node'):
+        issues.append('Node.js missing; install Node >=18')
+    return issues
+
+
+def link(source, target):
+    if target.is_symlink() and target.resolve() == source.resolve():
+        return
+    if target.exists() or target.is_symlink():
+        raise RuntimeError('Refusing to replace existing path: ' + str(target))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.symlink_to(os.path.relpath(source, target.parent), target_is_directory=source.is_dir())
+
+
+def launch(root, args):
+    issues = problems(root)
+    if issues:
+        print('\n'.join(issues), file=sys.stderr)
+        return 2
+    env = dict(os.environ, ARCHIFY_UPDATE_CHECK_DISABLED='1')
+    return subprocess.call([shutil.which('node'), str(root / 'Library/archify/archify/bin/archify.mjs'),
+                            *args], env=env)
+
+
+def main(args=None):
+    args = sys.argv[1:] if args is None else args
+    if args == ['skill']:
+        print(ROOT / 'Library/archify/archify/SKILL.md')
+        return 0
+    if args in (['--check'], ['--install']):
+        issues = problems(ROOT)
+        if args == ['--install'] and not issues:
+            link(ROOT / '.claude/skills/archify', ROOT / '.agents/skills/archify')
+            link(ROOT / 'Library/bin/archify', Path.home() / '.local/bin/archify')
+        for path in ('.claude/skills/archify/SKILL.md', '.agents/skills/archify/SKILL.md'):
+            if not (ROOT / path).is_file():
+                issues.append('missing adapter: ' + path + '; run --install')
+        print('\n'.join(issues) if issues else 'Archify ready: pinned source, Node and both agent adapters')
+        return 1 if issues else 0
+    if not args or args == ['--help']:
+        print('archify --install | --check | skill | doctor | <upstream arguments>')
+        return 0
+    return launch(ROOT, args)
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError) as error:
+        print('archify: ' + str(error), file=sys.stderr)
+        sys.exit(2)

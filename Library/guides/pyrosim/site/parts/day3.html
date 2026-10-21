@@ -1,0 +1,132 @@
+<section id="day3">
+  <div class="day-head">
+    <div><p class="kicker">Day 3</p><h2>The fire is a surface with a heat release rate, so today you define the fuel, its smoke, and the ISO 9705 heat output programme</h2></div>
+    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+  </div>
+  <div class="goal"><span class="g-l">Goal</span><p>By the end of today your model holds a propane reaction that produces soot and carbon monoxide, and a corner burner that runs 100 kW for ten minutes and then 300 kW for ten more.</p></div>
+
+  <p class="phase">Learn</p>
+
+  <p class="prose">There is no fire object in FDS. The User's Guide puts it plainly in section 9.1: a specified fire is modelled as the ejection of gaseous fuel from a solid surface or vent, with a heat release rate per unit area, <code>HRRPUA</code>, in kilowatts per square metre. You do not place a flame. You describe a patch of surface, say how many kilowatts each square metre of it gives off, and FDS pushes fuel gas in through that patch and burns it where it meets oxygen.</p>
+
+  <p class="prose">So a working burner needs two separate things, and they live in two separate dialogs. A <b>reaction</b> says what the fuel is and what it turns into. A <b>surface</b> says how fast fuel comes out and when. Miss the reaction and FDS refuses to start, with a message that names the surface: <code>ERROR(314): SURF BURNER Must have a REAC line when using HRRPUA or MLRPUA.</code> Miss a detail in either one and FDS usually runs to the end and gives you the wrong fire without complaining.</p>
+
+  <details class="deeper"><summary>Why a fire is a boundary condition and not a prediction</summary><div class="d-in"><p class="prose">FDS solves the gas in the room cell by cell. Fuel gas can only enter through the faces of cells, which is why a burner has to be a surface. The reaction then converts that fuel to heat, water, carbon dioxide, and whatever soot and CO you asked for, wherever fuel and oxygen mix.</p><p class="prose">One consequence is worth carrying into every report you write: this model does not predict how big the fire gets. You prescribe it. Johansson and Ekholm gave eight Swedish consultancies the same problem — an 800 mm heptane pool in a three-room apartment — and compared what came back, in Fire Technology in 2018. In their words, the differences in how the fuel and the burner were described were relatively large, which resulted in large differences in mass loss rate and heat release rate. The room physics was the easy part. The burner definition was where the answers diverged.</p></div></details>
+
+  <h3>The reaction, and the trap in the library</h3>
+
+  <p class="prose">From FDS 6 onward a reaction is compulsory for a fire, and the guide is explicit that you are responsible for the fuel chemistry and for the post-combustion yields of CO and soot, because those yields default to zero. Zero is a real number here, not a missing value: FDS will happily run a fire that makes no smoke at all.</p>
+
+  <p class="prose">PyroSim ships a property library with 21 predefined entries named <code>FDS6 PROPANE</code>, <code>FDS6 METHANE</code> and so on. Each of those entries sets the fuel and nothing else. Add <code>FDS6 PROPANE</code> from the library, change nothing, and every smoke channel in your results is dead flat for the whole run: the CO reading stays at exactly 0, optical density stays at 0, visibility sits pinned at its 30 m ceiling, and the fractional effective dose loses its carbon monoxide term entirely. The gas still gets hot, so the model looks alive while half of what DATASET needs is missing.</p>
+
+  <p class="prose">Set two numbers on the <span class="ui">Byproducts</span> tab and the problem goes away: a soot yield of <span class="val">0.024</span> and a CO yield of <span class="val">0.005</span>, both in kilograms per kilogram of fuel burned. Those are NIST's own values for propane. The FDS Validation Guide for 6.10.1 states in section 12.2.2 that in all cases the soot and CO yields were taken to be 0.024 and 0.005 respectively, based on the measurements of Tewarson, and NIST's validation input for an NFPA 286 room with a corner propane burner carries the same pair.</p>
+
+  <details class="deeper"><summary>What those two yields do and do not change</summary><div class="d-in"><p class="prose">The yields are fractions of fuel mass: 0.024 means 24 g of soot for every kilogram of propane burned. They apply to well-ventilated, post-flame conditions, which is what a 100 kW and 300 kW burner in an open-doored room gives you.</p><p class="prose">They barely change the heat. They decide the smoke. Soot yield drives optical density and visibility, because FDS turns soot mass into an extinction coefficient using a mass extinction coefficient of 8700 m²/kg. CO yield drives the CO reading and the CO part of the fractional effective dose. If you later model a different fuel, look the yields up rather than reusing these.</p></div></details>
+
+  <h3>The surface, and the arithmetic that decides your fire</h3>
+
+  <p class="prose">A burner surface carries one number that matters today: heat release rate per unit area, in kW/m². Total output is that number multiplied by the area you paint it on. PyroSim's own documentation gives the worked case: a surface with 500 kW/m² applied to a 2.0 m² vent produces a 1000 kW fire. Run it backwards to get what you type: divide the kilowatts you want by the square metres of burner top.</p>
+
+  <p class="prose">The ISO 9705 ignition source is a 170 mm square sand burner, so its top is 0.17 × 0.17 m = 0.0289 m². Your mesh cannot draw that. On the 20 cm grid you built yesterday the nearest honest shape is one whole cell, 0.2 × 0.2 m, which is 0.04 m² — about 38 % more area for the same kilowatts. The 10 cm version of the reference case draws that same square as four cells. Keeping the total heat right matters more than keeping the footprint right, so pick the flux that gives the right total on the patch you actually drew.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Burner top</th><th class="num">Area</th><th class="num">For 100 kW</th><th class="num">For 300 kW</th></tr></thead>
+      <tbody>
+        <tr><td><b>ISO 9705, as built</b></td><td class="num">0.0289 m²</td><td class="num">3460 kW/m²</td><td class="num">10 381 kW/m²</td></tr>
+        <tr><td><b>Drawn as 0.2 × 0.2 m on the grid</b></td><td class="num">0.0400 m²</td><td class="num">2500 kW/m²</td><td class="num">7500 kW/m²</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">The 0.2 m patch is a modelling choice, not part of the standard, and you should say so whenever you report the case. The reference case for this guide uses the second row: <code>HRRPUA=7500.0</code> on a 0.2 × 0.2 m top, with the ramp holding one third of it for the first stage.</p>
+
+  <h3>The programme, and the two ways to ramp</h3>
+
+  <p class="prose">ISO 9705-1:2016 clause 6.4 sets the heat output: 100 kW for the first 10 minutes after ignition, then 300 kW for a further 10 minutes. That is 600 s and 1200 s, and it is why the reference run is 1200 s long.</p>
+
+  <p class="prose">FDS will not step from nothing to full output instantly unless you insist. Every burner surface has a ramp, and the default is a hyperbolic tangent with a time constant of 1 s, so the burner is at about 76 % of full output one second after the start. That default is fine for a single-stage fire and useless for a two-stage programme. There are two ways to change it.</p>
+
+  <ul class="plain">
+    <li><b>A time constant.</b> In the FDS file this is <code>TAU_Q</code>. A positive value gives the tanh curve above. A negative value gives a t-squared growth that reaches full output at the absolute value of the number and holds it there: <code>TAU_Q=-300</code> means full output at 300 s. The 6.10.1 guide words this as "after TAU_Q seconds"; the 6.11.1 guide adds the absolute-value bars. PyroSim's ramp control is where you choose this.</li>
+    <li><b>A custom ramp.</b> A list of (time, fraction) pairs. The fraction is the share of the HRRPUA you typed, FDS interpolates linearly between the points, and the times must increase. This is the only way to write the ISO two-stage programme, because it is two flat stages with a step between them.</li>
+  </ul>
+
+  <p class="prose">The two are mutually exclusive. The FDS User's Guide says so in section 11.1: the TAUs and the RAMPs cannot both be used on the same quantity. In PyroSim you pick one from the <span class="ui">Ramp-Up Time</span> control on the burner's <span class="ui">Heat Release</span> tab, and picking a custom ramp opens an <span class="ui">Edit Values</span> table for the pairs.</p>
+
+  <p class="prose">One last decision before you draw anything: how high the burner sits. ISO 9705-1:2016 clause 6.2 puts the top surface (146 ± 3) mm off the floor, in the corner opposite the doorway wall, touching both walls. Under the 1993-era practice the same 17 cm burner was raised so that its top was 300 mm above the floor, which is how Dillon's 1998 NIST measurements were made. The reference case follows the 2016 edition, and each mesh takes the nearest cell face to 146 mm: <span class="val">0.1</span> m on the 10 cm version, <span class="val">0.2</span> m on the 20 cm mesh you are working in. That is not a choice you can dodge — run the 10 cm file on 20 cm cells and FDS snaps its 0.1 m burner top up to 0.2 m, which is what the reference run's own geometry shows. If you ever reproduce a pre-2016 test, move the top to 0.3 m and expect a different plume, because the flame starts about 0.15 m higher in a 2.4 m room.</p>
+
+  <p class="phase">Build</p>
+
+  <p class="prose">Open yesterday's model before you start. Every step below is done in PyroSim; nothing is computed until Day 5.</p>
+
+  <ol class="steps">
+    <li><div><p><span class="path">Model › Edit Reactions</span> — click <span class="ui">Add From Library</span>, select <span class="val">FDS6 PROPANE</span> on the right-hand side, and click the left arrow to copy it into your model. Click <span class="ui">Close</span> to return to <span class="ui">Edit Reactions</span>. The reaction now exists but produces no smoke.</p></div></li>
+    <li><div><p><span class="path">Model › Edit Reactions › Byproducts</span> — with the propane reaction selected, type <span class="val">0.024</span> into the soot yield field and <span class="val">0.005</span> into the CO yield field. Both are kg/kg. Click <span class="ui">OK</span>.</p></div></li>
+    <li><div><p><span class="path">Navigation panel › Reactions</span> — check that propane is the active reaction. PyroSim allows only one active simple chemistry reaction at a time; if yours is not active, right-click it and choose <span class="ui">Set as Active Reaction</span>.</p></div></li>
+    <li><div><p><span class="path">Model › Edit Surfaces</span> — click <span class="ui">New</span>, name the surface <span class="val">Burner</span>, set <span class="ui">Surface Type</span> to <span class="val">Burner</span>, and click <span class="ui">OK</span>.</p></div></li>
+    <li><div><p><span class="path">Model › Edit Surfaces › Heat Release</span> — type <span class="val">7500</span> into the <span class="ui">Heat Release Rate (HRRPUA)</span> field, which the manual defines as the heat release rate per unit area of this burner. The unit is kW/m². Leave <span class="ui">Mass Loss Rate (MLRPUA)</span> empty; the FDS User's Guide says not to specify both on the same surface.</p></div></li>
+    <li><div><p><span class="path">Model › Edit Surfaces › Heat Release</span> — open the <span class="ui">Ramp-Up Time</span> control and choose the custom option, then click <span class="ui">Edit Values</span> and enter five (time, fraction) pairs: <span class="val">0, 0</span> · <span class="val">10, 0.3333</span> · <span class="val">600, 0.3333</span> · <span class="val">610, 1.0</span> · <span class="val">1200, 1.0</span>. That is 10 s to reach 100 kW, hold to 600 s, 10 s to step up to 300 kW, hold to 1200 s. PyroSim's own 2026.1 program files name five ramp options: Default, Automatic, Tanh, t² and Custom. Which of them this particular control lists is not documented, so read what is on your screen. If there is no custom option, photograph the control for the screenshot slot below and keep going; the ramp can also be written into the exported <code>.fds</code> file, which is how the reference case does it.</p></div></li>
+    <li><div><p><span class="path">Drawing toolbar › Block</span> — in the corner opposite the door, draw a block from <span class="val">0, 0, 0</span> to <span class="val">0.2, 0.2, 0.2</span> m. On your 20 cm mesh that is one whole cell, so no edge of it is left to snapping; the 10 cm version of the reference case draws the same footprint 0.1 m tall. This is the burner body, and it keeps whichever surface your model uses by default.</p></div></li>
+    <li><div><p><span class="path">Drawing toolbar › Vent</span> — in the 3D view, draw a vent on the top face of that block, covering it exactly: <span class="val">0, 0, 0.2</span> to <span class="val">0.2, 0.2, 0.2</span> m. A vent has to be attached to a solid obstruction at least one cell thick, and PyroSim's manual says drawing it in the 3D view is the easier way to get that attachment.</p></div></li>
+    <li><div><p><span class="path">Vent Properties</span> — double-click the new vent, set <span class="ui">Surface</span> to <span class="val">Burner</span>, and name it <span class="val">Burner top</span>. This is the moment the fire exists.</p></div></li>
+    <li><div><p><span class="path">File › Save</span> — save the model, then switch to the <span class="ui">Record View</span> tab at the bottom of the model view and read the lines PyroSim has written for you.</p></div></li>
+  </ol>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The Edit Reactions dialog on the Byproducts tab, with the propane reaction selected and the soot yield 0.024 and CO yield 0.005 visible in their fields.</p></div></div>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The Edit Surfaces dialog with Surface Type set to Burner: the HRRPUA field showing 7500 kW/m², and the Ramp-Up Time control open so its list of options is readable.</p></div></div>
+
+  <p class="prose">This is the reference case in FDS's own language. Four kinds of line came from today's work: the <code>&amp;REAC</code> line with its two yields, the <code>&amp;SURF</code> line carrying <code>HRRPUA</code> and pointing at a ramp by name, the five <code>&amp;RAMP</code> lines that share that name, and the <code>&amp;OBST</code> burner block. The listing is the 10 cm version of the case, so its burner block stands 0.1 m tall where yours stands 0.2 m. The reference file attaches the burner surface to the top face of the block with <code>SURF_IDS</code>, which lists the top, the sides and the bottom in that order; your vent does the same job, and PyroSim writes it as a <code>&amp;VENT</code> line instead. Both are documented ways to prescribe a burner.</p>
+
+<!--FDSBLOCK:iso9705_room-->
+
+  <p class="phase">Check</p>
+
+  <div class="check"><h4>Check your result</h4><p class="prose">In the Record View, find your burner surface and read it back as arithmetic: 7500 kW/m² × 0.04 m² = 300 kW at full output, and the ramp fraction 0.3333 gives 99.99 kW in the first stage. Confirm the ramp has five pairs with increasing times, that the vent's <code>XB</code> coordinates match the top face of the block exactly, and that the reaction line carries both yields. PyroSim can total this for you: <span class="path">Model › Edit Model Checks</span>, click <span class="ui">New</span>, set <span class="ui">Check Type</span> to <span class="val">Surface</span> and <span class="ui">Surface Type</span> to <span class="val">Burner</span>, then run it from <span class="path">Analysis › Run Model Checks</span>. It reports the maximum heat release rate per applicable surface, and that number should read 300 kW. A burner that totals 4 kW, or 0 kW, has one of the faults in the table below.</p></div>
+
+  <p class="prose">You cannot see the fire yet — running is Day 5. What you can do is fix the shape you expect. The reference run below is this room and this burner on the same 20 cm cells you built yesterday, so it is what your own run should look like. It is not the truth about a real ISO 9705 room: 20 cm is coarse for this fire and the run reads cool, which is Day 6's subject.</p>
+
+<!--CHART:hrr-->
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Time</th><th class="num">Programme asks for</th><th class="num">Reference run, 20 cm cells</th></tr></thead>
+      <tbody>
+        <tr><td><b>60 s</b></td><td class="num">100 kW</td><td class="num">109 kW</td></tr>
+        <tr><td><b>300 s</b></td><td class="num">100 kW</td><td class="num">102 kW</td></tr>
+        <tr><td><b>590 s</b></td><td class="num">100 kW</td><td class="num">106 kW</td></tr>
+        <tr><td><b>620 s</b></td><td class="num">300 kW</td><td class="num">255 kW</td></tr>
+        <tr><td><b>900 s</b></td><td class="num">300 kW</td><td class="num">323 kW</td></tr>
+        <tr><td><b>1195 s</b></td><td class="num">300 kW</td><td class="num">317 kW</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">Read that table the way you will read your own run. The reported heat release rate is what actually burned in the gas, not the number you typed, so single one-second readings scatter: across the 100 kW stage this run ranges from 84 kW to 124 kW, and across the 300 kW stage from 215 kW to 401 kW. Averaged over ten seconds it sits within about 1 % of the programme — 100 kW before the step, 295 kW in the ten seconds after it — so the 255 kW at 620 s in the table is one noisy sample rather than a slow start. A fire that is a factor of ten out, or flat at zero, is a typing error or a geometry error, and the three below are the ones that produce no message at all.</p>
+
+  <div class="watch"><h4>Watch out</h4><p class="prose">The field is kW/m², not kW. Type <span class="val">100</span> into it, meaning 100 kW, and on a 0.04 m² burner top you have asked for 100 kW/m² × 0.04 m² = 4 kW, one twenty-fifth of the fire you meant. On the true 0.0289 m² ISO burner top the same slip gives 2.89 kW, 35 times too small, which is what a test run on this project's Mac produced. FDS reports no error, the run completes, and the room stays cold. Whenever you type into an HRRPUA field, say the multiplication out loud before you click OK.</p></div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>What you did</th><th>What FDS does with it</th><th class="num">Fire you get</th></tr></thead>
+      <tbody>
+        <tr><td><b>Typed 100 into HRRPUA for a 0.2 × 0.2 m top</b></td><td>Takes it as 100 kW/m² and multiplies by 0.04 m²</td><td class="num">4 kW</td></tr>
+        <tr><td><b>Drew the burner 0.17 × 0.17 m off the grid lines on 20 cm cells</b></td><td>The patch is narrower than one cell, both edges round to the same grid line, and the vent is dropped from the model with no message</td><td class="num">0 kW</td></tr>
+        <tr><td><b>Made the vent bigger than the block under it, say 0.8 × 0.8 m on a 0.4 × 0.4 m block at 500 kW/m²</b></td><td>Applies the heat release rate only to the part of the vent with solid beneath it</td><td class="num">80 kW</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">The second row is the reason step 7 drew the block on whole cell boundaries. Once a burner covers at least one cell face, FDS protects the total for you: the User's Guide says it adjusts the mass flux so that the specified area multiplied by the specified flux is maintained, even when snapping moves the edges. Below one cell there is nothing to adjust.</p>
+
+  <div class="quiz">
+    <details class="q"><summary><span class="qt">Your burner top is 0.2 × 0.2 m and you want 300 kW. What goes into the HRRPUA field?</span></summary><div class="qa">7500 kW/m². The area is 0.2 × 0.2 = 0.04 m², and 300 kW ÷ 0.04 m² = 7500 kW/m². On the real ISO burner top of 0.0289 m² the same 300 kW would need 10 381 kW/m².</div></details>
+    <details class="q"><summary><span class="qt">You added FDS6 PROPANE from the library and your CO reading is exactly 0 for the whole run. What is wrong?</span></summary><div class="qa">Nothing failed; the library entry sets only the fuel, and the CO and soot yields default to zero. Set 0.005 for CO and 0.024 for soot on the Byproducts tab. Until you do, CO, optical density, visibility and the CO part of the fractional effective dose carry no information.</div></details>
+    <details class="q"><summary><span class="qt">What does a negative TAU_Q mean, and why can you not use it together with a ramp?</span></summary><div class="qa">A negative value gives t-squared growth that reaches full output at the absolute value of the number and stays there; a positive value gives a tanh curve with that time constant. The User's Guide states that the TAUs and the RAMPs are mutually exclusive, because each is a complete description of the same curve — FDS would have no way to reconcile two.</div></details>
+    <details class="q"><summary><span class="qt">The heat release rate column reads 0 for the whole run and FDS printed no error. Name two things to check.</span></summary><div class="qa">First, whether the burner patch is at least one cell across and drawn on grid lines: a vent whose two edges round to the same grid line disappears silently. Second, whether the vent sits on a solid face — a vent floating in air stops the run with ERROR(820), but a vent hanging over the edge of its block burns only where solid is beneath it and gives a smaller fire with no message.</div></details>
+    <details class="q"><summary><span class="qt">How high is the burner top in your model, and why is that number not 146 mm?</span></summary><div class="qa">0.2 m, because that is the nearest cell face to 146 mm on a 20 cm grid; the 10 cm version of the reference case puts it at 0.1 m. ISO 9705-1:2016 asks for (146 ± 3) mm above the floor, which no cell face on either mesh lands on. Work from a pre-2016 test, such as Dillon's 1998 NIST measurements, and the burner top belongs at 0.3 m instead.</div></details>
+  </div>
+
+  <div class="done-row"><input type="checkbox" id="done-day3" data-done="day3"><label for="done-day3">Day 3 done</label></div>
+</section>

@@ -1,0 +1,1939 @@
+#!/usr/bin/env python3
+"""tieitup: TieItUp's changed-line check, its whole-file jobs and its record.
+
+check reads only the lines a change adds and prints one line per finding;
+audit, debt, gain and help do the jobs of Ponytail's other skills; mark, miss
+and learn keep a record of the check's own mistakes and turn it into
+proposals. Every command exits 0 so the check can never block an edit, a
+commit or a turn; only a usage error exits 2. Python 3.9 standard library.
+"""
+import ast
+import datetime
+import hashlib
+import importlib.util
+import inspect
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import sysconfig
+import time
+import traceback
+import warnings
+
+ROOT = Path(__file__).resolve().parents[2]
+# The Ponytail skills the conflicts table was last checked against; `tieitup rechecked` rewrites it.
+CHECKED_FILE = '.claude/skills/tieitup/references/checked.json'
+CHECKED_VERSION = 1
+BENCH_EVIDENCE = 'PRDs and Specs/*TieItUp*/evidence/bench-*.json'
+PATCH_GRACE_DAYS = 30   # a Claude Code patch release makes the benchmark due only once the last one is this old
+TRANSCRIPT_TAIL = 256 * 1024
+# The rule files a model-specific workaround would live in (router, CLAUDE.md "A rule that works around a model").
+RULE_FILES = ('CLAUDE.md', 'AGENTS.md', 'LESSONS.md', '*/CLAUDE.md', '.claude/skills/*/SKILL.md')
+EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+GIT_TIMEOUT = 20
+LOG_LIMIT = 2 * 1024 * 1024
+READ_LIMIT = 4 * 1024 * 1024
+AUDIT_SHOWN = 20
+CALLERS_SHOWN = 10
+CALLER_NAMES = 25
+SHOWN_TEXT = 100    # characters of a quoted line
+ID_DIGITS = 8       # hex digits of a finding's ID and of a check's revision
+SHORT_SHA = 7
+DEEP = 4            # levels allowed; a fifth is a finding
+RUN = 6             # lines in a row that make a duplicate
+SMALLEST_MAGIC = 3  # 0, 1, -1 and 2 are never magic
+PRECISION = 0.8
+DECIDED = 5
+SILENT_RUNS = 200
+NEVER_CUT = ('bare-except', 'swallowed-error', 'unchecked-run', 'open-file', 'shell-true')
+NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+
+PONYTAIL = 'Library/ponytail/skills/'
+CITE = {
+    'bare-except': 'rule 1; Core Python Programming p.355-356',
+    'swallowed-error': 'rule 1; The Practice of Programming p.113',
+    'unchecked-run': 'rule 2; Code Complete p.66',
+    'open-file': 'rule 6; Python Crash Course p.182',
+    'py39': 'rule 7; The Practice of Programming p.156-158',
+    'shell-true': 'rule 8; Python Cookbook p.576-577',
+    'vague-name': 'rule 9; Code Complete p.122',
+    'nesting': 'rule 13; The Art of Readable Code p.91-93',
+    'magic-number': 'rule 14; The Practice of Programming p.15-16',
+    'commented-code': 'rule 16; Clean Code p.81-82',
+    'duplicate': 'Ponytail ' + PONYTAIL + 'ponytail-review/SKILL.md:52; Refactoring p.101',
+    'shortcut': 'Ponytail ' + PONYTAIL + 'ponytail/SKILL.md:42; Clean Code p.72',
+    'untested-logic': 'Ponytail ' + PONYTAIL + 'ponytail/SKILL.md:41',
+    'new-dependency': 'Ponytail ' + PONYTAIL + 'ponytail/SKILL.md:29-30',
+    'one-implementation': 'Ponytail ' + PONYTAIL + 'ponytail-review/SKILL.md:51',
+    'pass-through': 'Ponytail ' + PONYTAIL + 'ponytail/SKILL.md:35; The Art of Readable Code p.129-130',
+}
+
+EXTENSIONS = {'.py': 'python', '.sh': 'bash', '.bash': 'bash', '.c': 'c', '.h': 'c',
+              '.js': 'js', '.mjs': 'js', '.cjs': 'js', '.jsx': 'js', '.ts': 'ts', '.tsx': 'ts'}
+CODE = ('python', 'bash', 'c', 'js', 'ts')
+TEST_DIRS = {'test', 'tests', '__tests__', 'spec', 'specs'}
+TEST_NAME = re.compile(r'(test_.*|.*_test\.\w+|.*\.(test|spec)\.\w+|conftest\.py)$')
+MANIFEST = re.compile(r'(requirements[\w.-]*\.txt|package\.json)$')
+
+
+class Usage(Exception):
+    """A usage error: the only thing that exits 2."""
+
+
+class GitError(Exception):
+    pass
+
+
+def git(root, *args, check=True):
+    try:
+        done = subprocess.run(['git', '-C', str(root)] + list(args), capture_output=True,
+                              text=True, encoding='utf-8', errors='replace', stdin=subprocess.DEVNULL,
+                              creationflags=NO_WINDOW, timeout=GIT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise GitError('git %s gave no answer within %ds' % (args[0], GIT_TIMEOUT))
+    if check and done.returncode:
+        lines = (done.stderr or done.stdout).strip().splitlines()
+        raise GitError('git %s failed: %s' % (args[0], lines[0] if lines else 'exit %d' % done.returncode))
+    return done
+
+
+def toplevel(folder):
+    try:
+        done = git(folder, 'rev-parse', '--show-toplevel', check=False)
+    except (OSError, GitError):
+        return None
+    return Path(done.stdout.strip()).resolve() if done.returncode == 0 and done.stdout.strip() else None
+
+
+def finding_id(check, path, text):
+    key = '\n'.join([check, path, re.sub(r'\s+', '', text)])
+    return hashlib.sha1(key.encode('utf-8')).hexdigest()[:ID_DIGITS]
+
+
+def language(path, head):
+    name = path.rsplit('/', 1)[-1]
+    if MANIFEST.match(name):
+        return 'manifest'
+    ext = os.path.splitext(name)[1].lower()
+    if ext:
+        return EXTENSIONS.get(ext)
+    if head.startswith('#!'):
+        if 'python' in head:
+            return 'python'
+        if re.search(r'[/\s](ba)?sh\b', head):
+            return 'bash'
+    return None
+
+
+def is_test(path):
+    parts = path.lower().split('/')
+    return bool(TEST_DIRS.intersection(parts[:-1])) or bool(TEST_NAME.match(parts[-1]))
+
+
+# ---------------------------------------------------------------- reading a file
+
+def scan(lines, lang):
+    """Split each line into its code, with string contents removed, and its comment text."""
+    codes, notes = [], []
+    hashes = lang in ('python', 'bash')
+    slashes = lang in ('c', 'js', 'ts')
+    quotes = {'python': ('"""', "'''", '"', "'"), 'js': ('`', '"', "'"), 'ts': ('`', '"', "'")}.get(lang, ('"', "'"))
+    state, heredoc = None, None
+    for line in lines:
+        if heredoc is not None:            # a here-document's body is data, often another language
+            codes.append('')
+            notes.append('')
+            if (line.lstrip('\t') if heredoc[1] else line) == heredoc[0]:
+                heredoc = None
+            continue
+        code, note, i, n = [], [], 0, len(line)
+        while i < n:
+            if state == '*/':
+                end = line.find('*/', i)
+                note.append(line[i:] if end < 0 else line[i:end])
+                if end < 0:
+                    break
+                state, i = None, end + 2
+                continue
+            if state is not None:
+                if line[i] == '\\' and not (lang == 'bash' and state == "'"):
+                    i += 2
+                elif line.startswith(state, i):
+                    code.append(state)
+                    i += len(state)
+                    state = None
+                else:
+                    i += 1
+                continue
+            if hashes and line[i] == '#' and (lang == 'python' or i == 0 or line[i - 1] in ' \t;&|('):
+                note.append(line[i + 1:])
+                break
+            if slashes and line.startswith('//', i):
+                note.append(line[i + 2:])
+                break
+            if slashes and line.startswith('/*', i):
+                state, i = '*/', i + 2
+                continue
+            for quote in quotes:
+                if line.startswith(quote, i):
+                    code.append(quote)
+                    state, i = quote, i + len(quote)
+                    break
+            else:
+                code.append(line[i])
+                i += 1
+        if state in ('"', "'") and lang != 'bash':
+            state = None           # a one-line string that never closed; do not carry it on
+        if lang == 'bash' and '<<' in ''.join(code):
+            opened = re.search(r'<<(-?)\s*[\'"]?([A-Za-z_]\w*)[\'"]?', line)
+            heredoc = (opened.group(2), bool(opened.group(1))) if opened and '<<<' not in line else None
+        codes.append(''.join(code))
+        notes.append(' '.join(note).strip())
+    return codes, notes
+
+
+class Source:
+    """One file's new side and which of its lines the change added."""
+
+    def __init__(self, path, text, added, removed=(), whole_new=False, lang=None):
+        self.path = path
+        self.text = text
+        self.lines = [line.rstrip('\r') for line in text.split('\n')]
+        if self.lines and self.lines[-1] == '':
+            self.lines.pop()
+        self.added = set(added)
+        self.removed = list(removed)
+        self.whole_new = whole_new
+        head = self.lines[0] if self.lines else (self.removed[0] if self.removed else '')
+        self.lang = lang or language(path, head)
+        self.test = is_test(path)
+        self.where = None          # the file on disk, when there is one
+        self._scan = None
+        self._tree = False
+        self._parents = None
+
+    @property
+    def codes(self):
+        if self._scan is None:
+            self._scan = scan(self.lines, self.lang)
+        return self._scan[0]
+
+    @property
+    def notes(self):
+        if self._scan is None:
+            self._scan = scan(self.lines, self.lang)
+        return self._scan[1]
+
+    @property
+    def tree(self):
+        if self._tree is False:
+            self._tree = None
+            if self.lang == 'python':
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter('ignore')
+                        self._tree = ast.parse('\n'.join(self.lines))
+                except (SyntaxError, ValueError, RecursionError):
+                    self._tree = None    # a file mid-edit: the text checks still run
+        return self._tree
+
+    @property
+    def parents(self):
+        if self._parents is None:
+            self._parents = {}
+            for node in ast.walk(self.tree) if self.tree else ():
+                for child in ast.iter_child_nodes(node):
+                    self._parents[child] = node
+        return self._parents
+
+    def touched(self, start, end=None):
+        return any(line in self.added for line in range(start, (end or start) + 1))
+
+    def noted(self, start, end=None):
+        return any(self.notes[line - 1] for line in range(start, (end or start) + 1)
+                   if 0 < line <= len(self.notes))
+
+    def nodes(self, *kinds):
+        return [node for node in ast.walk(self.tree) if isinstance(node, kinds)] if self.tree else []
+
+
+class Context:
+    """What the checks may know beyond one file: the repository, the tree and the whole change."""
+
+    def __init__(self, root, tree, sources, whole=False, audit=False, changed=()):
+        self.root = root
+        self.tree = tree            # 'worktree', 'index' or a revision
+        self.sources = sources
+        self.whole = whole
+        self.audit = audit
+        self.changed = list(changed)
+        self._files = None
+        self._windows = None
+        self._test_words = None
+
+    def grep(self, pattern, word=False):
+        """(path, line, text) for each match in the repository's tree; [] outside one."""
+        if self.root is None:
+            return []
+        args = ['grep', '-n', '-I', '-z', '--full-name'] + (['--cached'] if self.tree == 'index' else [])
+        args += (['-w', '-F'] if word else ['-E']) + ['-e', pattern]
+        if self.tree not in ('worktree', 'index'):
+            args.append(self.tree)
+        prefix = '' if self.tree in ('worktree', 'index') else self.tree + ':'
+        return parse_grep(git(self.root, *args, check=False).stdout, prefix)
+
+    def files(self):
+        if self._files is None:
+            self._files = []
+            if self.root is not None:
+                args = ['ls-files', '-z'] if self.tree == 'worktree' else (
+                    ['ls-files', '-z', '--cached'] if self.tree == 'index' else
+                    ['ls-tree', '-r', '-z', '--name-only', '--full-tree', self.tree])
+                self._files = [p for p in git(self.root, *args, check=False).stdout.split('\0') if p]
+        return self._files
+
+
+def parse_grep(stdout, prefix=''):
+    """(path, line, text) from git grep -n -z output; prefix is the revision a tree search adds."""
+    hits = []
+    for row in stdout.split('\n'):
+        path, _, rest = row.partition('\0')
+        number, _, text = rest.partition('\0')
+        if number.isdigit():
+            hits.append((path[len(prefix):] if prefix and path.startswith(prefix) else path, int(number), text))
+    return hits
+
+
+def word_lines(src, pattern, flags=0):
+    regex = re.compile(pattern, flags)
+    for line in sorted(src.added):
+        if line <= len(src.codes):
+            for match in regex.finditer(src.codes[line - 1]):
+                yield line, match
+
+
+def dotted(node):
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return '.'.join(reversed(parts))
+    return ''
+
+
+def aliases(src):
+    """Local name -> the module path it stands for, from the file's imports."""
+    names = {}
+    for node in src.nodes(ast.Import, ast.ImportFrom):
+        for alias in node.names:
+            if isinstance(node, ast.Import):
+                names[(alias.asname or alias.name).split('.')[0]] = (alias.asname and alias.name) or alias.name.split('.')[0]
+            elif node.module and not node.level:
+                names[alias.asname or alias.name] = node.module + '.' + alias.name
+    return names
+
+
+def resolved(call, names):
+    name = dotted(call.func)
+    head, _, rest = name.partition('.')
+    if head in names:
+        return names[head] + ('.' + rest if rest else '')
+    return name
+
+
+def keyword(call, name):
+    for kw in call.keywords:
+        if kw.arg == name:
+            return kw.value
+    return None
+
+
+def is_true(node):
+    return isinstance(node, ast.Constant) and node.value is True
+
+
+def span(node):
+    return node.lineno, getattr(node, 'end_lineno', None) or node.lineno
+
+
+# ---------------------------------------------------------------- the sixteen checks
+
+def check_bare_except(src, ctx):
+    for node in src.nodes(ast.ExceptHandler):
+        if node.type is None and node.lineno in src.added:
+            yield node.lineno, 'a bare except: also catches KeyboardInterrupt and SystemExit; name the exception types'
+
+
+def check_swallowed_error(src, ctx):
+    if src.lang == 'python':
+        for node in src.nodes(ast.ExceptHandler):
+            if all(isinstance(s, ast.Pass) or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant)
+                                               and s.value.value is Ellipsis) for s in node.body):
+                start, end = span(node)
+                if src.touched(start, end) and not src.noted(start, end):
+                    yield start, 'a handler that only passes, with no comment saying why that is safe'
+    elif src.lang == 'bash':
+        for line, _ in word_lines(src, r'\|\|\s*(?:true|:)\s*(?:$|[;&|)])'):
+            if not src.noted(line):
+                yield line, '|| true hides the failure, with no comment saying why that is safe'
+    elif src.lang in ('js', 'ts'):
+        text = '\n'.join(src.codes)
+        for match in re.finditer(r'\bcatch\b\s*(?:\([^)]*\))?\s*\{\s*\}', text):
+            start = text.count('\n', 0, match.start()) + 1
+            end = start + match.group().count('\n')
+            if src.touched(start, end) and not src.noted(start, end):
+                yield start, 'an empty catch, with no comment saying why that is safe'
+
+
+def check_unchecked_run(src, ctx):
+    names = aliases(src)
+    for node in src.nodes(ast.Expr):
+        if not isinstance(node.value, ast.Call):
+            continue
+        call, (start, end) = node.value, span(node)
+        name = resolved(call, names)
+        if not src.touched(start, end) or src.noted(start, end):
+            continue
+        if name in ('subprocess.run', 'subprocess.call') and not is_true(keyword(call, 'check')):
+            yield start, '%s result is thrown away and it has no check=True, so a failure goes unseen' % name
+        elif name == 'os.system':
+            yield start, "os.system's exit status is thrown away, so a failure goes unseen"
+
+
+def open_mode(call, method=False):
+    """The mode string of an open() call, 'r' when absent, None when it is not a literal."""
+    node = keyword(call, 'mode')
+    position = 0 if method else 1
+    if node is None and len(call.args) > position:
+        node = call.args[position]
+    if node is None:
+        return 'r'
+    literal = isinstance(node, ast.Constant) and isinstance(node.value, str) and re.fullmatch(r'[rwxabt+U]+', node.value)
+    return node.value if literal else None
+
+
+def check_open_file(src, ctx):
+    names = aliases(src)
+    opens = ('open', 'io.open', 'codecs.open')
+    for node in src.nodes(ast.Assign):
+        if not (isinstance(node.value, ast.Call) and resolved(node.value, names) in opens):
+            continue
+        mode = open_mode(node.value)
+        if node.lineno not in src.added or (mode and 'b' in mode):
+            continue
+        if any(isinstance(t, ast.Attribute) for t in node.targets):
+            continue                              # kept on self or an object
+        bound = {t.id for t in node.targets if isinstance(t, ast.Name)}
+        scope = src.parents.get(node)
+        while scope is not None and not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            scope = src.parents.get(scope)
+        if scope is not None and any(isinstance(r.value, ast.Name) and r.value.id in bound
+                                     for r in ast.walk(scope) if isinstance(r, ast.Return) and r.value):
+            continue                              # handed back to the caller
+        yield node.lineno, 'open() kept in a variable outside a with block; an error leaves the file open'
+    for call in src.nodes(ast.Call):
+        if call.lineno not in src.added:
+            continue
+        name = resolved(call, names)
+        method = isinstance(call.func, ast.Attribute) and call.func.attr in ('open', 'write_text') and name not in opens
+        if name not in opens and not method:
+            continue
+        mode = 'w' if method and call.func.attr == 'write_text' else open_mode(call, method)
+        if mode and 'b' not in mode and set(mode) & set('wax+') and keyword(call, 'encoding') is None:
+            yield call.lineno, "a text-mode write with no encoding=; the default differs between machines"
+
+
+def check_py39(src, ctx):
+    for call in src.nodes(ast.Call):
+        if (isinstance(call.func, ast.Attribute) and call.func.attr == 'write_text'
+                and keyword(call, 'newline') is not None and call.lineno in src.added):
+            yield call.lineno, ("write_text(newline=) needs Python 3.10 and the Mac runs 3.9; use "
+                                "open(path, 'w', encoding='utf-8', newline='\\n')")
+
+
+def check_shell_true(src, ctx):
+    for call in src.nodes(ast.Call):
+        if is_true(keyword(call, 'shell')) and src.touched(*span(call)):
+            yield call.lineno, 'shell=True hands the command to a shell; pass a list, or shlex.quote each part from input'
+
+
+VAGUE = {'foo', 'bar', 'baz', 'stuff', 'thing', 'xx', 'xxx', 'dummy'}
+TYPE_DIGIT = re.compile(r'(list|dict|set|tuple|str|string|int|num|number|float|arr|array|obj|object|data|info'
+                        r'|val|value|var|item|res|result|handle|text|map)_?\d+$')
+TWINS = ('_info', '_data', 'Info', 'Data')
+LOOP_HEAD = re.compile(r'\bfor\s*\(\s*$')
+BINDERS = {
+    'js': re.compile(r'\b(?:const|let|var|function\*?|class)\s+([A-Za-z_$][\w$]*)'),
+    'c': re.compile(r'\b(?:int|char|float|double|long|short|unsigned|signed|bool|void|size_t|u?int\d+_t'
+                    r'|struct\s+\w+|enum\s+\w+)\s+\**\s*([A-Za-z_]\w*)\s*(?=[=;\[,()])'),
+    'bash': re.compile(r'^\s*(?:local|export|readonly|declare(?:\s+-\w+)*)\s+([A-Za-z_]\w*)|^\s*([A-Za-z_]\w*)='
+                       r'|^\s*(?:function\s+)?([A-Za-z_][\w-]*)\s*\(\)|^\s*function\s+([A-Za-z_][\w-]*)'),
+}
+
+
+def bound_names(src):
+    """(line, name) for each name the file binds, leaving out loop and comprehension variables."""
+    if src.lang == 'python':
+        found = []
+        loops = set()
+        for node in src.nodes(ast.For, ast.AsyncFor, ast.comprehension):
+            loops.update(id(n) for n in ast.walk(node.target))
+        for node in ast.walk(src.tree) if src.tree else ():
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and id(node) not in loops:
+                found.append((node.lineno, node.id))
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                found.append((node.lineno, node.name))
+            elif isinstance(node, ast.arg) and node.arg not in ('self', 'cls'):
+                found.append((node.lineno, node.arg))
+        return found
+    regex = BINDERS.get('js' if src.lang == 'ts' else src.lang)
+    found = []
+    for number, code in enumerate(src.codes, 1):
+        for match in regex.finditer(code) if regex else ():
+            name = next((g for g in match.groups() if g), None)
+            if name and not LOOP_HEAD.search(code[:match.start()]):
+                found.append((number, name))
+    return found
+
+
+def callable_names(src):
+    """Names the file defines as functions or classes."""
+    if src.lang == 'python':
+        return {n.name for n in src.nodes(ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)}
+    return {name for name in (defined(line, src.lang) for line in src.codes) if name}
+
+
+def check_vague_name(src, ctx):
+    found = bound_names(src)
+    every = {name for _, name in found}
+    functions = callable_names(src)
+    for line, name in found:
+        if line not in src.added:
+            continue
+        low = name.lower()
+        if name in VAGUE:
+            yield line, "'%s' says nothing about what it holds; name it for its meaning" % name
+        elif TYPE_DIGIT.match(low):
+            yield line, "'%s' is a type word and a number; name it for what sets it apart" % name
+        else:
+            for suffix in TWINS:
+                twin = name[:-len(suffix)] if name.endswith(suffix) else name + suffix
+                # A function and the variable holding its result (file = file_info()) are not twins.
+                if twin and twin != name and twin in every and (name in functions) == (twin in functions):
+                    yield line, "'%s' differs from '%s' only by a noise word; give each its own meaning" % (name, twin)
+                    break
+
+
+def deep_python(src):
+    counted = tuple(getattr(ast, n) for n in ('If', 'For', 'AsyncFor', 'While', 'Try', 'TryStar') if hasattr(ast, n))
+    blocks = []
+
+    def visit(body, depth):
+        for stmt in body:
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                visit(stmt.body, 0)
+                continue
+            if isinstance(stmt, counted):
+                if depth >= DEEP:
+                    blocks.append(span(stmt))
+                    continue
+                visit(stmt.body, depth + 1)
+                orelse = stmt.orelse
+                if (isinstance(stmt, ast.If) and len(orelse) == 1 and isinstance(orelse[0], ast.If)
+                        and src.lines[orelse[0].lineno - 1].lstrip().startswith('elif')):
+                    visit(orelse, depth)
+                else:
+                    visit(orelse, depth + 1)
+                for handler in getattr(stmt, 'handlers', ()):
+                    visit(handler.body, depth + 1)
+                visit(getattr(stmt, 'finalbody', ()), depth + 1)
+            else:
+                visit(getattr(stmt, 'body', ()) if isinstance(getattr(stmt, 'body', None), list) else (), depth)
+                for case in getattr(stmt, 'cases', ()):
+                    visit(case.body, depth)
+    if src.tree:
+        visit(src.tree.body, 0)
+    return blocks
+
+
+def deep_bash(src):
+    blocks, stack, start = [], [], None
+    command_words = {';', '&', '|', '(', 'then', 'do', 'else', 'elif', ';;', '{', '!', '&&', '||'}
+    for number, code in enumerate(src.codes, 1):
+        command = True
+        for token in re.findall(r';;|&&|\|\||[A-Za-z_]+|[;&|(){}!]', code):
+            if command and token in ('if', 'for', 'while', 'until', 'case', 'select'):
+                stack.append(number)
+                if len(stack) == DEEP + 1:
+                    start = number
+            elif command and token in ('fi', 'done', 'esac') and stack:
+                if len(stack) == DEEP + 1 and start is not None:
+                    blocks.append((start, number))
+                    start = None
+                stack.pop()
+            command = token in command_words or token in ('if', 'while', 'until')
+    if start is not None:
+        blocks.append((start, len(src.lines)))
+    return blocks
+
+
+def deep_braces(src):
+    text = '\n'.join(src.codes)
+    blocks, stack, last, parens = [], [], 0, 0
+    for match in re.finditer(r'[{}();]', text):
+        char = match.group()
+        if char == '(':
+            parens += 1
+            continue
+        if char == ')':
+            parens = max(0, parens - 1)
+            continue
+        if char == ';' and parens:
+            continue
+        if char == '{':
+            head = text[last:match.start()]
+            outer = stack[-1][1] if stack else 0
+            line = text.count('\n', 0, match.start()) + 1
+            if (re.search(r'\b(?:if|for|while|switch|catch)\s*\(.*\)\s*$', head, re.S)
+                    or re.search(r'\b(?:else|try|finally|do)\s*$', head)):
+                stack.append(('control', outer + 1, line))
+            elif re.search(r'(=>|\))\s*$', head):
+                stack.append(('function', 0, line))
+            else:
+                stack.append(('other', outer, line))
+        elif char == '}' and stack:
+            kind, depth, line = stack.pop()
+            if kind == 'control' and depth == DEEP + 1:
+                blocks.append((line, text.count('\n', 0, match.start()) + 1))
+        last = match.end()
+    return blocks
+
+
+def check_nesting(src, ctx):
+    finder = {'python': deep_python, 'bash': deep_bash}.get(src.lang, deep_braces)
+    for start, end in finder(src):
+        if src.touched(start, end):
+            yield start, 'this block opens a fifth level in one function; return or continue early instead'
+
+
+NUMBER = re.compile(r'(?<![\w.$])(0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(?![\w.])')
+CONSTANT_LINE = re.compile(r'^\s*(?:[\w\[\]<>*]+\s+)*[A-Z][A-Z0-9_]*\s*(?::[^=]*)?=(?!=)')
+DEFAULT_BEFORE = re.compile(r'[({,]\s*[A-Za-z_$][\w$]*\s*(?::\s*\w+\s*)?=[-\d\s*+/.]*$')  # incl. 2 * 1024
+QUANTIFIER = re.compile(r'\{\d+(?:,\d*)?\}')    # a regex's {1,4096} counts, not a value
+HTTP_STATUS = {200, 201, 204, 301, 302, 304, 400, 401, 403, 404, 405, 409, 410, 422, 429, 500, 502, 503}
+STATUS_ARGUMENT = re.compile(r'[(,]\s*$')
+
+
+def numbers(src):
+    """(line, value, exempt) for each number literal in the file's code."""
+    found = []
+    if src.lang == 'python':
+        if not src.tree:
+            return found
+        exempt = set()
+        for node in ast.walk(src.tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                for default in node.args.defaults + [d for d in node.args.kw_defaults if d]:
+                    exempt.update(id(n) for n in ast.walk(default))
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                if all(isinstance(t, ast.Name) and t.id.isupper() for t in targets):
+                    exempt.update(id(n) for n in ast.walk(node))
+            elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+                factors = (node.left, node.right)
+                if all(isinstance(n, ast.Constant) and type(n.value) is int and n.value == 1024
+                       for n in factors):
+                    exempt.update(id(n) for n in factors)
+            elif isinstance(node, ast.ClassDef) and any('Enum' in dotted(b) or 'Flag' in dotted(b) for b in node.bases):
+                exempt.update(id(n) for n in ast.walk(node))
+            elif isinstance(node, ast.Call):
+                exempt.update(id(a) for a in node.args if isinstance(a, ast.Constant) and a.value in HTTP_STATUS)
+        for node in ast.walk(src.tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, (int, float))
+                    and not isinstance(node.value, bool)):
+                found.append((node.lineno, abs(node.value), id(node) in exempt))
+        return found
+    text = '\n'.join(src.codes)
+    enums = set()
+    for match in re.finditer(r'\benum\b[^{;]*\{[^}]*\}', text):
+        first = text.count('\n', 0, match.start()) + 1
+        enums.update(range(first, first + match.group().count('\n') + 1))
+    for number, code in enumerate(src.codes, 1):
+        whole = number in enums or code.lstrip().startswith('#define') or bool(CONSTANT_LINE.match(code))
+        counts = [m.span() for m in QUANTIFIER.finditer(code)]
+        for match in NUMBER.finditer(code):
+            raw = match.group()
+            value = int(raw, 16) if raw[:2] in ('0x', '0X') else float(raw)
+            before, after = code[:match.start()], code[match.end():]
+            status = (value in HTTP_STATUS and bool(STATUS_ARGUMENT.search(before))
+                      and after.lstrip()[:1] in (',', ')'))
+            counted = any(a <= match.start() and match.end() <= b for a, b in counts)
+            found.append((number, abs(value), whole or status or counted or bool(DEFAULT_BEFORE.search(before))))
+    return found
+
+
+def check_magic_number(src, ctx):
+    if src.test:
+        return
+    found = [(line, value) for line, value, exempt in numbers(src) if not exempt and value >= SMALLEST_MAGIC]
+    counts = {}
+    for _, value in found:
+        counts[value] = counts.get(value, 0) + 1
+    seen = set()
+    for line, value in sorted(found):
+        if line in src.added and counts[value] >= 2 and line not in seen:
+            seen.add(line)
+            shown = int(value) if float(value).is_integer() else value
+            yield line, 'the number %s is written by hand more than once; name it once and use the name' % shown
+
+
+CODE_WORDS = re.compile(r'\b(import|from|return|def|class|if|elif|else|for|while|try|except|finally|raise|with'
+                        r'|assert|del|global|nonlocal|lambda|yield|pass|break|continue|await|async)\b')
+SIGNED = re.compile(r'@author\b|\b(?:[Aa]dded|[Ww]ritten) by [A-Z][a-z]+')
+PROSE = re.compile(r'(?:\b[A-Za-z]+\b,? ){4}')   # four plain words in a row read as a sentence
+DIRECTIVE = re.compile(r'(!|type:|noqa|pragma|-\*-|pylint:|fmt:|shellcheck |eslint|ts-|istanbul|prettier)')
+
+
+def reads_as_code(text, lang):
+    if lang == 'python':
+        if not (re.search(r'[(=]', text) or CODE_WORDS.search(text)):
+            return False
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                tree = ast.parse(text)
+        except (SyntaxError, ValueError, RecursionError):
+            return False
+        return not all(isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant) for s in tree.body)
+    if lang == 'bash':
+        return bool(re.match(r'[A-Za-z_]\w*=("[^"]*"|\'[^\']*\'|\S*)(\s*;.*)?$', text) or text.endswith(('; then', '; do'))
+                    or re.search(r'(?:^|;\s*)(?:fi|done|esac)$', text))
+    return len(text) > 1 and text.endswith((';', '{', '}')) and not PROSE.search(text)
+
+
+def check_commented_code(src, ctx):
+    for line in sorted(src.added):
+        if line > len(src.notes) or not src.notes[line - 1]:
+            continue
+        text = src.notes[line - 1].strip().lstrip('*').strip()
+        if SIGNED.search(text):
+            yield line, 'a signature in a comment; git already records who wrote the line'
+        elif text and not DIRECTIVE.match(text) and reads_as_code(text, src.lang):
+            yield line, 'a comment that reads as code; delete it, git keeps the old version'
+
+
+IGNORED = {'else', 'else:', '}else{', 'fi', 'done', 'esac'}
+
+
+def significant(src):
+    """(line, text) for each line that counts toward a duplicate, spaces and comments stripped."""
+    rows = []
+    literal_rows = {}
+    for node in ast.walk(src.tree) if src.tree else ():
+        if (isinstance(node, ast.Constant) and isinstance(node.value, (str, bytes))
+                and node.lineno == node.end_lineno
+                and isinstance(src.parents.get(node), (ast.List, ast.Tuple, ast.Set, ast.Dict))):
+            literal_rows.setdefault(node.lineno, []).append((node.col_offset, repr(node.value)))
+    for number, code in enumerate(src.codes, 1):
+        text = re.sub(r'\s+', '', code)
+        if number in literal_rows:
+            # Keep data distinct after scan removes strings; preserve literal whitespace.
+            text += repr([value for _, value in sorted(literal_rows[number])])
+        if text and text not in IGNORED and not re.fullmatch(r'[{}()\[\];,:]+', text):
+            rows.append((number, text))
+    return rows
+
+
+def windows(ctx):
+    """For every non-test file: each run of RUN significant lines, and which of them are all added."""
+    if ctx._windows is None:
+        ctx._windows = {'file': {}, 'added': {}}
+        for src in ctx.sources:
+            if src.lang not in CODE or src.test:
+                continue
+            rows = significant(src)
+            mine = ctx._windows['file'][src.path] = {'rows': rows, 'at': {}}
+            for k in range(len(rows) - RUN + 1):
+                key = tuple(text for _, text in rows[k:k + RUN])
+                mine['at'].setdefault(key, []).append(k)
+                if all(line in src.added for line, _ in rows[k:k + RUN]):
+                    ctx._windows['added'].setdefault(key, []).append((src.path, rows[k][0]))
+    return ctx._windows
+
+
+def check_duplicate(src, ctx):
+    if src.test:
+        return
+    index = windows(ctx)
+    mine = index['file'].get(src.path)
+    if not mine:
+        return
+    rows = mine['rows']
+
+    def copy_of(k):
+        if not all(line in src.added for line, _ in rows[k:k + RUN]):
+            return None
+        key = tuple(text for _, text in rows[k:k + RUN])
+        other = next(('%s:%d' % (src.path, rows[j][0]) for j in mine['at'][key] if abs(j - k) >= RUN), None)
+        return other or next(('%s:%d' % hit for hit in index['added'].get(key, ()) if hit[0] != src.path), None)
+    k, last = 0, len(rows) - RUN
+    while k <= last:
+        other = copy_of(k)
+        if not other:
+            k += 1
+            continue
+        start = k
+        while k + 1 <= last and copy_of(k + 1):
+            k += 1                         # one finding for the whole repeated run
+        k += RUN
+        yield rows[start][0], '%d or more lines here repeat %s; merge them if they must change together' % (RUN, other)
+
+
+NOTE_WORDS = re.compile(r'\b(TODO|FIXME|XXX|HACK)\b')
+MARKER = re.compile(r'\b(shortcut|ponytail):(.*)')
+
+
+def check_shortcut(src, ctx):
+    for line in sorted(src.added):
+        note = src.notes[line - 1] if line <= len(src.notes) else ''
+        word, marker = NOTE_WORDS.search(note), MARKER.search(note)
+        if word:
+            yield line, ('a bare %s note; write it as shortcut: <the limit>, <when to upgrade>, '
+                         'or do it now' % word.group(1))
+        elif marker and not re.search(r'[,;]', marker.group(2)):
+            yield line, 'a %s: marker with no upgrade trigger after a comma or semicolon' % marker.group(1)
+
+
+def branchy(node):
+    return any(isinstance(n, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.IfExp))
+               for n in ast.walk(node) if n is not node)
+
+
+def untested_logic(ctx):
+    """One finding per change at most: new logic, and no test or assert anywhere in it."""
+    if not ctx.whole or any(is_test(path) for path in ctx.changed):
+        return []
+    code = sorted((s for s in ctx.sources if s.lang in CODE), key=lambda s: s.path)
+    if any(re.search(r'\bassert\b', s.codes[line - 1]) for s in code for line in s.added if line <= len(s.codes)):
+        return []
+    for src in code:
+        if src.whole_new and src.added:
+            return [(src, min(src.added), 'a new code file, and the change adds no test file and no assert')]
+        if src.lang == 'python':
+            for node in src.nodes(ast.FunctionDef, ast.AsyncFunctionDef):
+                if node.lineno in src.added and branchy(node):
+                    return [(src, node.lineno, "new function '%s' holds a branch or a loop, and the change "
+                                               "adds no test file and no assert" % node.name)]
+    return []
+
+
+def audit_untested(src, ctx):
+    """Under audit: a branching Python function whose name no test file mentions."""
+    if src.test or src.lang != 'python':
+        return
+    if ctx._test_words is None:
+        ctx._test_words = set()
+        texts = [other.text for other in ctx.sources if other.test]
+        for path in ctx.files():                  # the whole repository's tests, not only the audited path
+            if is_test(path) and language(path, '') in CODE:
+                try:
+                    with open(str(ctx.root / path), encoding='utf-8', errors='replace') as fh:
+                        texts.append(fh.read())
+                except OSError:
+                    continue                      # deleted in the working tree
+        for text in texts:
+            ctx._test_words.update(re.findall(r'\w+', text))
+    for node in src.nodes(ast.FunctionDef, ast.AsyncFunctionDef):
+        if branchy(node) and node.name not in ctx._test_words and not node.name.startswith('_'):
+            yield node.lineno, "function '%s' holds a branch or a loop and no test names it" % node.name
+
+
+_STDLIB = {}
+
+
+def standard(module):
+    if module not in _STDLIB:
+        _STDLIB[module] = _standard(module)
+    return _STDLIB[module]
+
+
+def _standard(module):
+    if module in sys.builtin_module_names or module == '__future__':
+        return True
+    try:
+        spec = importlib.util.find_spec(module)
+    except (ImportError, ValueError, AttributeError):
+        return False
+    if spec is None:
+        return False
+    if spec.origin in ('built-in', 'frozen'):
+        return True
+    where = spec.origin or next(iter(spec.submodule_search_locations or ()), '')
+    where = os.path.realpath(where)
+    homes = {os.path.realpath(p) for p in (sysconfig.get_paths().get('stdlib'), sysconfig.get_paths().get('platstdlib'),
+                                           os.path.join(sys.base_prefix, 'DLLs')) if p}
+    parts = set(Path(where).parts)
+    return (not {'site-packages', 'dist-packages'} & parts
+            and any(where.startswith(home + os.sep) for home in homes))
+
+
+def in_repository(module, src, ctx):
+    folder = (src.where or Path(ctx.root or '.') / src.path).parent
+    if (folder / (module + '.py')).exists() or (folder / module).is_dir():
+        return True
+    for path in ctx.files():
+        parts = path.split('/')
+        if parts[-1] == module + '.py' or module in parts[:-1]:
+            return True
+    return False
+
+
+def imported_elsewhere(module, src, ctx):
+    regex = re.compile(r'\s*(import|from)\s+%s\b' % re.escape(module))
+    for path, line, text in ctx.grep(module, word=True):
+        if regex.match(text) and (path != src.path or line not in src.added):
+            return True
+    return False
+
+
+def manifest_names(lines):
+    names = set()
+    for text in lines:
+        match = re.match(r'\s*"([^"]+)"\s*:', text) or re.match(r'\s*([A-Za-z0-9][\w.-]*)', text)
+        if match:
+            names.add(match.group(1).lower())
+    return names
+
+
+def check_new_dependency(src, ctx):
+    if src.lang == 'manifest':
+        yield from manifest_dependency(src)
+        return
+    for node in src.nodes(ast.Import, ast.ImportFrom):
+        if node.lineno not in src.added:
+            continue
+        if isinstance(node, ast.ImportFrom):
+            if node.level or not node.module:
+                continue
+            modules = [node.module]
+        else:
+            modules = [alias.name for alias in node.names]
+        for module in modules:
+            top = module.split('.')[0]
+            if standard(top) or in_repository(top, src, ctx) or imported_elsewhere(top, src, ctx):
+                continue
+            yield node.lineno, ("'%s' is not in the standard library or this repository and nothing else "
+                                "imports it: a new dependency" % top)
+            break
+
+
+def manifest_dependency(src):
+    old = manifest_names(src.removed)
+    if src.path.endswith('package.json'):
+        inside, depth = False, 0
+        for number, text in enumerate(src.lines, 1):
+            if not inside and re.match(r'\s*"(dependencies|devDependencies|peerDependencies|optionalDependencies)"\s*:\s*\{', text):
+                inside, depth = True, text.count('{') - text.count('}')
+                continue
+            if inside:
+                depth += text.count('{') - text.count('}')
+                match = re.match(r'\s*"([^"]+)"\s*:', text)
+                if match and number in src.added and match.group(1).lower() not in old:
+                    yield number, "'%s' is a new dependency in package.json" % match.group(1)
+                if depth <= 0:
+                    inside = False
+        return
+    for number in sorted(src.added):
+        text = src.lines[number - 1].strip()
+        match = re.match(r'[A-Za-z0-9][\w.-]*', text)
+        if match and match.group().lower() not in old:
+            yield number, "'%s' is a new dependency in %s" % (match.group(), src.path.rsplit('/', 1)[-1])
+
+
+def subclasses(pattern, name, src, ctx):
+    """How many lines in the repository and this file match pattern; git greps the plain name."""
+    regex = re.compile(pattern)
+    count = sum(1 for path, _, text in ctx.grep(name, word=True) if path != src.path and regex.search(text))
+    return count + sum(1 for code in src.lines if regex.search(code))
+
+
+def check_one_implementation(src, ctx):
+    if src.lang == 'python':
+        for node in src.nodes(ast.ClassDef):
+            if node.lineno not in src.added:
+                continue
+            bases = {dotted(b).split('.')[-1] for b in node.bases}
+            meta = {dotted(k.value).split('.')[-1] for k in node.keywords if k.arg == 'metaclass'}
+            abstract = ('ABC' in bases or 'ABCMeta' in meta or any(
+                dotted(d).split('.')[-1] in ('abstractmethod', 'abstractproperty')
+                for f in node.body if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) for d in f.decorator_list))
+            if abstract and 'Protocol' not in bases:
+                if subclasses(r'^\s*class\s+\w+\s*\([^)]*\b%s\b' % node.name, node.name, src, ctx) <= 1:
+                    yield node.lineno, ("abstract base '%s' has at most one subclass; use the class itself "
+                                        "until a second one exists" % node.name)
+    elif src.lang == 'ts':
+        for line, match in word_lines(src, r'^\s*(?:export\s+)?(?:default\s+)?(abstract\s+class|interface)\s+(\w+)'):
+            name = match.group(2)
+            if match.group(1) == 'interface':
+                if subclasses(r'\bimplements\s+[\w\s,<>]*\b%s\b' % name, name, src, ctx) == 1:
+                    yield line, "interface '%s' has one implementing class; use the class until a second exists" % name
+            elif subclasses(r'\bextends\s+%s\b' % name, name, src, ctx) <= 1:
+                yield line, "abstract class '%s' has at most one subclass; use the class until a second exists" % name
+
+
+def check_pass_through(src, ctx):
+    if src.test:
+        return
+    for node in src.nodes(ast.FunctionDef, ast.AsyncFunctionDef):
+        if node.lineno not in src.added or node.decorator_list or isinstance(src.parents.get(node), ast.ClassDef):
+            continue
+        body = node.body
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                and isinstance(body[0].value.value, str):
+            body = body[1:]
+        if len(body) != 1 or not isinstance(body[0], (ast.Return, ast.Expr)) or not isinstance(body[0].value, ast.Call):
+            continue
+        call, args = body[0].value, node.args
+        params = [a.arg for a in args.posonlyargs + args.args]
+        if not params or dotted(call.func) in ('', node.name):
+            continue
+        given = [a.id if isinstance(a, ast.Name) else ('*' + a.value.id if isinstance(a, ast.Starred)
+                 and isinstance(a.value, ast.Name) else None) for a in call.args]
+        wanted = params + (['*' + args.vararg.arg] if args.vararg else [])
+        keywords = [(k.arg, k.value.id if isinstance(k.value, ast.Name) else None) for k in call.keywords]
+        wanted_kw = [(a.arg, a.arg) for a in args.kwonlyargs] + ([(None, args.kwarg.arg)] if args.kwarg else [])
+        if given == wanted and keywords == wanted_kw:
+            yield node.lineno, ("'%s' only hands its parameters to %s(); call that directly"
+                                % (node.name, dotted(call.func)))
+
+
+CHECKS = [
+    ('bare-except', ('python',), check_bare_except),
+    ('swallowed-error', ('python', 'bash', 'js', 'ts'), check_swallowed_error),
+    ('unchecked-run', ('python',), check_unchecked_run),
+    ('open-file', ('python',), check_open_file),
+    ('py39', ('python',), check_py39),
+    ('shell-true', ('python',), check_shell_true),
+    ('vague-name', CODE, check_vague_name),
+    ('nesting', CODE, check_nesting),
+    ('magic-number', CODE, check_magic_number),
+    ('commented-code', CODE, check_commented_code),
+    ('duplicate', CODE, check_duplicate),
+    ('shortcut', CODE, check_shortcut),
+    ('untested-logic', CODE, None),
+    ('new-dependency', ('python', 'manifest'), check_new_dependency),
+    ('one-implementation', ('python', 'ts'), check_one_implementation),
+    ('pass-through', ('python',), check_pass_through),
+]
+NAMES = [name for name, _, _ in CHECKS]
+
+
+def run_checks(ctx):
+    """Every finding as (source, line, check, message), in file and line order, one per line and check."""
+    found = []
+    for src in ctx.sources:
+        for name, langs, check in CHECKS:
+            if src.lang not in langs:
+                continue
+            if check is None:
+                if ctx.audit:
+                    found.extend((src, line, name, text) for line, text in audit_untested(src, ctx))
+                continue
+            found.extend((src, line, name, text) for line, text in check(src, ctx))
+    found.extend((src, line, 'untested-logic', text) for src, line, text in untested_logic(ctx))
+    seen, unique = set(), []
+    for item in sorted(found, key=lambda f: (f[0].path, f[1], NAMES.index(f[2]))):
+        key = (item[0].path, item[1], item[2])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
+
+
+def render(src, line, check, text):
+    code = src.lines[line - 1] if 0 < line <= len(src.lines) else ''
+    ident = finding_id(check, src.path, code)
+    return ident, '%s:%d [%s %s] %s (%s)' % (src.path, line, check, ident, text, CITE[check])
+
+
+# ---------------------------------------------------------------- reading a change
+
+def unquote(name):
+    name = name.rstrip('\t')
+    if name.startswith('"'):
+        try:
+            return ast.literal_eval('b' + name).decode('utf-8', 'replace')
+        except (SyntaxError, ValueError):
+            return name.strip('"')
+    return name
+
+
+def parse_diff(text):
+    files, current, header, at = [], None, False, 0
+    for line in text.split('\n'):
+        if line.startswith('diff --git '):
+            match = re.match(r'diff --git a/(.*) b/(.*)$', line)
+            current = {'path': match.group(2) if match else None, 'old': match.group(1) if match else None,
+                       'added': set(), 'removed': [], 'new': False, 'deleted': False}
+            files.append(current)
+            header = True
+            continue
+        if current is None:
+            continue
+        if header:
+            if line.startswith('new file mode'):
+                current['new'] = True
+            elif line.startswith('deleted file mode'):
+                current['deleted'] = True
+            elif line.startswith(('--- ', '+++ ')):
+                name = unquote(line[4:])
+                side = 'old' if line[0] == '-' else 'path'
+                current[side] = name[2:] if name.startswith(('a/', 'b/')) else current[side]
+            elif line.startswith('rename to '):
+                current['path'] = unquote(line[len('rename to '):])
+        if line.startswith('@@'):
+            header = False
+            match = re.match(r'@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@', line)
+            at = int(match.group(1)) if match else 0
+        elif not header and line.startswith('+'):
+            current['added'].add(at)
+            at += 1
+        elif not header and line.startswith('-'):
+            current['removed'].append(line[1:])
+    return files
+
+
+def read_text(data):
+    text = data.decode('utf-8', 'replace') if isinstance(data, bytes) else data
+    return None if '\0' in text else text
+
+
+def new_side(root, tree, path):
+    if tree == 'worktree':
+        try:
+            with open(str(root / path), 'rb') as fh:
+                return read_text(fh.read())
+        except OSError:
+            return None
+    spec = (':' if tree == 'index' else tree + ':') + path
+    done = subprocess.run(['git', '-C', str(root), 'show', spec], capture_output=True, stdin=subprocess.DEVNULL,
+                          creationflags=NO_WINDOW, timeout=GIT_TIMEOUT)
+    return read_text(done.stdout) if done.returncode == 0 else None
+
+
+def parse_check_args(args):
+    staged, span_, paths = False, None, None
+    for i, arg in enumerate(args):
+        if arg == '--':
+            paths = args[i + 1:]
+            if not paths:
+                raise Usage('check -- needs at least one path')
+            break
+        if arg == '--staged':
+            staged = True
+        elif not arg.startswith('-') and span_ is None and ('..' in arg or arg.endswith('^!')):
+            span_ = arg
+        else:
+            raise Usage('check: unexpected %r; usage: tieitup check [--staged] [A..B | X^!] [-- PATH...]' % arg)
+    if staged and span_:
+        raise Usage('check: --staged and a range cannot be used together')
+    return staged, span_, paths
+
+
+def diff_args(root, staged, span_):
+    """git diff arguments, the tree that holds the new side, and the base commit."""
+    if span_ and span_.endswith('^!'):
+        commit = span_[:-2]
+        return [commit + '^', commit], commit, commit + '^'
+    if span_:
+        base, _, end = span_.replace('...', '..').partition('..')
+        return [span_], end or 'HEAD', base or 'HEAD'
+    head = git(root, 'rev-parse', '--verify', '-q', 'HEAD', check=False).stdout.strip()
+    base = head or EMPTY_TREE
+    return (['--cached', base] if staged else [base]), ('index' if staged else 'worktree'), base
+
+
+def changed_sources(root, staged, span_, pathspec):
+    args, tree, base = diff_args(root, staged, span_)
+    if span_:
+        tree = git(root, 'rev-parse', '--verify', tree + '^{commit}').stdout.strip()
+    command = ['-c', 'core.quotepath=on', 'diff', '-U0', '--no-color', '--no-ext-diff', '--no-textconv',
+               '--src-prefix=a/', '--dst-prefix=b/'] + args + ['--'] + list(pathspec)
+    files = parse_diff(git(root, *command).stdout)
+    sources, plus, minus = [], 0, 0
+    for entry in files:
+        plus += len(entry['added'])
+        minus += len(entry['removed'])
+        if entry['deleted']:
+            sources.append(Source(entry['old'] or entry['path'], '', (), entry['removed']))
+            continue
+        text = new_side(root, tree, entry['path'])
+        if text is not None:
+            sources.append(Source(entry['path'], text, entry['added'], entry['removed'], entry['new']))
+    base_commit = git(root, 'rev-parse', '--verify', '-q', base, check=False).stdout.strip() or None
+    return sources, tree, base_commit, [e['path'] or e['old'] for e in files], plus, minus, len(files)
+
+
+def whole_file(path, label):
+    with open(str(path), 'rb') as fh:
+        text = read_text(fh.read())
+    if text is None:
+        return None
+    src = Source(label, text, (), whole_new=True)
+    src.added = set(range(1, len(src.lines) + 1))
+    src.where = Path(path)
+    return src
+
+
+# ---------------------------------------------------------------- the callers aid
+
+DEFINES = {
+    'python': re.compile(r'^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)'),
+    'bash': re.compile(r'^\s*(?:function\s+([A-Za-z_][\w-]*)|([A-Za-z_][\w-]*)\s*\(\)\s*\{?\s*$)'),
+    'js': re.compile(r'^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)'
+                     r'|class\s+([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?'
+                     r'(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>))'),
+}
+
+
+def defined(line, lang):
+    regex = DEFINES.get('js' if lang == 'ts' else lang)
+    match = regex.match(line) if regex else None
+    return next((g for g in match.groups() if g), None) if match else None
+
+
+def edited_definitions(src):
+    """Names defined in this file whose definition the change edited or removed."""
+    names = []
+    for text in src.removed:
+        name = defined(text, src.lang)
+        if name and name not in names:
+            names.append(name)
+    starts = [(number, defined(line, src.lang)) for number, line in enumerate(src.lines, 1)]
+    starts = [(number, name) for number, name in starts if name]
+    for k, (number, name) in enumerate(starts):
+        end = starts[k + 1][0] - 1 if k + 1 < len(starts) else len(src.lines)
+        if src.lang == 'python' and src.tree:
+            node = next((n for n in src.nodes(ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+                         if n.lineno == number), None)
+            end = span(node)[1] if node else end
+        if number not in src.added and src.touched(number + 1, end) and name not in names:
+            names.append(name)
+    return names
+
+
+def same_code(path, lang):
+    """A caller sits only in code of the same language; a script with no extension is Python or shell."""
+    family = {'ts': 'js'}
+    if not os.path.splitext(path.rsplit('/', 1)[-1])[1]:
+        return lang in ('python', 'bash')
+    found = language(path, '')
+    return family.get(found, found) == family.get(lang, lang)
+
+
+def callers(ctx, out):
+    for src in ctx.sources:
+        if src.lang not in ('python', 'bash', 'js', 'ts'):
+            continue
+        for name in edited_definitions(src)[:CALLER_NAMES]:
+            hits = [(path, line, text) for path, line, text in ctx.grep(name, word=True)
+                    if not (path == src.path and line in src.added) and same_code(path, src.lang)
+                    and defined(text, language(path, '') or src.lang) != name]
+            if not hits:
+                continue
+            out.write('callers of %s, changed in %s:\n' % (name, src.path))
+            for path, line, text in hits[:CALLERS_SHOWN]:
+                out.write('  %s:%d: %s\n' % (path, line, text.strip()[:SHOWN_TEXT]))
+            if len(hits) > CALLERS_SHOWN:
+                out.write('  and %d more\n' % (len(hits) - CALLERS_SHOWN))
+
+
+# ---------------------------------------------------------------- check
+
+def plural(count, word):
+    return '%d %s%s' % (count, word, '' if count == 1 else 's')
+
+
+def named_groups(cwd, paths, err):
+    """Named paths grouped by the repository each one sits in; None for those outside any."""
+    groups = {}
+    for given in paths:
+        path = (cwd / given).resolve() if not Path(given).is_absolute() else Path(given).resolve()
+        folder = path.parent if path.parent.is_dir() else cwd
+        root = toplevel(folder)
+        if root is not None:
+            try:
+                label = path.relative_to(root).as_posix()
+            except ValueError:
+                root, label = None, given.replace('\\', '/')
+        else:
+            label = given.replace('\\', '/')
+        groups.setdefault(root, []).append((path, label))
+    return groups
+
+
+def cmd_check(args, cwd, out, err):
+    staged, span_, paths = parse_check_args(args)
+    hidden = hidden_ids()
+    if paths is None:
+        root = toplevel(cwd)
+        if root is None:
+            err.write('tieitup: not inside a git repository; name a file with tieitup check -- PATH\n')
+            return 0
+        jobs = [(root, None)]
+    else:
+        jobs = sorted(named_groups(cwd, paths, err).items(), key=lambda kv: str(kv[0]))
+    shown = hidden_count = files_total = plus_total = minus_total = 0
+    for root, named in jobs:
+        try:
+            sources, changed, tree, base, plus, minus, nfiles = gather(root, named, staged, span_, err)
+        except GitError as error:
+            err.write('tieitup: %s\n' % error)
+            continue
+        ctx = Context(root, tree, sources, whole=named is None, changed=changed)
+        findings = run_checks(ctx)
+        recorded = []
+        for src, line, check, text in findings:
+            ident, rendered = render(src, line, check, text)
+            recorded.append({'id': ident, 'check': check, 'path': src.path, 'line': line})
+            if ident in hidden:
+                hidden_count += 1
+                continue
+            shown += 1
+            out.write(rendered + '\n')
+        record_run(root, base, mode_name(staged, span_, named), sources, recorded, err)
+        if named is None:
+            callers(ctx, out)
+        files_total += nfiles
+        plus_total += plus
+        minus_total += minus
+    if paths is None:
+        out.write('tieitup: +%d -%d lines in %s; %s%s\n' % (
+            plus_total, minus_total, plural(files_total, 'file'), plural(shown + hidden_count, 'finding'),
+            ', %d hidden as %s' % (hidden_count, 'a false alarm' if hidden_count == 1 else 'false alarms')
+            if hidden_count else ''))
+    return 0
+
+
+def mode_name(staged, span_, named):
+    return 'range' if span_ else 'staged' if staged else 'paths' if named is not None else 'worktree'
+
+
+def gather(root, named, staged, span_, err):
+    """The sources to check: the whole change, or only the named paths."""
+    if named is None:
+        sources, tree, base, changed, plus, minus, nfiles = changed_sources(root, staged, span_, [])
+        return sources, changed, tree, base, plus, minus, nfiles
+    loose, tracked = [], []
+    if root is None:
+        loose = named
+    else:
+        listed = set(git(root, 'ls-files', '-z', '--', *[label for _, label in named]).stdout.split('\0'))
+        for path, label in named:
+            (tracked if label in listed else loose).append((path, label))
+    sources, tree, base, changed = [], 'worktree', None, []
+    if tracked:
+        sources, tree, base, changed, _, _, _ = changed_sources(root, staged, span_, [l for _, l in tracked])
+    for path, label in loose:
+        if not path.is_file():
+            err.write('tieitup: no such file: %s\n' % label)
+            continue
+        src = whole_file(path, label)
+        if src is not None:
+            sources.append(src)
+            changed.append(label)
+    if root is not None and base is None:
+        base = git(root, 'rev-parse', '--verify', '-q', 'HEAD', check=False).stdout.strip() or None
+    return [s for s in sources if s.lang], changed, tree, base, 0, 0, len(changed)
+
+
+# ---------------------------------------------------------------- the record
+
+def home():
+    return Path(os.environ.get('TIEITUP_HOME') or ROOT / 'Library/.runtime/tieitup')
+
+
+HELPERS = {
+    'vague-name': (bound_names,), 'nesting': (deep_python, deep_bash, deep_braces), 'magic-number': (numbers,),
+    'commented-code': (reads_as_code,), 'duplicate': (significant, windows), 'open-file': (open_mode,),
+    'untested-logic': (untested_logic, audit_untested, branchy), 'one-implementation': (subclasses,),
+    'new-dependency': (_standard, in_repository, imported_elsewhere, manifest_dependency),
+}
+_REVISIONS = {}
+
+
+def revisions():
+    """Each check's revision: a hash of its own code, so a changed check starts its counts again."""
+    if not _REVISIONS:
+        for name, _, check in CHECKS:
+            digest = hashlib.sha1()
+            for part in ((check,) if check else ()) + HELPERS.get(name, ()):
+                try:
+                    text = inspect.getsource(part)
+                except (OSError, TypeError):
+                    text = part.__code__.co_code.hex()
+                digest.update(text.encode('utf-8'))
+            _REVISIONS[name] = digest.hexdigest()[:ID_DIGITS]
+    return dict(_REVISIONS)
+
+
+def all_revisions():
+    return hashlib.sha1(json.dumps(revisions(), sort_keys=True).encode('utf-8')).hexdigest()[:ID_DIGITS]
+
+
+def stamp():
+    return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+
+
+def append(path, row, rotate=False):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if rotate and path.is_file() and path.stat().st_size > LOG_LIMIT:
+        os.replace(str(path), str(path.with_name('log.1.jsonl')))
+    with open(str(path), 'a', encoding='utf-8', newline='\n') as fh:
+        fh.write(json.dumps(row, sort_keys=True) + '\n')
+
+
+def read_jsonl(path, budget):
+    """The rows of the last `budget` bytes of a JSON-lines file, the unreadable lines, and the bytes read."""
+    try:
+        size = path.stat().st_size
+        with open(str(path), 'rb') as fh:
+            if size > budget:
+                fh.seek(size - budget)
+                data = fh.read().split(b'\n', 1)[-1]
+            else:
+                data = fh.read()
+    except OSError:
+        return [], 0, 0
+    rows, bad = [], 0
+    for line in data.decode('utf-8', 'replace').split('\n'):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            bad += 1
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+        else:
+            bad += 1
+    return rows, bad, min(size, budget)
+
+
+def records(folder):
+    """The check runs, oldest first, from at most READ_LIMIT bytes, and the count of unreadable lines."""
+    newer, bad, used = read_jsonl(folder / 'log.jsonl', READ_LIMIT)
+    older, bad_older, _ = read_jsonl(folder / 'log.1.jsonl', READ_LIMIT - used) if used < READ_LIMIT else ([], 0, 0)
+    return older + newer, bad + bad_older
+
+
+def verdicts(folder):
+    latest = {}
+    for row in read_jsonl(folder / 'marks.jsonl', READ_LIMIT)[0]:
+        if row.get('verdict') in ('fp', 'ok') and isinstance(row.get('id'), str):
+            latest[row['id']] = row['verdict']
+    return latest
+
+
+def hidden_ids():
+    return {ident for ident, verdict in verdicts(home()).items() if verdict == 'fp'}
+
+
+def record_run(root, base, mode, sources, findings, err):
+    langs = sorted({s.lang for s in sources if s.lang})
+    revs = revisions()
+    checks = {}
+    for name, covers, _ in CHECKS:
+        if set(covers) & set(langs) and not (name == 'untested-logic' and mode == 'paths'):
+            checks[name] = {'rev': revs[name], 'count': sum(1 for f in findings if f['check'] == name)}
+    row = {'v': 1, 'time': stamp(), 'repo': str(root) if root else None, 'base': base, 'mode': mode,
+           'langs': langs, 'files': [s.path for s in sources], 'checks': checks, 'findings': findings}
+    try:
+        append(home() / 'log.jsonl', row, rotate=True)
+    except OSError as error:
+        err.write('tieitup: could not write the record: %s\n' % error)
+
+
+def find_recorded(ident):
+    for row in reversed(records(home())[0]):
+        for finding in row.get('findings') or ():
+            if isinstance(finding, dict) and finding.get('id') == ident:
+                return finding
+    return None
+
+
+def cmd_mark(args, cwd, out, err):
+    if len(args) < 2 or args[1] not in ('fp', 'ok') or not re.fullmatch(r'[0-9a-f]{8}', args[0]):
+        raise Usage('usage: tieitup mark ID fp|ok [REASON]')
+    finding = find_recorded(args[0])
+    if finding is None:
+        raise Usage('unknown finding ID %s; it is not in the record' % args[0])
+    append(home() / 'marks.jsonl', {'time': stamp(), 'id': args[0], 'verdict': args[1], 'check': finding.get('check'),
+                                    'path': finding.get('path'), 'reason': ' '.join(args[2:])})
+    out.write('tieitup: %s %s\n' % (args[0], 'marked a false alarm and hidden on this machine'
+                                    if args[1] == 'fp' else 'marked right'))
+    return 0
+
+
+def cmd_miss(args, cwd, out, err):
+    rest, check = list(args), None
+    if '--check' in rest:
+        at = rest.index('--check')
+        if at + 1 >= len(rest) or rest[at + 1] not in NAMES:
+            raise Usage('--check needs one of: %s' % ', '.join(NAMES))
+        check = rest[at + 1]
+        del rest[at:at + 2]
+    where = re.fullmatch(r'(.+):(\d+)', rest[0]) if len(rest) == 2 else None
+    if not where or not rest[1].strip():
+        raise Usage('usage: tieitup miss PATH:LINE "what was missed" [--check NAME]')
+    append(home() / 'misses.jsonl', {'time': stamp(), 'path': where.group(1).replace('\\', '/'),
+                                     'line': int(where.group(2)), 'what': rest[1], 'check': check,
+                                     'rev': revisions()[check] if check else all_revisions()})
+    out.write('tieitup: miss recorded; tieitup learn lists it\n')
+    return 0
+
+
+def ponytail_rev(root, rev):
+    """A revision of the Ponytail clone (HEAD, or HEAD:skills for its skills tree), or None."""
+    clone = Path(root) / 'Library/ponytail'
+    if not clone.is_dir():
+        return None
+    try:
+        done = git(clone, 'rev-parse', '--verify', '--quiet', rev, check=False)
+    except (OSError, GitError):
+        return None
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def checked(root):
+    """The checked record, or None when it is missing; ValueError when it is not version 1."""
+    path = Path(root) / CHECKED_FILE
+    if not path.is_file():
+        return None
+    with open(str(path), encoding='utf-8') as fh:
+        record = json.load(fh)
+    if not isinstance(record, dict) or record.get('version') != CHECKED_VERSION:
+        raise ValueError('checked record is not version %d' % CHECKED_VERSION)
+    return record
+
+
+def ponytail_changes(root):
+    """Why the conflicts table needs a new look: only a change to Ponytail's skills counts, not a new commit."""
+    try:
+        record = checked(root)
+    except (OSError, ValueError):
+        return ['unreadable checked record at ' + CHECKED_FILE]
+    if record is None:
+        return ['no checked record at ' + CHECKED_FILE]
+    head, tree = ponytail_rev(root, 'HEAD'), ponytail_rev(root, 'HEAD:skills')
+    if head is None or tree is None:
+        return ['Ponytail revision unavailable']
+    if tree == record.get('ponytail_skills_tree'):
+        return []
+    return ["Ponytail's skills changed since %s (now %s); re-check the conflicts table, then tieitup rechecked"
+            % (str(record.get('ponytail_commit'))[:SHORT_SHA], head[:SHORT_SHA])]
+
+
+def cmd_rechecked(args, cwd, out, err):
+    if args:
+        raise Usage('rechecked takes no arguments')
+    head, tree = ponytail_rev(ROOT, 'HEAD'), ponytail_rev(ROOT, 'HEAD:skills')
+    if head is None or tree is None:
+        err.write('tieitup: Ponytail revision unavailable; nothing recorded\n')
+        return 0
+    record = {'version': CHECKED_VERSION, 'ponytail_commit': head, 'ponytail_skills_tree': tree,
+              'checked_on': time.strftime('%Y-%m-%d')}
+    path = ROOT / CHECKED_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + '.tmp')
+    with open(str(temp), 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(json.dumps(record, indent=2) + '\n')
+    os.replace(str(temp), str(path))
+    out.write('tieitup: conflicts table recorded as checked against Ponytail %s\n' % head[:SHORT_SHA])
+    return 0
+
+
+def claude_version():
+    """`claude --version`, as the benchmark's fingerprint records it, or None."""
+    try:
+        done = subprocess.run(['claude', '--version'], capture_output=True, text=True, encoding='utf-8',
+                              errors='replace', stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=GIT_TIMEOUT)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode:
+        return None
+    return done.stdout.strip() or None
+
+
+def newest_model(folder):
+    """The last real model in the newest transcript of a Claude Code project folder, or None."""
+    try:
+        transcripts = [path for path in Path(folder).glob('*.jsonl') if path.is_file()]
+    except OSError:
+        return None
+    if not transcripts:
+        return None
+    rows = read_jsonl(max(transcripts, key=lambda path: path.stat().st_mtime), TRANSCRIPT_TAIL)[0]
+    for row in reversed(rows):
+        model = (row.get('message') or {}).get('model') if row.get('type') == 'assistant' else None
+        if isinstance(model, str) and model and not model.startswith('<'):
+            return model
+    return None
+
+
+def served_model(root):
+    """The model the last Claude Code session in this root was served."""
+    config = Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
+    return newest_model(config / 'projects' / re.sub(r'[^A-Za-z0-9]', '-', str(Path(root).resolve())))
+
+
+def latest_bench(root):
+    """The newest benchmark summary's date and TieItUp arm fingerprint, or None."""
+    for path in sorted(Path(root).glob(BENCH_EVIDENCE), key=lambda p: p.name, reverse=True):
+        try:
+            with open(str(path), encoding='utf-8') as fh:
+                summary = json.load(fh)
+            fingerprint = summary['fingerprint']['ponytail2']
+            return {'date': summary['date'], 'claude': fingerprint['claude'], 'model': fingerprint['model']}
+        except (OSError, ValueError, KeyError, TypeError):
+            continue                     # a broken summary: fall back to the one before it
+    return None
+
+
+def release(version):
+    """'2.1.292 (Claude Code)' -> (2, 1, 292), or None."""
+    match = re.match(r'(\d+)\.(\d+)\.(\d+)', version or '')
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
+def family(model):
+    """'claude-opus-5-5' -> 'claude-opus'."""
+    return '-'.join(model.split('-')[:2])
+
+
+def harness_drift(root, version=None, model=None, today=None):
+    """What moved since the newest benchmark: {'bench', 'version': (old, new) or None, 'model': ...}, or None."""
+    bench = latest_bench(root)
+    if bench is None:
+        return None
+    version = claude_version() if version is None else version
+    model = served_model(root) if model is None else model
+    today = today or datetime.date.today()
+    drift = {'bench': bench, 'version': None, 'model': None}
+    old, new = release(bench['claude']), release(version)
+    if old and new and old != new:
+        try:
+            age = (today - datetime.date(*map(int, bench['date'].split('-')))).days
+        except (ValueError, TypeError):
+            age = PATCH_GRACE_DAYS
+        if old[:2] != new[:2] or age >= PATCH_GRACE_DAYS:
+            drift['version'] = ('.'.join(map(str, old)), '.'.join(map(str, new)))
+    if model and model != bench['model'] and family(model) == family(bench['model']):
+        drift['model'] = (bench['model'], model)
+    return drift
+
+
+def harness_changes(root, version=None, model=None, today=None):
+    """One line per harness move since the newest benchmark; the start check shows them."""
+    drift = harness_drift(root, version, model, today)
+    if drift is None:
+        return []
+    reasons = []
+    if drift['version']:
+        reasons.append('Claude Code %s -> %s since the benchmark of %s; due: python -B Library/tieitup-bench.py auto'
+                       % (drift['version'] + (drift['bench']['date'],)))
+    if drift['model']:
+        reasons.append('model %s -> %s since the benchmark of %s; re-audit the rules that name it with prompt-audit'
+                       % (drift['model'] + (drift['bench']['date'],)))
+    return reasons
+
+
+def model_rule_lines(root, model):
+    """PATH:LINE of each rule-file line naming a model, as claude-opus-5-5 or Opus 5.5."""
+    parts = [part for part in model.split('-')[1:] if not re.fullmatch(r'\d{8}', part)]
+    if len(parts) < 2:
+        return []
+    pattern = re.compile(r'%s|%s' % (re.escape('-'.join(['claude'] + parts)),
+                                     re.escape('%s %s' % (parts[0].capitalize(), '.'.join(parts[1:])))))
+    found = []
+    for glob in RULE_FILES:
+        for path in sorted(Path(root).glob(glob)):
+            try:
+                with open(str(path), encoding='utf-8', errors='replace') as fh:
+                    lines = fh.read().splitlines()
+            except OSError:
+                continue                 # a rule file that cannot be read names no model to re-audit
+            found += ['%s:%d' % (path.relative_to(root).as_posix(), number)
+                      for number, line in enumerate(lines, 1) if pattern.search(line)]
+    return sorted(set(found))
+
+
+def tally(rows, revs):
+    """Per check: runs covering it at its current revision, findings in them, and each finding's fate."""
+    covered, found, latest, fixed, standing = {}, {}, {}, set(), {}
+    for row in rows:
+        checks = row.get('checks') if isinstance(row.get('checks'), dict) else {}
+        current = {name for name, info in checks.items() if isinstance(info, dict) and info.get('rev') == revs.get(name)}
+        for name in current:
+            covered[name] = covered.get(name, 0) + 1
+            count = checks[name].get('count')
+            found[name] = found.get(name, 0) + (count if isinstance(count, int) else 0)
+        by_path = {}
+        for finding in row.get('findings') or ():
+            if isinstance(finding, dict) and finding.get('check') in current and isinstance(finding.get('id'), str):
+                latest[finding['id']] = finding['check']
+                by_path.setdefault(finding.get('path'), set()).add(finding['id'])
+                fixed.discard(finding['id'])
+        # shortcut: an edit that changes the flagged line without fixing it also counts as fixed, since the ID
+        # follows the text; upgrade when marks show fixed findings that were never fixed
+        for path in row.get('files') or ():
+            key = (row.get('repo'), row.get('base'), path)
+            now = by_path.get(path, set())
+            fixed.update(standing.get(key, set()) - now)
+            standing[key] = now
+    return covered, found, latest, fixed
+
+
+def scored(folder, root):
+    """Every open proposal, and the count of unreadable record lines."""
+    revs = revisions()
+    rows, bad = records(Path(folder))
+    covered, found, latest, fixed = tally(rows, revs)
+    marks = verdicts(Path(folder))
+    out = []
+    for name in NAMES:
+        false = sum(1 for ident, check in latest.items() if check == name and marks.get(ident) == 'fp')
+        right = sum(1 for ident, check in latest.items() if check == name and marks.get(ident) != 'fp'
+                    and (marks.get(ident) == 'ok' or ident in fixed))
+        decided = false + right
+        if decided >= DECIDED and right / decided < PRECISION:
+            out.append('narrow %s: precision %.2f over %d decided findings, %d of them false alarms; make it fire less'
+                       % (name, right / decided, decided, false))
+    for name in NAMES:
+        if covered.get(name, 0) >= SILENT_RUNS and not found.get(name):
+            if name in NEVER_CUT:
+                out.append("silent %s: no finding in %d runs; only reported, since it guards Ponytail's never-cut list"
+                           % (name, covered[name]))
+            else:
+                out.append('silent %s: no finding in %d runs that covered its language; delete it or broaden it'
+                           % (name, covered[name]))
+    combined = all_revisions()
+    for miss in read_jsonl(Path(folder) / 'misses.jsonl', READ_LIMIT)[0]:
+        check = miss.get('check')
+        if miss.get('rev') == (revs.get(check) if check else combined):
+            out.append('missed %s:%s%s: %s' % (miss.get('path'), miss.get('line'),
+                                                ' (%s)' % check if check else '', miss.get('what')))
+    if (Path(root) / 'Library/ponytail').is_dir():
+        out += ['drift: ' + reason for reason in ponytail_changes(root)]
+    drift = harness_drift(root)
+    if drift and drift['version']:
+        out.append('harness: Claude Code %s -> %s since the benchmark of %s; run python -B Library/tieitup-bench.py auto'
+                   % (drift['version'] + (drift['bench']['date'],)))
+    if drift and drift['model']:
+        lines = model_rule_lines(root, drift['model'][0])
+        out.append('harness: model %s -> %s; re-audit with prompt-audit: %s'
+                   % (drift['model'] + (', '.join(lines) or 'no rule names the old model',)))
+    return out, bad
+
+
+def proposals(home_folder, root):
+    """One string per open proposal, from at most READ_LIMIT bytes of record; the start check calls this."""
+    return scored(home_folder, root)[0]
+
+
+def cmd_learn(args, cwd, out, err):
+    if args:
+        raise Usage('learn takes no arguments')
+    found, bad = scored(home(), ROOT)
+    for line in found:
+        out.write(line + '\n')
+    skipped = '; %s skipped' % plural(bad, 'unreadable record line') if bad else ''
+    out.write('tieitup learn: %s%s\n' % (plural(len(found), 'open proposal') if found else 'no open proposals', skipped))
+    return 0
+
+
+# ---------------------------------------------------------------- audit, debt, gain, help
+
+def cmd_audit(args, cwd, out, err):
+    if len(args) > 1:
+        raise Usage('audit takes at most one path')
+    target = (cwd / args[0]).resolve() if args else cwd
+    if not target.exists():
+        err.write('tieitup: no such path: %s\n' % args[0])
+        return 0
+    root = toplevel(target if target.is_dir() else target.parent)
+    if root is not None:
+        rel = target.relative_to(root).as_posix() if target != root else '.'
+        labels = [p for p in git(root, 'ls-files', '-z', '--', rel).stdout.split('\0') if p]
+        if not labels and target.is_file():
+            labels = [rel]
+        files = [(root / label, label) for label in labels]
+    elif target.is_file():
+        files = [(target, target.name)]
+    else:
+        files = [(Path(folder) / name, (Path(folder) / name).relative_to(target).as_posix())
+                 for folder, dirs, names in os.walk(str(target)) for name in names
+                 if not any(part.startswith('.') for part in Path(folder).relative_to(target).parts)]
+    sources = []
+    for path, label in files:
+        try:
+            src = whole_file(path, label) if path.is_file() else None
+        except OSError:
+            src = None
+        if src is not None and src.lang:
+            sources.append(src)
+    ctx = Context(root, 'worktree', sources, audit=True)
+    findings = run_checks(ctx)
+    for name in NAMES:
+        mine = [f for f in findings if f[2] == name]
+        if not mine:
+            continue
+        out.write('%s: %s\n' % (name, plural(len(mine), 'finding')))
+        for src, line, check, text in mine[:AUDIT_SHOWN]:
+            out.write(render(src, line, check, text)[1] + '\n')
+        if len(mine) > AUDIT_SHOWN:
+            out.write('  and %d more\n' % (len(mine) - AUDIT_SHOWN))
+    out.write('tieitup audit: %s in %s\n' % (plural(len(findings), 'finding') if findings else 'no findings',
+                                             plural(len(sources), 'file')))
+    return 0
+
+
+def grep_rows(cwd, pattern, target, root):
+    args = ['grep', '-n', '-I', '-z'] + (['--untracked'] if root else ['--no-index']) + ['-E', '-e', pattern, '--', target]
+    return parse_grep(git(cwd, *args, check=False).stdout)
+
+
+def age(cwd, path, line):
+    done = git(cwd, 'blame', '--porcelain', '-L', '%d,%d' % (line, line), '--', path, check=False)
+    sha = done.stdout.split(' ', 1)[0]
+    stamp = re.search(r'^author-time (\d+)$', done.stdout, re.M)
+    if done.returncode or not stamp or not sha.strip('0'):
+        return 'uncommitted'
+    return plural(int((time.time() - int(stamp.group(1))) // 86400), 'day')
+
+
+def cmd_debt(args, cwd, out, err):
+    if len(args) > 1:
+        raise Usage('debt takes at most one path')
+    target, root = (args[0] if args else '.'), toplevel(cwd)
+    markers = grep_rows(cwd, r'(#|//|/[*]) ?(shortcut|ponytail):', target, root)
+    bare = 0
+    for path, line, text in markers:
+        rest = MARKER.search(text).group(2) if MARKER.search(text) else ''
+        parts = re.split(r'[,;]', rest.strip().rstrip('*/'), maxsplit=1)
+        limit, trigger = parts[0].strip(), (parts[1].strip() if len(parts) > 1 else '')
+        when = 'age: %s.' % age(cwd, path, line)
+        if trigger:
+            out.write('%s:%d, ceiling: %s. upgrade: %s. %s\n' % (path, line, limit.rstrip('.'), trigger.rstrip('.'), when))
+        else:
+            bare += 1
+            out.write('%s:%d, ceiling: %s. no-trigger. %s\n' % (path, line, limit.rstrip('.') or '(none named)', when))
+    marked = {(path, line) for path, line, _ in markers}
+    notes = [(path, line, text) for path, line, text in grep_rows(cwd, r'(#|//|/[*]).*(TODO|FIXME|XXX|HACK)', target, root)
+             if (path, line) not in marked and NOTE_WORDS.search(text)]
+    if notes:
+        out.write('unmarked notes:\n')
+        for path, line, text in notes:
+            out.write('  %s:%d: %s\n' % (path, line, text.strip()[:SHOWN_TEXT]))
+    if not markers and not notes:
+        out.write('tieitup debt: no shortcut markers and no unmarked notes\n')
+    else:
+        out.write('tieitup debt: %s, %d with no trigger; %s\n' % (
+            plural(len(markers), 'marker'), bare, plural(len(notes), 'unmarked note')))
+    return 0
+
+
+def gain_lines(root):
+    summaries = sorted(Path(root).glob('PRDs and Specs/*TieItUp*/evidence/bench-*.json'), key=lambda p: p.name)
+    for path in reversed(summaries):
+        try:
+            with open(str(path), encoding='utf-8') as fh:
+                summary = json.load(fh)
+            headline = summary['headline']
+        except (OSError, ValueError, KeyError, TypeError):
+            continue                     # a broken summary: fall back to the one before it
+        fingerprint = summary.get('fingerprint')
+        if not isinstance(fingerprint, str):
+            fingerprint = hashlib.sha1(json.dumps(fingerprint, sort_keys=True).encode('utf-8')).hexdigest()[:12]
+        return ['tieitup gain: %s' % headline,
+                'measured %s, fingerprint %s, from %s' % (summary.get('date', '?'), fingerprint, path.name),
+                "an average over the benchmark's tasks against Ponytail; it is not a saving measured on this repository"]
+    return ['tieitup gain: not measured yet',
+            "Ponytail's own measured results are in Library/ponytail/benchmarks/results/",
+            'no saving is claimed for this repository or any other until the benchmark has run']
+
+
+def cmd_gain(args, cwd, out, err):
+    if args:
+        raise Usage('gain takes no arguments')
+    out.write('\n'.join(gain_lines(ROOT)) + '\n')
+    return 0
+
+
+HELP = """TieItUp: Ponytail first, then the coding books' rules, then a check of what changed.
+
+Levels (Ponytail's three; none turns off a rule, the check or the never-cut list):
+  lite    build what was asked and name the smaller option
+  full    the default: the 18 rules, the pack for each language, the check after each edit and in the final review
+  ultra   also question the request first, and read the reference rules in the final review
+Only the owner's words change the level. "stop tieitup" stops it; there is no variable or config file.
+
+Commands (every one exits 0; a usage error exits 2):
+  tieitup check [--staged] [A..B | X^!] [-- PATH...]
+                       the added lines of a change: one line per finding, then a balance line
+                       and the callers of each changed definition; named paths print findings only
+  tieitup audit [PATH]  all sixteen checks over whole files, grouped by check, never recorded
+  tieitup debt [PATH]   shortcut: and ponytail: markers with their trigger and age, then bare notes
+  tieitup gain          the newest benchmark result against Ponytail, or "not measured yet"
+  tieitup mark ID fp|ok [REASON]
+                       a finding was a false alarm (hidden from then on) or was right
+  tieitup miss PATH:LINE "WHAT" [--check NAME]
+                       a problem the check should have found
+  tieitup learn         proposals from the record: narrow, silent and missed; drift when Ponytail's
+                       skills changed; harness when Claude Code or the model moved past the benchmark
+  tieitup rechecked     record that the conflicts table now matches Ponytail's skills
+
+The record: {home}
+  log.jsonl, marks.jsonl, misses.jsonl; IDs, check names, paths and line numbers, never a line of code.
+"""
+
+
+def cmd_help(args, cwd, out, err):
+    out.write(HELP.format(home=home()))
+    return 0
+
+
+COMMANDS = {'check': cmd_check, 'audit': cmd_audit, 'debt': cmd_debt, 'gain': cmd_gain, 'help': cmd_help,
+            'mark': cmd_mark, 'miss': cmd_miss, 'learn': cmd_learn, 'rechecked': cmd_rechecked}
+
+
+def main(argv=None, cwd=None, out=None, err=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    cwd = Path(cwd or os.getcwd()).resolve()
+    out, err = out or sys.stdout, err or sys.stderr
+    if not argv or argv[0] not in COMMANDS:
+        err.write('tieitup: unknown command %r; run tieitup help\n' % (argv[0] if argv else ''))
+        return 2
+    try:
+        return COMMANDS[argv[0]](argv[1:], cwd, out, err) or 0
+    except Usage as error:
+        err.write('tieitup: %s\n' % error)
+        return 2
+    except Exception as error:            # a fault in the check must never block an edit or a commit
+        err.write('tieitup: internal error: %s: %s\n%s' % (type(error).__name__, error, traceback.format_exc()))
+        return 0
+
+
+if __name__ == '__main__':
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors='replace')
+        except AttributeError:
+            pass                                  # an old or wrapped stream: keep its own handling
+    sys.exit(main())

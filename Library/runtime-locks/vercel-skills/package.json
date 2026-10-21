@@ -1,0 +1,6 @@
+{
+  "name": "dev-vercel-skills-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {"skills": "1.7.2"}
+}

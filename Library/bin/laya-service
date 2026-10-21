@@ -1,0 +1,336 @@
+#!/usr/bin/env python3
+"""laya-service — dev's short decisions through laya: one local service, trusted above a threshold.
+
+  laya-service                      the MCP server both agents start: laya_decide, laya_predict, laya_status
+  laya-service decide KIND TEXT     one decision from the command line: failure | change | route
+  laya-service eval [--gate]        Library/laya-eval/decisions.jsonl: accuracy, and precision where trusted
+  laya-service serve                the service itself, on 127.0.0.1 — what the logon task runs
+  laya-service install-service | uninstall-service   the Windows logon task DEVARNESS_laya_serve
+
+laya answers yes/no, choice and score questions about a text in one forward
+pass. An answer is trusted only at a confidence of THRESHOLD or more, which the
+evaluation set measures; below it the agent decides as it would without laya.
+One service holds the model for every session. A call that finds it down
+starts it, and answers in this process if it cannot, so a question is always
+answered. Owner request 2026-09-24; Library/INSTALL.md, section "laya".
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+
+LIBRARY = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import common  # noqa: E402
+RUNTIME = LIBRARY / ".runtime" / "laya"
+PYTHON = RUNTIME / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+EVAL = LIBRARY / "laya-eval" / "decisions.jsonl"
+PORT = 47631
+URL = "http://127.0.0.1:%d" % PORT
+TASK = "DEVARNESS_laya_serve"
+# Measured on Library/laya-eval/ on 2026-09-24: at 0.8, failure 33 of 34 and
+# change 30 of 30 trusted answers were right, covering 81% and 75%.
+THRESHOLD = 0.8
+GATE = {"precision": 0.95, "coverage": 0.6}      # an update that scores below either is rolled back
+RUNTIME_ENV = {
+    "LAYA_PRELOAD": "0",            # a checkpoint loads on first use
+    "LAYA_DEFAULT_MODEL": "english",  # preserve dev's measured fallback across upstream changes
+    "LAYA_DEVICE": "cpu",
+    "LAYA_THREADS": "4",
+    "HF_HOME": str(RUNTIME / "hf"),
+    "HF_HUB_OFFLINE": "1",          # setup-laya.py --install fetched the weights; nothing here fetches
+    "TRANSFORMERS_OFFLINE": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+}
+SERVICE_ENV = dict(RUNTIME_ENV, LAYA_HOST="127.0.0.1", LAYA_PORT=str(PORT), LAYA_LOG_LEVEL="warning")
+
+OWNERS = {
+    "md-format": "writing or editing a Markdown document in dev",
+    "bilingual-page": "building or editing an HTML page, report or dashboard",
+    "markitdown": "reading a PDF, Word, PowerPoint or Excel file by converting it to text",
+    "ocr": "reading text from a scanned page, a photo or an image",
+    "archify": "drawing a technical diagram: architecture, workflow, sequence or data flow",
+    "sync": "bringing the workspace up to date from its remote: a fast-forward pull; commits go by path",
+    "update-tools": "updating vendored tool clones, their pins and the plugins to newer versions",
+    "pcb-studio": "reviewing, checking, routing or fabricating a PCB design in KiCad or Altium",
+    "pyrosim": "fire simulation with PyroSim, FDS or Smokeview",
+    "video-study": "studying a video from its audio and its screen",
+    "codex": "a review or second opinion from a non-Claude model, Aster",
+    "prompt-master": "writing or fixing a prompt for another AI tool",
+}
+QUESTIONS = {
+    "failure": {"type": "noul", "instructions": "Does this output report a failure or a problem?"},
+    # Chosen over three other wordings on the evaluation set: 37 of 40, and
+    # it reads "keep going" as a request, which "asks for a change" did not.
+    "change": {"type": "noul", "instructions": "Does the user tell the assistant to do, continue or approve something?"},
+}
+# Measured and never offered: routing scored 14 of 38 as one twelve-way choice
+# (laya's own weights call choices of eleven or more uncalibrated) and no
+# better as twelve yes/no questions. It stays in the evaluation set as the gap
+# a fine-tune would have to close.
+MEASURED = {"route": {"q": {"type": "choice", "instructions": "Which tool should handle this task?",
+                            "criteria": OWNERS}}}
+OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))   # localhost never goes through a proxy
+_ROUTER = None
+
+
+def questions_for(kind: str) -> dict:
+    if kind not in QUESTIONS:
+        why = "measured and not reliable enough to offer" if kind in MEASURED else "unknown"
+        raise ValueError("%s decision %r; offered: %s" % (why, kind, ", ".join(QUESTIONS)))
+    return {"q": QUESTIONS[kind]}
+
+
+def mark(result: dict) -> dict:
+    """Name each answer and say whether it clears the threshold."""
+    for answer in (result.get("answers") or {}).values():
+        if "choice" in answer:
+            answer["answer"] = answer["choice"]
+        elif "noul" in answer:
+            answer["answer"] = "yes" if answer["noul"] >= 0.5 else "no"
+        elif "score" in answer:
+            answer["answer"] = answer["score"]
+        answer["trusted"] = (answer.get("confidence") or 0) >= THRESHOLD
+    return result
+
+
+def post_service(state, questions, model):
+    body = {"state": state, "questions": questions}
+    if model != "auto":
+        body["model"] = model
+    request = urllib.request.Request(URL + "/v1/systemone", data=json.dumps(body).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with OPENER.open(request, timeout=120) as reply:      # a first call loads a checkpoint
+            return json.loads(reply.read())
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", "replace")[:300]
+        if error.code < 500:
+            raise ValueError("laya refused the question: " + detail) from None
+        raise OSError("laya service error %d: %s" % (error.code, detail)) from None
+
+
+def healthy(timeout: float = 2.0) -> bool:
+    try:
+        with OPENER.open(URL + "/health", timeout=timeout) as reply:
+            return json.loads(reply.read()).get("status") == "ok"
+    except (OSError, ValueError):
+        return False
+
+
+def start_service(wait: float = 45.0) -> bool:
+    """Start the service the way this device runs it, then wait until it answers."""
+    if healthy():
+        return True
+    if os.name == "nt":
+        # A detached child can be ended with the session's process tree; the
+        # task outlives every session, and Task Scheduler restarts it.
+        if common.run(["schtasks", "/Run", "/TN", TASK], capture_output=True).returncode != 0:
+            install_service()
+    else:
+        log = (RUNTIME / "service.log").open("a", encoding="utf-8")
+        subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "serve"], stdin=subprocess.DEVNULL,
+                         stdout=log, stderr=log, start_new_session=True)
+    end = time.monotonic() + wait
+    while time.monotonic() < end:
+        if healthy():
+            return True
+        time.sleep(1)
+    return False
+
+
+def run_local(state, questions, model):
+    """laya in this process: the answer when the service cannot run."""
+    global _ROUTER
+    for key, value in RUNTIME_ENV.items():
+        os.environ.setdefault(key, value)
+    if _ROUTER is None:
+        from laya import Router
+        _ROUTER = Router(device="cpu", default=RUNTIME_ENV["LAYA_DEFAULT_MODEL"])
+    return _ROUTER.predict(state, questions) if model == "auto" else _ROUTER.predict(state, questions, model=model)
+
+
+def predict(state, questions, model="auto", post=None, start=None, local=None):
+    """The service; else the service, started; else laya in this process."""
+    post, start, local = post or post_service, start or start_service, local or run_local
+    try:
+        return post(state, questions, model), "service"
+    except OSError:
+        pass
+    if start():
+        try:
+            return post(state, questions, model), "service"
+        except OSError:
+            pass
+    return local(state, questions, model), "in-process"
+
+
+def decide(kind: str, text: str, ask=None, questions=None) -> dict:
+    result, source = (ask or predict)({"text": text}, questions or questions_for(kind))
+    answer = mark(result)["answers"]["q"]
+    return {"kind": kind, "answer": answer["answer"], "confidence": round(answer.get("confidence") or 0, 3),
+            "trusted": answer["trusted"], "source": source}
+
+
+def score(rows: list) -> dict:
+    """rows: (right, trusted) pairs. Precision counts only the trusted answers."""
+    trusted = [right for right, sure in rows if sure]
+    return {"items": len(rows), "right": sum(right for right, _ in rows), "answered": len(trusted),
+            "trusted_right": sum(trusted),
+            "precision": round(sum(trusted) / len(trusted), 3) if trusted else 1.0,
+            "coverage": round(len(trusted) / len(rows), 3) if rows else 0.0}
+
+
+def passes(by_kind: dict) -> bool:
+    """The gate, over the offered decisions only."""
+    total = score([row for kind, rows in by_kind.items() if kind in QUESTIONS for row in rows])
+    return total["precision"] >= GATE["precision"] and total["coverage"] >= GATE["coverage"]
+
+
+def evaluate(gate: bool) -> int:
+    items = [json.loads(line) for line in EVAL.read_text(encoding="utf-8").splitlines() if line.strip()]
+    by_kind, wrong = {}, []
+    for item in items:
+        kind = item["kind"]
+        verdict = decide(kind, item["text"], questions=MEASURED.get(kind))
+        right = verdict["answer"] == item["answer"]
+        by_kind.setdefault(kind, []).append((right, verdict["trusted"]))
+        if not right and kind in QUESTIONS:
+            wrong.append("  %s %-7s %.2f %-4s %s" % ("TRUSTED" if verdict["trusted"] else "abstain", kind,
+                                                    verdict["confidence"], verdict["answer"], item["text"][:70]))
+    print("laya on %d dev decisions, trusted at confidence >= %.2f:" % (len(items), THRESHOLD))
+    offered = [row for kind, rows in by_kind.items() if kind in QUESTIONS for row in rows]
+    for kind, part in list(by_kind.items()) + [("offered", offered)]:
+        s = score(part)
+        print("  %-8s %3d/%-3d right; trusted %3d, precision %.3f, coverage %.3f%s"
+              % (kind, s["right"], s["items"], s["answered"], s["precision"], s["coverage"],
+                 "" if kind in QUESTIONS or kind == "offered" else "  (measured, not offered)"))
+    print("\n".join(wrong))
+    if gate and not passes(by_kind):
+        print("laya: below the gate %s" % GATE)
+        return 1
+    return 0
+
+
+def service_xml(python: str, tool: str, user: str) -> str:
+    """At logon, restarted a minute after any failure, never stopped for time or power."""
+    return common.task_xml(description="laya's decision service for dev's agents, on 127.0.0.1:%s." % PORT, trigger=common.logon_trigger(user), user=user,
+                             python=python, tool=tool, arguments="serve", hidden=True, restart=True)
+
+
+def install_service() -> int:
+    if os.name != "nt":
+        print("laya-service: no logon task off Windows; the MCP server starts the service when it is down")
+        return 0
+    xml = service_xml(common.windowless_python(PYTHON), str(Path(__file__).resolve()), common.task_user())
+    done = common.create_task(TASK, xml)
+    if done.returncode != 0:
+        print("laya-service: Task Scheduler refused %s: %s" % (TASK, (done.stderr or done.stdout).strip()), file=sys.stderr)
+        return 1
+    common.run(["schtasks", "/Run", "/TN", TASK], capture_output=True)
+    print("%s: starts at logon, restarts after a failure; running now on %s" % (TASK, URL))
+    return 0
+
+
+def uninstall_service() -> int:
+    if os.name == "nt":
+        common.run(["schtasks", "/End", "/TN", TASK], capture_output=True)
+        done = common.run(["schtasks", "/Delete", "/TN", TASK, "/F"], capture_output=True)
+        print("%s: %s" % (TASK, "removed" if done.returncode == 0 else "was not installed"))
+    return 0
+
+
+def status() -> dict:
+    record = RUNTIME / "install.json"
+    return {"service": "up" if healthy() else "down", "url": URL, "threshold": THRESHOLD,
+            "installed": json.loads(record.read_text(encoding="utf-8")) if record.is_file() else None}
+
+
+def serve_mcp() -> None:
+    from mcp.server.mcpserver import MCPServer
+    server = MCPServer("laya")
+    rule = (" An answer is trusted only when `trusted` is true (confidence >= %.2f); otherwise decide without it,"
+            " and cite a trusted answer as, for example, 'laya: yes, 0.92'." % THRESHOLD)
+
+    @server.tool(name="laya_decide", description=(
+        "One short dev decision about a text, with no free-form output to invent: kind 'failure' (does this "
+        "tool output report a failure or a problem?) or 'change' (does the user tell the assistant to do, "
+        "continue or approve something, rather than ask a question?). Routing a task to a tool is not "
+        "offered: it measured unreliable, so use the router's ownership table.") + rule)
+    def laya_decide(kind: str, text: str) -> str:
+        return json.dumps(decide(kind, text), ensure_ascii=False)
+
+    @server.tool(name="laya_predict", description=(
+        "Typed questions about one state in one forward pass: each question is "
+        "{'type': 'noul'|'choice'|'score', 'instructions': ..., 'criteria': {...} or [...]}.") + rule)
+    def laya_predict(state: dict, questions: dict, model: str = "auto") -> str:
+        result, source = predict(state, questions, model)
+        return json.dumps(dict(mark(result), source=source), ensure_ascii=False)
+
+    @server.tool(name="laya_status", description="Whether the service is up, where, and the trust threshold.")
+    def laya_status() -> str:
+        return json.dumps(status(), ensure_ascii=False)
+
+    threading.Thread(target=start_service, daemon=True).start()     # every session finds it running
+    server.run()
+
+
+def serve_http() -> None:
+    os.environ.update(SERVICE_ENV)
+    if sys.stdout is None or sys.stderr is None:
+        # pythonw, as the logon task runs it, has no console, and uvicorn's
+        # logging fails on the missing streams: they go to a log instead.
+        sys.stdout = sys.stderr = (RUNTIME / "service.log").open("a", encoding="utf-8", buffering=1)
+    from laya.serve import main as serve
+    serve()
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="laya-service", description=__doc__.split("\n")[0])
+    sub = parser.add_subparsers(dest="command")
+    one = sub.add_parser("decide")
+    one.add_argument("kind", choices=sorted(QUESTIONS))
+    one.add_argument("text")
+    gate = sub.add_parser("eval")
+    gate.add_argument("--gate", action="store_true", help="exit 1 below the precision and coverage gate")
+    for name in ("serve", "install-service", "uninstall-service"):
+        sub.add_parser(name)
+    args = parser.parse_args(argv)
+    if args.command == "install-service":
+        return install_service()
+    if args.command == "uninstall-service":
+        return uninstall_service()
+    if not PYTHON.is_file():
+        print("laya-service: laya is not installed on this device; run python3 Library/setup-laya.py --install",
+              file=sys.stderr)
+        return 2
+    if Path(sys.prefix).resolve() != PYTHON.parents[1].resolve():
+        # Everything below needs laya's own runtime. Windows has no exec: the
+        # child inherits this process's stdio and ends on end of input.
+        argv = [str(PYTHON), str(Path(__file__).resolve())] + list(sys.argv[1:] if argv is None else argv)
+        if os.name != "nt":
+            os.execv(argv[0], argv)
+        # Hand over the pipes explicitly: under pythonw, which update-tools's
+        # 04:00 task runs, a console child otherwise gets a new console and
+        # the MCP messages never reach it (2026-09-25).
+        return subprocess.call(argv, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if args.command == "serve":
+        serve_http()
+    elif args.command == "decide":
+        print(json.dumps(decide(args.kind, args.text), ensure_ascii=False))
+    elif args.command == "eval":
+        return evaluate(args.gate)
+    else:
+        serve_mcp()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

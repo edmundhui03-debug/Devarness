@@ -1,0 +1,406 @@
+#!/usr/bin/env python3
+"""dev-check — run every dev checker and both test trees, and print one table.
+
+  dev-check [--fast] [--only NAME ...] [--json]
+  dev-check --daily | --install-daily | --uninstall-daily
+
+Two channels' talks made the same point on 2026-09-18: an agent cannot know it
+has finished if it cannot measure that cheaply, from one obvious entry point.
+The old workspace had eight checkers and no single way to run them; this is
+that way.
+
+Each row is a gate or information. A gate that fails, errors or outlives its
+bound fails the run; information never does, however loud it is — the md-format
+backlog is reported here and is not a failure, because the house format is not
+retroactive. --fast skips the rows marked slow, the three test suites over
+twenty seconds; --only names rows explicitly and so wins over it. Exit 0 when every gate passed, 1 otherwise, 2 on a usage
+error. Read-only: nothing here writes to the repository, and start-check runs with
+--check.
+
+The full check also runs every day at 05:00, as the task DEVARNESS_check_daily
+(owner decision 2026-09-24; a launchd job on the Mac since 2026-09-26):
+--install-daily registers it and --uninstall-daily removes it. --daily is what
+the task runs: the day's table goes to .claude/hooks/dev-check-daily/, with
+latest.json for the session banner.
+
+Standard-library Python 3.9 or later. No network of its own.
+"""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime
+import json
+import os
+import plistlib
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import time
+from typing import NamedTuple
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "Library"))
+import common  # noqa: E402
+GATE, INFO = "gate", "info"
+DAILY = ROOT / ".claude/hooks/dev-check-daily"   # gitignored, per machine
+TASK = "DEVARNESS_check_daily"
+KEEP = 30                                  # days of logs
+
+
+class UsageError(Exception):
+    pass
+
+
+class Check(NamedTuple):
+    name: str
+    kind: str
+    argv: list        # relative to the dev root; the launcher is resolved by command_for
+    bound: int        # seconds
+    slow: bool
+    tolerate: tuple   # exit codes reported as information rather than failure
+
+
+class Result(NamedTuple):
+    name: str
+    kind: str
+    status: str       # pass, FAIL, TIMEOUT, ERROR, info, SKIP
+    seconds: float
+    detail: str
+
+
+PLAN = (
+    # 1500 s: the tree took 644 s on 2026-09-26 before the repositories branch
+    # added its tests, then 1133 s on an idle PC, where 900 timed out. The daily
+    # task's 45 min still holds every gate at its bound (about 36 min).
+    Check("library-tests", GATE, ["python", "-m", "unittest", "discover", "-v", "-s", "Library/tests", "-p", "test_*.py"], 1500, True, ()),
+    Check("sync-tests", GATE, ["python", ".claude/hooks/test_sync.py"], 900, True, ()),
+    Check("startup-tests", GATE, ["python", ".claude/hooks/test_startup.py"], 300, True, ()),
+    Check("library-index-tests", GATE, ["python", "-m", "unittest", "discover", "-s", "Library/tests", "-p", "test_*library*.py"], 120, False, ()),
+    Check("library-check", GATE, ["python", "Library/bin/library", "check"], 60, False, ()),
+    # Every skill, command, agent, MCP server and guide dev holds has a library entry.
+    Check("library-coverage", GATE, ["python", "Library/bin/library", "coverage"], 60, False, ()),
+    # The frozen real-task prompts each still pick the right library entry.
+    Check("library-picks", GATE, ["python", "Library/bin/library", "eval-picks", "Library/tests/fixtures/library-picks.json"], 120, False, ()),
+    # No tracked file outside the history names the old workspace.
+    Check("names-audit", GATE, ["python", "Library/names-audit.py"], 60, False, ()),
+    # No tracked file holds a personal value, so dev could be published.
+    Check("publishable", GATE, ["python", "Library/publish-check.py"], 60, False, ()),
+    # The commit guards, over every tracked and new file: no machine path in an
+    # executable or config, no file named like a credential.
+    Check("portability", GATE, [".claude/hooks/sync.sh", "--check-portability"], 60, False, ()),
+    Check("no-secrets", GATE, [".claude/hooks/sync.sh", "--guard-secrets"], 60, False, ()),
+    # The reverse tools the owner uses all the time are installed and answer.
+    Check("reverse-ready", GATE, ["python", "Library/setup-reverse.py", "--check", "--doctor"], 600, False, ()),
+    Check("preflight-claims-tests", GATE, ["python", "Library/tests/test_preflight_claims.py"], 60, False, ()),
+    Check("guard-tests", GATE, ["python", ".claude/hooks/test_guard_git_amend.py"], 120, False, ()),
+    Check("heredoc-guard-tests", GATE, ["python", ".claude/hooks/test_guard_heredoc.py"], 120, False, ()),
+    Check("vendor-code-guard-tests", GATE, ["python", ".claude/hooks/test_guard_vendor_code.py"], 120, False, ()),
+    Check("post-edit-hook-tests", GATE, ["python", ".claude/hooks/test_post_edit_check.py"], 300, False, ()),
+    Check("prompt-recall-tests", GATE, ["python", ".claude/hooks/test_prompt_task_recall.py"], 300, False, ()),
+    Check("prompt-start-tests", GATE, ["python", ".claude/hooks/test_prompt_start.py"], 120, False, ()),
+    Check("harness-step-tests", GATE, ["python", "-m", "unittest", "discover", "-s", ".claude/skills/harness-step/scripts", "-p", "test_*.py"], 300, False, ()),
+    Check("vercel-find-tests", GATE, ["python", "Library/tests/test_vercel_find.py"], 60, False, ()),
+    Check("compaction-tests", GATE, ["python", "Library/tests/test_compaction_ceiling.py"], 60, False, ()),
+    Check("md-format-selftest", GATE, ["Library/bin/md-format", "selftest"], 120, False, ()),
+    Check("i18n-selftest", GATE, ["Library/bin/i18n", "selftest"], 300, False, ()),
+    Check("i18n-check", GATE, ["Library/bin/i18n", "check"], 120, False, ()),
+    # exit 2 is "no memory folder", the state of a device that has not restored one
+    Check("agent-memory-check", GATE, ["Library/bin/agent-memory", "check"], 60, False, (2,)),
+    Check("new-device-check", GATE, ["Library/bin/new-device", "check"], 120, False, ()),
+    Check("task-recall-tests", GATE, ["python", "Library/tests/test_task_recall.py"], 300, False, ()),
+    # The developer's dashboard (Library/dashboard/): its exporter, its Codex
+    # bridge on a fake Codex, and the taskboard launcher. The page test is Node
+    # (node --test Library/tests/test_dashboard_page.mjs) and runs by hand.
+    Check("dashboard-tests", GATE, ["python", "Library/tests/test_dashboard.py"], 120, False, ()),
+    Check("dashboard-bridge-tests", GATE, ["python", "Library/tests/test_dashboard_bridge.py"], 180, False, ()),
+    Check("taskboard-tests", GATE, ["python", "Library/tests/test_taskboard.py"], 60, False, ()),
+    Check("ponytail-tests", GATE, ["python", "Library/tests/test_ponytail.py"], 120, False, ()),
+    Check("ponytail-check", GATE, ["python", "Library/ponytail-check.py"], 30, False, ()),
+    Check("tieitup-tests", GATE, ["python", "-B", "Library/tests/test_tieitup.py"], 180, False, ()),
+    Check("tieitup-skill-tests", GATE, ["python", "-B", "Library/tests/test_tieitup_skill.py"], 60, False, ()),
+    Check("tieitup-bench-tests", GATE, ["python", "-B", "Library/tests/test_tieitup_bench.py"], 120, False, ()),
+    Check("tieitup-check", GATE, ["python", "Library/tieitup-check.py"], 30, False, ()),
+    Check("archify-tests", GATE, ["python", "Library/tests/test_archify.py"], 120, False, ()),
+    Check("archify-check", GATE, ["Library/bin/archify", "--check"], 30, False, ()),
+    # Thirty tests that each run real git against local bare upstreams: 253 s on
+    # the Windows PC, so it is a slow suite with room, not a fast one at its edge.
+    Check("update-tools-tests", GATE, ["python", "Library/tests/test_update_tools.py"], 600, True, ()),
+    Check("update-tools-status", INFO, ["Library/bin/update-tools", "status"], 30, False, ()),
+    Check("start-check-check", GATE, ["Library/bin/start-check", "--check", "--text"], 60, False, ()),
+    # Codex skips a dev hook it does not trust, silently: Aster's turn-end alert
+    # never ran from 2026-10-03 to 2026-10-07. Exit 3 is a device with no Codex,
+    # or one where the owner has not yet trusted dev in Codex.
+    # Its tests run inside library-tests (Library/tests/test_codex_hook_trust.py).
+    Check("codex-hook-trust", GATE, ["python", "Library/codex-hook-trust.py", "--check"], 120, False, (3,)),
+    Check("md-format-backlog", INFO, ["Library/bin/md-format", "check"], 300, False, ()),
+    Check("md-format-dupes", INFO, ["Library/bin/md-format", "dupes"], 300, False, ()),
+)
+
+
+def bash() -> str:
+    """The bash to run a launcher with: on Windows, Git for Windows' own.
+
+    A bare "bash" on Windows is found in System32 before PATH is searched,
+    and that is WSL's launcher, whose bash strips the backslashes from a
+    Windows path; three rows failed that way on 2026-09-19. Git's bash sits
+    in the bin folder of the Git install that holds git.
+    """
+    if os.name != "nt":
+        return "bash"
+    git = shutil.which("git")
+    if git:
+        for folder in list(Path(git).resolve().parents)[:3]:
+            candidate = folder / "bin" / "bash.exe"
+            if candidate.is_file():
+                return str(candidate)
+    return "bash"
+
+
+def command_for(check: Check, root: Path) -> list:
+    """The argv to run: python launchers under this interpreter, bash ones under bash.
+
+    Git Bash on Windows does not honour a shebang for a file run by path, so
+    the interpreter is chosen here from the launcher's own first line.
+    """
+    head, rest = check.argv[0], list(check.argv[1:])
+    if head == "python":
+        return [sys.executable] + rest
+    if Path(head).is_absolute():
+        return [head] + rest
+    launcher = root / head
+    try:
+        with launcher.open(encoding="utf-8", errors="replace") as fh:
+            first = fh.readline()
+    except OSError:
+        return [str(launcher)] + rest
+    if "python" in first:
+        return [sys.executable, str(launcher)] + rest
+    if "bash" in first or first.startswith("#!/bin/sh"):
+        return [bash(), str(launcher)] + rest
+    return [str(launcher)] + rest
+
+
+SUMMARY = re.compile(r"^(OK\b|FAILED\b|Ran \d+ test|NO TESTS|\d+ (checks|files|deliverable)\b|"
+                     r"START (COMPLETE|FAILED)|NEW DEVICE|checked \d+ )")
+DETAIL_LIMIT = 160
+
+
+def detail_from(stdout: str, stderr: str) -> str:
+    """The line worth putting in the table.
+
+    A checker's verdict is not always its last line: unittest writes OK to
+    stderr while a test under it prints JSON to stdout, and the table showed
+    `}` for the whole Library tree. Prefer a line shaped like a verdict, newest
+    first, and fall back to the last line of either stream.
+    """
+    for text in (stderr, stdout):
+        for line in reversed([line.strip() for line in text.splitlines() if line.strip()]):
+            if SUMMARY.match(line):
+                return line[:DETAIL_LIMIT]
+    for text in (stdout, stderr):
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if lines:
+            return lines[-1][:DETAIL_LIMIT]
+    return ""
+
+
+def run_check(check: Check, root: Path) -> Result:
+    argv = command_for(check, root)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    if os.name == "nt":
+        shell = Path(bash())
+        if shell.is_absolute():
+            # Child tests discover bash and POSIX utilities through PATH too.
+            env["PATH"] = os.pathsep.join([str(shell.parent),
+                                          str(shell.parent.parent / "usr" / "bin"),
+                                          env.get("PATH", "")])
+    started = time.monotonic()
+    try:
+        done = subprocess.run(argv, cwd=str(root), capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=check.bound, env=env, stdin=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired as error:
+        output = error.stderr or error.stdout or ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", "replace")
+        lines = output.strip().splitlines()
+        detail = "no answer within %ds" % check.bound
+        if lines:
+            detail += "; last output: " + lines[-1][-DETAIL_LIMIT:]
+        return Result(check.name, check.kind, "TIMEOUT", time.monotonic() - started,
+                      detail)
+    except OSError as error:
+        return Result(check.name, check.kind, "ERROR", time.monotonic() - started, str(error)[:DETAIL_LIMIT])
+    seconds = time.monotonic() - started
+    detail = detail_from(done.stdout, done.stderr)
+    if check.kind == INFO or done.returncode in check.tolerate:
+        return Result(check.name, check.kind, "info", seconds, detail)
+    return Result(check.name, check.kind, "pass" if done.returncode == 0 else "FAIL", seconds, detail)
+
+
+def run(plan, root: Path, fast: bool = False, only=None):
+    """Every result in plan order, and the exit code: 1 if any gate did not pass."""
+    names = [check.name for check in plan]
+    for wanted in only or ():
+        if wanted not in names:
+            raise UsageError("no check called %s; the checks are: %s" % (wanted, ", ".join(names)))
+    results = []
+    for check in plan:
+        if only and check.name not in only:
+            continue
+        if fast and check.slow and not only:   # naming a row is explicit; --fast is a default
+            results.append(Result(check.name, check.kind, "SKIP", 0.0, "slow; skipped by --fast"))
+            continue
+        results.append(run_check(check, root))
+    failed = any(r.status in ("FAIL", "TIMEOUT", "ERROR") for r in results)
+    return results, (1 if failed else 0)
+
+
+def tally(results):
+    return {"passed": sum(1 for r in results if r.status == "pass"),
+            "failed": sum(1 for r in results if r.status in ("FAIL", "TIMEOUT", "ERROR")),
+            "skipped": sum(1 for r in results if r.status == "SKIP")}
+
+
+def as_table(results, code: int) -> str:
+    width = max([len(r.name) for r in results] + [5])
+    lines = ["%-*s  %-8s %8s  %s" % (width, "CHECK", "RESULT", "SECONDS", "DETAIL")]
+    for r in results:
+        lines.append("%-*s  %-8s %8.1f  %s" % (width, r.name, r.status, r.seconds, r.detail))
+    gates, info = tally(results), sum(1 for r in results if r.status == "info")
+    total = sum(r.seconds for r in results)
+    lines.append("dev-check: %d gate%s passed, %d failed, %d skipped, %d informational — %dm%02ds, exit %d" % (
+        gates["passed"], "" if gates["passed"] == 1 else "s", gates["failed"], gates["skipped"], info,
+        int(total) // 60, int(total) % 60, code))
+    return "\n".join(lines)
+
+
+def as_json(results, code: int, root: Path, fast: bool) -> str:
+    return json.dumps({"root": str(root), "fast": fast, "exit": code, "gates": tally(results),
+                       "results": [r._asdict() for r in results]}, indent=2)
+
+
+def write_daily(results, code: int, folder: Path, now: datetime) -> None:
+    """The day's table, and latest.json for the session banner; only the newest KEEP logs stay."""
+    folder.mkdir(parents=True, exist_ok=True)
+    log = folder / (now.strftime("%Y-%m-%d") + ".log")
+    log.write_text(as_table(results, code) + "\n", encoding="utf-8")
+    failed = [r.name for r in results if r.status in ("FAIL", "TIMEOUT", "ERROR")]
+    verdict = {"finished_at": now.isoformat(timespec="minutes"), "exit": code, "gates": tally(results),
+               "failed": failed, "log": log.name}
+    (folder / "latest.json").write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
+    for old in sorted(folder.glob("????-??-??.log"))[:-KEEP]:
+        old.unlink()
+
+
+def daily(folder: Path = DAILY, now=None) -> int:
+    """What the task runs. It starts windowless, under pythonw, which has no stdout, and each
+    console tool it started would open a window; so the checks run under the console Python
+    with no window, and the verdict goes to files. A run that leaves none is an error."""
+    python = Path(sys.executable)
+    if os.name == "nt" and python.with_name("python.exe").is_file():
+        python = python.with_name("python.exe")
+    done = None
+    try:
+        done = subprocess.run([str(python), str(Path(__file__).resolve()), "--json"], cwd=str(ROOT),
+                              capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              stdin=subprocess.DEVNULL, timeout=2400,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        report = json.loads(done.stdout)
+        results, code = [Result(**row) for row in report["results"]], report["exit"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+        detail = ((done.stderr or done.stdout) if done else "") or str(error)
+        results, code = [Result("dev-check", GATE, "ERROR", 0.0, detail.strip()[-160:])], 2
+    write_daily(results, code, folder, now or datetime.now())
+    return code
+
+
+def daily_task_xml(python: str, tool: str, user: str, arguments: str = "--daily", hour: int = 5,
+                   limit: str = "PT45M",
+                   description: str = "Run dev-check every morning; the verdict goes to .claude/hooks/dev-check-daily.") -> str:
+    """Every day at the hour for the signed-in user. update-tools and books register theirs through this too."""
+    start = datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0).isoformat()
+    trigger = ("<CalendarTrigger><StartBoundary>%s</StartBoundary><Enabled>true</Enabled>"
+               "<ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>" % start)
+    return common.task_xml(description=description, trigger=trigger, user=user, python=python, tool=tool,
+                             arguments=arguments, limit=limit, cwd=ROOT)
+
+
+def daily_plist(python: str, tool: str, task: str, arguments: str, hour: int) -> bytes:
+    """The macOS form of daily_task_xml: launchd runs a calendar job missed while
+    asleep at the next wake. launchd's own PATH lacks ~/.local/bin, where bootstrap
+    puts uv, claude and node; the installing shell's PATH is no better, since it
+    holds folders that live only as long as that session."""
+    return plistlib.dumps({"Label": task, "ProgramArguments": [python, tool, *arguments.split()],
+                           "StartCalendarInterval": {"Hour": hour, "Minute": 0},
+                           "WorkingDirectory": str(ROOT), "ProcessType": "Background",
+                           "EnvironmentVariables": {"PATH": str(Path.home() / ".local/bin") + ":/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"}})
+
+
+def schedule(install: bool, task: str = TASK, tool: str = "", **xml) -> int:
+    """Register or remove a daily task: Task Scheduler on Windows, launchd on a Mac.
+    Defaults are DEVARNESS_check_daily's; xml takes daily_task_xml's keywords."""
+    tool = tool or str(Path(__file__).resolve())
+    name = Path(tool).name
+    if sys.platform == "darwin":
+        job = Path.home() / "Library" / "LaunchAgents" / (task + ".plist")
+        target = "gui/%d" % os.getuid()
+        subprocess.run(["launchctl", "bootout", target + "/" + task], capture_output=True)
+        if not install:
+            print("%s: %s" % (task, "removed" if job.exists() else "was not installed"))
+            job.unlink(missing_ok=True)
+            return 0
+        job.parent.mkdir(parents=True, exist_ok=True)
+        job.write_bytes(daily_plist(sys.executable, tool, task, xml.get("arguments", "--daily"), xml.get("hour", 5)))
+        done = subprocess.run(["launchctl", "bootstrap", target, str(job)], capture_output=True, text=True)
+        if done.returncode != 0:
+            print("%s: launchctl refused %s: %s" % (name, job, (done.stderr or done.stdout).strip()), file=sys.stderr)
+            return 1
+        print("%s: every day at %02d:00, or at the next wake after it" % (task, xml.get("hour", 5)))
+        return 0
+    if os.name != "nt":
+        print("%s: the daily task is registered on Windows and macOS only" % name, file=sys.stderr)
+        return 2
+    if not install:
+        # schtasks answers in the console code page (cp950 on the Windows PC).
+        done = common.run(["schtasks", "/Delete", "/TN", task, "/F"], capture_output=True, text=True,
+                            errors="replace")
+        print("%s: %s" % (task, "removed" if done.returncode == 0 else "was not installed"))
+        return 0
+    user = common.task_user()
+    done = common.create_task(task, daily_task_xml(common.windowless_python(), tool, user, **xml))
+    if done.returncode != 0:
+        print("%s: Task Scheduler refused %s: %s" % (name, task, (done.stderr or done.stdout).strip()),
+              file=sys.stderr)
+        return 1
+    print("%s: every day at %02d:00, as %s" % (task, xml.get("hour", 5), user))
+    return 0
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="dev-check", description="run every dev checker and both test trees")
+    parser.add_argument("--fast", action="store_true", help="skip the slow test suites")
+    parser.add_argument("--only", nargs="+", metavar="NAME",
+                        help="run only these checks; runs them even with --fast")
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--daily", action="store_true", help="the scheduled run: the full check, verdict to files")
+    mode.add_argument("--install-daily", action="store_true", help="register the 05:00 task (Windows or macOS)")
+    mode.add_argument("--uninstall-daily", action="store_true", help="remove the 05:00 task")
+    args = parser.parse_args(argv)
+    if args.daily:
+        return daily()
+    if args.install_daily or args.uninstall_daily:
+        return schedule(install=args.install_daily)
+    try:
+        results, code = run(PLAN, ROOT, fast=args.fast, only=args.only)
+    except UsageError as error:
+        print("dev-check: %s" % error, file=sys.stderr)
+        return 2
+    print(as_json(results, code, ROOT, args.fast) if args.json else as_table(results, code))
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

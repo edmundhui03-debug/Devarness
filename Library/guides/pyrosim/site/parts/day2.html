@@ -1,0 +1,132 @@
+<section id="day2">
+  <div class="day-head">
+    <div><p class="kicker">Day 2</p><h2>The mesh decides everything you can see</h2></div>
+    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+  </div>
+  <div class="goal"><span class="g-l">Goal</span><p>An ISO 9705 room in PyroSim built from two meshes of 20 cm cubes, with a 0.8 m × 2.0 m door punched right through the front wall, proved open by a one-second run.</p></div>
+
+  <p class="phase">Learn</p>
+
+  <p class="prose">FDS does not see a room. It sees a box of rectangular cells, and it solves the same set of equations once in every cell, every time step. That box of cells is the mesh. Everything you draw in PyroSim — a wall, a doorway, a burner, a thermocouple — is placed against that grid before FDS starts, and anything smaller than a cell is either snapped onto a cell face or dropped. So the mesh is not a setting you tune later. It fixes what the run is able to show you.</p>
+
+  <p class="prose">Two properties of a cell matter. The first is its shape. The FDS 6.10.1 User's Guide is direct about it: "It is best if the mesh cells resemble cubes; that is, the length, width and height of the cells ought to be roughly the same." PyroSim carries the same advice inside the <span class="ui">Edit Meshes</span> dialog, where each axis shows a <span class="ui">Cell Size Ratio</span> whose tooltip reads "Ratio of this cell dimension to the shortest. For best results, use cubic cells (ratio of 1.0)." Today every cell is a 0.2 m cube, so all three ratios read 1.00.</p>
+
+  <p class="prose">The second is its size. Halving the cell size doubles the cell count along each of three axes, which is eight times the cells, and FDS sets its time step to satisfy the CFL condition, so the step roughly halves as well. Sixteen times the work for one refinement step is the arithmetic that matters here. That is why this guide builds the room at 20 cm and refines to 10 cm only on Day 6. The reference run of the full 1200 s programme at 20 cm took 8868 s of wall clock — about 2 hours 28 minutes — on a Mac with two MPI processes. Your office desktop will differ.</p>
+
+  <p class="prose">There is a way to judge cell size that does not depend on the room. FDS defines a characteristic fire diameter <code>D*</code> from the heat release rate, and compares it with the cell size. Write the fire's heat release rate as Q in kW, and:</p>
+
+  <ul class="plain">
+    <li><code>D* = ( Q / (ρ∞ · c_p · T∞ · √g) )^(2/5)</code>, which for ambient air at 20 °C works out as <code>D* ≈ (Q / 1111)^0.4</code> in metres.</li>
+    <li>The number that matters is <code>D*/δx</code>, where δx is the cell size. The guide describes it as "the number of computational cells spanning the characteristic (not necessarily the physical) diameter of the fire. The more cells spanning the fire, the better the resolution of the calculation."</li>
+  </ul>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Fire size</th><th class="num">D* (m)</th><th class="num">D*/δx at 0.2 m</th><th class="num">D*/δx at 0.1 m</th></tr></thead>
+      <tbody>
+        <tr><td><b>100 kW</b></td><td class="num">0.382</td><td class="num">1.9</td><td class="num">3.8</td></tr>
+        <tr><td><b>300 kW</b></td><td class="num">0.592</td><td class="num">3.0</td><td class="num">5.9</td></tr>
+        <tr><td><b>1000 kW</b></td><td class="num">0.959</td><td class="num">4.8</td><td class="num">9.6</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">The ISO 9705 burner programme you will build tomorrow runs at 100 kW and then 300 kW, so a 20 cm mesh gives you about 1.9 and 3.0. That is coarse. It is not a failure, and it is not a pass either — there is no threshold to pass, which is the part most beginners are taught wrongly.</p>
+
+  <details class="deeper"><summary>Where "4 to 16" came from, and why it is not a rule</summary><div class="d-in">
+    <p class="prose">The FDS 6.0.0 User's Guide of November 2013 carried a footnote saying that for the validation study sponsored by the US Nuclear Regulatory Commission — NUREG-1824, Stroup and Lindeman, 2013 — the D*/δx values ranged from 4 to 16. That footnote is the source of every "4 to 16" you will read on a forum. NIST removed it. The 6.10.1 guide now points at the table in the FDS Validation Guide instead and says of those values: "These values range over two orders of magnitude and were chosen based on a grid resolution study and the particular attributes of the given fire scenario. Taking any of these values as an 'acceptable' minimum is inappropriate."</p>
+    <p class="prose">The same guide says what to do in its place: "build an FDS input file using a relatively coarse mesh, and then gradually refine the mesh until you do not see appreciable differences in your results. This is referred to as a mesh sensitivity study." That is Day 6, and it is the only honest answer to "is my mesh fine enough".</p>
+    <p class="prose">For context, the Validation Guide's row for NIST's own ISO 9705 room experiments lists D*/δx between 3.8 and 14. Your 20 cm mesh sits below that. Report it that way rather than hiding it.</p>
+  </div></details>
+
+  <details class="deeper"><summary>What "divisible by 2, 3 and 5" actually buys you</summary><div class="d-in">
+    <p class="prose">PyroSim warns when a cell count is awkward: "The number of cells is potentially inefficient. For maximum efficiency, the number should be factorable by 2, 3 and 5." It is an efficiency message, not an accuracy message, and the FDS guide explains why. The pressure solver uses Fast Fourier Transforms in the y and z directions only, so the habit applies to the J and K of the cell counts; "The number of cells in the x direction (the I in IJK) is not affected by this restriction". And then the guide undercuts it: "since the pressure solver uses less than 10 % of the total CPU time, the gains in using low prime dimensions are usually negligible."</p>
+    <p class="prose">Thunderhead's own first tutorial uses a 55 × 55 × 42 mesh, which breaks the advice and runs fine. Today's counts — 18, 12, 12 and 12, 18, 15 — all factor into 2, 3 and 5, so you should see no warning. If you ever do, treat it as a suggestion about speed.</p>
+  </div></details>
+
+  <p class="prose">One last thing before you draw anything, and it is the reason today's room needs so few obstructions. The FDS guide states: "By default, FDS assumes that the exterior boundary of the computational domain ... is a solid wall." A mesh is a sealed box unless you open it. That cuts both ways. It means a mesh drawn exactly to the room's inner dimensions gives you the back wall, the two side walls, the floor and the ceiling for nothing. It also means that the space outside the door will hold its smoke in and its pressure up unless you add <code>OPEN</code> vents on its outer faces.</p>
+
+  <p class="prose">Why a second mesh outside the door at all, rather than an <code>OPEN</code> vent across the doorway itself? Two reasons, both from the guide. An <code>OPEN</code> vent may only sit on the exterior boundary of the domain, so one placed on an interior wall stops the run with <code>ERROR(819)</code>. And where the doorway flow is part of the answer, as it is here, the guide advises: "if the flow through the doorway or window is important, you should extend the domain a few meters rather than use an OPEN boundary." So the domain is extended 2.4 m past the door, and the open boundaries are moved out there.</p>
+
+  <p class="phase">Build</p>
+
+  <ol class="steps">
+    <li><div><p><span class="path">View › Units</span> — set the unit system to metric, or click <span class="ui">SI</span> on the File toolbar. Every number below is in metres.</p></div></li>
+    <li><div><p><span class="path">Model › Edit Meshes</span> — click <span class="ui">New</span> and name the mesh <span class="val">ROOM</span>. This mesh is the room, so its boundary is the inside face of the walls.</p></div></li>
+    <li><div><p>On the <span class="ui">Properties</span> tab, fill the six <span class="ui">Mesh Boundary</span> fields: Min X <span class="val">0</span>, Max X <span class="val">3.6</span>, Min Y <span class="val">0</span>, Max Y <span class="val">2.4</span>, Min Z <span class="val">0</span>, Max Z <span class="val">2.4</span>. Leave <span class="ui">Division Method</span> on <span class="val">Uniform</span>.</p></div></li>
+    <li><div><p>Click the <span class="ui">Cell Size (m)</span> link to open <span class="ui">Set Cell Size</span>, and enter <span class="val">0.2</span>. <span class="ui">X Cells</span> becomes 18, <span class="ui">Y Cells</span> 12, <span class="ui">Z Cells</span> 12, all three <span class="ui">Cell Size Ratio</span> boxes read 1.00, and the mesh holds 2,592 cells.</p></div></li>
+    <li><div><p>Click <span class="ui">New</span> again and name the second mesh <span class="val">OUTSIDE</span>. Mesh Boundary: Min X <span class="val">3.6</span>, Max X <span class="val">6.0</span>, Min Y <span class="val">-0.6</span>, Max Y <span class="val">3.0</span>, Min Z <span class="val">0</span>, Max Z <span class="val">3.0</span>. Set its cell size to <span class="val">0.2</span> as well, giving 12, 18 and 15 cells and 3,240 in total.</p></div></li>
+    <li><div><p>Before leaving the dialog, read two lines. <span class="ui">Mesh Alignment Test</span> must say <span class="val">Passed</span>, and <span class="ui">Total number of cells in model</span> must say <span class="val">5832</span>. Click <span class="ui">OK</span>.</p></div></li>
+    <li><div><p>In the Navigation panel, right-click <span class="val">OUTSIDE</span> and choose <span class="ui">Open Mesh Boundaries</span>. PyroSim adds six Mesh Boundary Vents, each using the reserved <code>OPEN</code> surface. Delete the two that must stay solid: the one on Min X, which is the seam this mesh shares with <span class="val">ROOM</span> and where the front wall will stand, and the one on Min Z, which is the ground.</p></div></li>
+    <li><div><p>Do not run <span class="ui">Open Mesh Boundaries</span> on <span class="val">ROOM</span>. Its six faces are the room's floor, ceiling and three remaining walls, and they have to stay shut. They carry PyroSim's default surface, which is the reserved <code>INERT</code> — a smooth wall held at ambient temperature — until you give the room its aerated-concrete lining.</p></div></li>
+    <li><div><p>Switch to the <span class="ui">2D View</span> tab and pick the <span class="ui">Wall</span> tool. Right-click to open <span class="ui">Tool Properties</span> and set Z Location <span class="val">0</span>, Height <span class="val">2.4</span>, Wall Thickness <span class="val">0.2</span>. Press <kbd>CTRL</kbd> until the wall is centred on the line you draw.</p></div></li>
+    <li><div><p>Press <kbd>TAB</kbd> until the entry box asks for an absolute position — one press for the first point, two for the second, because once a point exists the first press offers a relative offset instead. Type <span class="val">3.7,0,0</span> and press <kbd>ENTER</kbd>, then <span class="val">3.7,2.4,0</span> and <kbd>ENTER</kbd>, then right-click and choose <span class="ui">Finish</span> to end the wall at that point. A 0.2 m wall centred on x = 3.7 m runs from 3.6 m to 3.8 m, which is exactly one cell. Double-click it in the tree, check those bounds in <span class="ui">Obstruction Properties</span>, and rename it <span class="val">Front wall</span>.</p></div></li>
+    <li><div><p>Still in the <span class="ui">2D View</span>, pick the <span class="ui">Wall Hole</span> tool. Its defaults are align hole to left, Z Location 0, Height 1 m and Wall Thickness 0.2 m. In <span class="ui">Tool Properties</span>, change Height to <span class="val">2.0</span>, Wall Thickness to <span class="val">0.3</span>, and the alignment from left to centred, so the hole reaches past both faces of a 0.2 m wall.</p></div></li>
+    <li><div><p>Draw the hole across the wall from <span class="val">3.7,0.8,0</span> to <span class="val">3.7,1.6,0</span>, entering both points with <kbd>TAB</kbd> and <kbd>ENTER</kbd> the same way. That is a 0.8 m opening centred in the 2.4 m wall, 2.0 m high, leaving the 0.4 m soffit that ISO 9705 specifies.</p></div></li>
+    <li><div><p>If PyroSim asks "PyroSim has detected a hole touching a mesh boundary, which may cause cutting problems in FDS. Would you like to slightly expand these types of holes?", click <span class="ui">Yes</span>. The door sits on the seam between your two meshes, and the expansion — one tenth of a cell past the boundary — is what stops FDS leaving a thin sheet of wall behind.</p></div></li>
+    <li><div><p><span class="path">File › Save</span> — save the model as <span class="val">iso9705_room.psm</span> in a local folder. Avoid spaces and periods in the name and in every folder above it, keep the name itself in plain English characters, and keep it out of OneDrive: PyroSim writes the run into a folder of the same name beside the model file, and a sync service holding a file lock can fail a run part-way.</p></div></li>
+  </ol>
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The <span class="ui">Edit Meshes</span> dialog on the office desktop with both meshes in the list: capture the Mesh Boundary fields, the X, Y and Z cell counts, the <span class="ui">Cell Size (m)</span> line reading 0.2 x 0.2 x 0.2, <span class="ui">Mesh Alignment Test: Passed</span>, and <span class="ui">Total number of cells in model</span>.</p></div></div>
+
+  <div class="watch"><h4>Watch out</h4>
+    <p class="prose">A door that does not reach through the wall is the quietest failure in this whole guide. FDS punches a <code>&amp;HOLE</code> only out of the obstruction it overlaps, and the guide's advice is "a good rule of thumb is to punch more than enough to create the hole". If the hole is shallower than the wall, a sliver of wall survives, the room is sealed, and the run still ends with <code>STOP: FDS completed successfully</code>. On this project's Mac, a 0.4 m wall with a 0.2 m-deep hole left a pressure zone of 21.1 m³ behind; extending the hole past both faces removed it. That is why the hole's Wall Thickness is set to 0.3 m against a 0.2 m wall, and why the check below exists.</p>
+    <p class="prose">One more trap in the same family: a hole drawn in the <span class="ui">3D View</span> can snap on top of the obstruction instead of cutting into it. Draw holes in the <span class="ui">2D View</span>, where the problem does not arise.</p>
+  </div>
+
+  <p class="phase">Check</p>
+
+  <p class="prose">Check the geometry before the physics, and check it twice: once by looking, once by reading the log. Both checks are quick because neither needs a real fire.</p>
+
+  <ol class="steps">
+    <li><div><p><span class="path">Analysis › Simulation Parameters › Time</span> — set <span class="ui">End Time</span> to <span class="val">0</span> s. Thunderhead documents this field as 0.001 s in a new model, which is why it always needs your attention. With an end time of zero FDS does the set-up work only, and the log finishes with <code>STOP: Set-up only</code>.</p></div></li>
+    <li><div><p>Turn on <span class="ui">Preview FDS Blocks</span> on the render and filter toolbar, which the Fundamentals tutorial also calls FDS Block Preview. PyroSim redraws your wall and door as the blocks FDS will actually use. Switch back to the <span class="ui">3D View</span> tab, because the 2D View has no orbit, and turn round to the door to confirm the opening is a clean 0.8 m by 2.0 m hole and not a recess.</p></div></li>
+    <li><div><p>Set <span class="ui">End Time</span> to <span class="val">1</span> s and run the model, then open <code>iso9705_room.out</code> in the run folder beside your <code>.psm</code> file and search it for the words <code>Pressure Zone</code>.</p></div></li>
+  </ol>
+
+  <div class="check"><h4>Check your result</h4>
+    <p class="prose">A search for <code>Pressure Zone</code> in the <code>.out</code> file should find <b>nothing</b>. An empty result is the proof that your room has a path to the outside air, because FDS lists a pressure zone here only when it finds a volume sealed off from it. If instead you get a two-line block, a header and a volume, the door did not cut through and you must go back to the hole. This pair is from the deliberately broken 10 cm model used on Day 6, so your own volume and cell count would be your mesh's:</p>
+    <ul class="plain">
+      <li><code>Pressure Zone Information</code></li>
+      <li><code>1 Volume: 2.0732E+01 m3, Cells: 20732, Mesh: 1, Indices: (36,24,24)</code></li>
+    </ul>
+    <p class="prose">While you are in the file, confirm three things near the top: <code>Total Number of Grid Cells</code> reads 5832 cells, <code>Maximum Cell Aspect Ratio</code> reads 1.000, and the two <code>Grid Dimensions</code> blocks read 18, 12, 12 and 12, 18, 15 cells.</p>
+    <p class="prose">The one-second run matters. On this project's Mac, runs with an end time of zero printed no pressure zone information at all, even for a model that was genuinely sealed. A set-up-only run checks your geometry and your mesh alignment; it cannot check whether the room is open.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>What</th><th class="num">Value</th><th>Where it comes from</th></tr></thead>
+      <tbody>
+        <tr><td><b>Room, inside</b></td><td class="num">3.6 × 2.4 × 2.4 m</td><td>ISO 9705-1:2016 clause 5.1, each dimension ± 0.05 m</td></tr>
+        <tr><td><b>Doorway</b></td><td class="num">0.8 × 2.0 m</td><td>ISO 9705-1:2016 clause 5.2, centred in a 2.4 × 2.4 m wall</td></tr>
+        <tr><td><b>Soffit above the door</b></td><td class="num">0.4 m</td><td>Room height minus door height</td></tr>
+        <tr><td><b>Front wall, modelled</b></td><td class="num">0.2 m thick</td><td>One cell at 20 cm, from x = 3.6 m to x = 3.8 m</td></tr>
+        <tr><td><b>ROOM mesh</b></td><td class="num">18 × 12 × 12 = 2,592 cells</td><td>x 0 to 3.6, y 0 to 2.4, z 0 to 2.4 m</td></tr>
+        <tr><td><b>OUTSIDE mesh</b></td><td class="num">12 × 18 × 15 = 3,240 cells</td><td>x 3.6 to 6.0, y −0.6 to 3.0, z 0 to 3.0 m</td></tr>
+        <tr><td><b>Whole model</b></td><td class="num">5,832 cells</td><td>Reported in the <code>.out</code> file as Total Number of Grid Cells</td></tr>
+        <tr><td><b>Cell</b></td><td class="num">0.2 m cube</td><td>Aspect ratio 1.000; counts factor into 2, 3 and 5</td></tr>
+        <tr><td><b>Open faces</b></td><td class="num">4</td><td>Max X, Min Y, Max Y and Max Z of the OUTSIDE mesh</td></tr>
+        <tr><td><b>Same room at 10 cm</b></td><td class="num">46,656 cells</td><td>36 × 24 × 24 plus 24 × 36 × 30; the Day 6 comparison</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="prose">Two meshes only touch correctly when their cells line up. The FDS rule is that abutting cells "ought to have the same cross sectional area, or integral ratios", and a mismatch stops the run with <code>ERROR(431): MESH 2 is out of alignment with MESH 1</code>. Here both meshes use 0.2 m cubes, so every cell on the seam meets exactly one cell on the other side, and the <span class="ui">Mesh Alignment Test</span> line in <span class="ui">Edit Meshes</span> tells you so before FDS ever sees the file. Be aware of one trade-off you have accepted: that seam lies in the plane of the doorway, and Thunderhead advise against putting a mesh boundary where critical action is expected. The fire sits at the other end of the 3.6 m room, in the corner opposite the door, which is the reason this placement is tolerable rather than ideal.</p>
+
+  <p class="prose">Here is the whole reference case as FDS reads it. Only four kinds of line belong to today: the two <code>&amp;MESH</code> lines, the <code>&amp;OBST</code> front wall, the <code>&amp;HOLE</code> door, and the four <code>&amp;VENT</code> lines carrying <code>SURF_ID='OPEN'</code>. This listing is the 10 cm version, because the reference case ships at both resolutions; at 20 cm the mesh lines read <code>IJK=18,12,12</code> and <code>IJK=12,18,15</code>, the wall runs to 3.8 m rather than 3.7 m, and the door hole runs from 3.59 m to 3.81 m. Everything else is identical, and Day 6 runs both.</p>
+
+<!--FDSBLOCK:iso9705_room-->
+
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The 3D View from outside and slightly above the door, with <span class="ui">Preview FDS Blocks</span> on: capture the door opening cut cleanly through the front wall, the 0.4 m soffit above it, and the outline of the OUTSIDE mesh with its four open faces.</p></div></div>
+
+  <div class="quiz">
+    <details class="q"><summary><span class="qt">Your cells are 0.2 m and the fire is 100 kW, so D*/δx is about 1.9. Does that mean the run is wrong?</span></summary><div class="qa">No, and no number here can tell you that on its own. NIST withdrew the old "4 to 16" range from the User's Guide and now says that taking any tabulated value as an acceptable minimum is inappropriate. What 1.9 does tell you is that the mesh is coarse for this fire, and that you owe the result a mesh sensitivity study, which is Day 6. Report the value alongside the result rather than leaving it out.</div></details>
+    <details class="q"><summary><span class="qt">Why does this room need no obstructions for its floor, ceiling, back wall or side walls?</span></summary><div class="qa">Because FDS treats the exterior boundary of the computational domain as a solid wall by default, and the ROOM mesh is drawn to exactly the room's inner dimensions of 3.6 × 2.4 × 2.4 m. The five surfaces come free. The front wall is the exception because it needs a door cut through it.</div></details>
+    <details class="q"><summary><span class="qt">The run ends with STOP: FDS completed successfully, but the .out file contains a Pressure Zone Information block. What has gone wrong?</span></summary><div class="qa">The room is sealed. Almost always the door hole is shallower than the wall, so a sliver of wall survives the cut. Make the hole reach past both faces of the wall and run one second again; a healthy model lists no pressure zone at all. FDS raises no error for this, which is why you check the file rather than trusting the final line.</div></details>
+    <details class="q"><summary><span class="qt">Someone tells you every cell count must divide by 2, 3 and 5 or the answer will be wrong. What is actually true?</span></summary><div class="qa">It is about speed, not accuracy. The FDS pressure solver uses Fast Fourier Transforms in the y and z directions, so only those two cell counts are affected, and the guide adds that the solver uses less than 10 % of total CPU time, making the gains usually negligible. PyroSim's message calls such a count "potentially inefficient", not incorrect.</div></details>
+    <details class="q"><summary><span class="qt">Why extend the domain 2.4 m past the door instead of putting an OPEN vent across the doorway?</span></summary><div class="qa">Two reasons. An OPEN vent is only allowed on the exterior boundary of the domain, so one drawn on an interior wall stops the run with ERROR(819). And the FDS guide warns that the pressure boundary condition on an open boundary is imperfect, advising that where the doorway flow matters you should extend the domain a few metres instead. The doorway flow is exactly what this room is for.</div></details>
+  </div>
+
+  <div class="done-row"><input type="checkbox" id="done-day2" data-done="day2"><label for="done-day2">Day 2 done</label></div>
+</section>

@@ -1,0 +1,105 @@
+{
+  "autoCompactWindow": 300000,
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/session.py\" --hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/session.py\" --prompt-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_git_amend.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_heredoc.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_vendor_code.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_edit_check.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "claudeMdExcludes": [
+    "**/Library/reverse-skill/**",
+    "**/Library/rea/**",
+    "**/Library/docling/**",
+    "**/Library/playwright-cli/**",
+    "**/Library/ECC/**",
+    "**/Library/claude-scholar/**",
+    "**/Library/codex-plugin-cc/**",
+    "**/Library/cship/**",
+    "**/Library/markitdown/**",
+    "**/Library/prompt-master/**",
+    "**/Library/skills/**",
+    "**/Library/Understand-Anything/**",
+    "**/Library/diagram-design/**",
+    "**/Library/learn-claude-code/**",
+    "**/Library/i-have-adhd/**",
+    "**/Library/pcb/KiCAD-MCP-Server/**",
+    "**/Library/pcb/kicad-happy/**",
+    "**/Library/pcb/pcb-designer-ai-agent/**",
+    "**/Library/pcb/Konnect/**",
+    "**/Library/archify/**",
+    "**/Library/ponytail/**",
+    "**/Library/laya/**",
+    "**/Library/karpathy-skills/**",
+    "**/Library/dashi-taskboard/**",
+    "**/Library/anthropic-design/**",
+    "**/Library/vercel-skills/**",
+    "**/Library/harness2/**",
+    "**/Library/pcb/heypcb-mcp/**",
+    "**/Library/pstack/**",
+    "**/Library/superpowers/**",
+    "**/Library/superpowers/**"
+  ]
+}

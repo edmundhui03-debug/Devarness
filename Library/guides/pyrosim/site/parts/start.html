@@ -1,0 +1,99 @@
+<header class="mast" id="start">
+  <p class="eyebrow">DATASET · learning record · 13 September 2026</p>
+  <h1>PyroSim in seven days</h1>
+  <p class="standfirst">A room fire, built once by hand and then a hundred times by script. Seven days of two to three hours, from opening PyroSim for the first time to handing DATASET a folder of simulated fires it can train on.</p>
+  <div class="mast-meta">
+    <span>For <b>PyroSim 2026.1</b> on Windows</span>
+    <span>Writes input for <b>FDS 6.10.1</b></span>
+    <span>Reference run on <b>macOS, FDS 6.10.1</b></span>
+  </div>
+
+  <div class="week">
+    <a href="#day1"><span class="wk-day">Day 1</span><span class="wk-t">Editor and solver</span></a>
+    <a href="#day2"><span class="wk-day">Day 2</span><span class="wk-t">Mesh and room</span></a>
+    <a href="#day3"><span class="wk-day">Day 3</span><span class="wk-t">The fire</span></a>
+    <a href="#day4"><span class="wk-day">Day 4</span><span class="wk-t">Sensors</span></a>
+    <a href="#day5"><span class="wk-day">Day 5</span><span class="wk-t">Run and read</span></a>
+    <a href="#day6"><span class="wk-day">Day 6</span><span class="wk-t">Is it right?</span></a>
+    <a href="#day7"><span class="wk-day">Day 7</span><span class="wk-t">A dataset</span></a>
+  </div>
+</header>
+
+<section id="how-to-use">
+  <p class="kicker">Start here</p>
+  <h2>PyroSim does not calculate the fire, and knowing that changes how you learn it</h2>
+
+  <p class="prose">PyroSim is an editor. It draws the room, holds the burner and the sensors, and writes them all into a plain text file with a <code>.fds</code> extension. That file goes to <b>FDS</b> — the Fire Dynamics Simulator, written by NIST and free — which does every calculation. When people say "I ran PyroSim", what ran was FDS.</p>
+
+  <p class="prose">This matters for three reasons. The words you use in a paper are "an FDS simulation prepared in PyroSim", not "a PyroSim simulation". The thing to check when a result looks wrong is the text file, not the drawing. And on Day 7, when one room has to become hundreds of rooms, the text file is what a script can write and PyroSim cannot.</p>
+
+  <figure>
+    <div class="fig-frame">
+      <svg viewBox="0 0 720 210" role="img" aria-labelledby="pipe-t pipe-d" preserveAspectRatio="xMidYMid meet">
+        <title id="pipe-t">From PyroSim to a DATASET training set</title>
+        <desc id="pipe-d">PyroSim writes an FDS input file; FDS computes the fire and writes CSV and smoke files; Results or Smokeview shows them; a script turns the CSV into DATASET frames. A second path runs a template through the same solver many times.</desc>
+        <g font-family="var(--sans)" font-size="13" font-weight="600" fill="var(--ink)" text-anchor="middle">
+          <rect x="16" y="30" width="130" height="56" rx="4" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="81" y="54">PyroSim</text>
+          <rect x="206" y="30" width="130" height="56" rx="4" fill="var(--heat-soft)" stroke="var(--heat)"/>
+          <text x="271" y="54">FDS 6.10.1</text>
+          <rect x="396" y="30" width="130" height="56" rx="4" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="461" y="54">Results · Smokeview</text>
+          <rect x="576" y="30" width="128" height="56" rx="4" fill="var(--gas-soft)" stroke="var(--gas)"/>
+          <text x="640" y="54">DATASET</text>
+          <rect x="206" y="130" width="130" height="52" rx="4" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="4,3"/>
+          <text x="271" y="152">make_scenarios</text>
+        </g>
+        <g font-family="var(--mono)" font-size="10.5" fill="var(--muted)" text-anchor="middle">
+          <text x="81" y="72">the editor</text>
+          <text x="271" y="72">the physics</text>
+          <text x="461" y="72">the pictures</text>
+          <text x="640" y="72">the training set</text>
+          <text x="271" y="170">many .fds files</text>
+          <text x="176" y="46">.fds</text>
+          <text x="366" y="46">.csv</text>
+          <text x="556" y="46">frames</text>
+          <text x="271" y="112">one file becomes many</text>
+        </g>
+        <g stroke="var(--ink-2)" stroke-width="1.5" fill="none" marker-end="url(#ar)">
+          <path d="M146 58 H200"/><path d="M336 58 H390"/><path d="M526 58 H570"/>
+          <path d="M81 86 V156 H200" stroke-dasharray="4,3"/>
+          <path d="M336 156 H400 V92" stroke-dasharray="4,3"/>
+        </g>
+        <defs><marker id="ar" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="var(--ink-2)"/></marker></defs>
+      </svg>
+    </div>
+    <figcaption><b>The whole week in one picture.</b> Days 1 to 6 walk the solid path once, by hand. Day 7 adds the dashed path, where a script writes the input files instead of you.</figcaption>
+  </figure>
+
+  <h3>What you need before Day 1</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Thing</th><th>State</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td><b>PyroSim 2026.1</b>, licensed</td><td><span class="chip ok">Windows only</span></td><td>The system requirements list Windows 10 as the minimum and Windows 11 as recommended. There is no macOS or Linux build. Installing needs administrator rights, and a newer version replaces the older one.</td></tr>
+        <tr><td><b>FDS 6.10.1</b></td><td><span class="chip ok">bundled</span></td><td>PyroSim 2026.1 and 2026.2 both ship the same FDS 6.10.1 and Smokeview 6.10.1. You do not install FDS separately on that machine.</td></tr>
+        <tr><td>A local folder for your work</td><td><span class="chip warn">not OneDrive</span></td><td>FDS writes continuously while it runs. A synced or network folder can lock a file mid-write and fail the run. Use a folder on the machine's own disk, with no spaces in the path.</td></tr>
+        <tr><td>Two to three hours a day</td><td><span class="chip muted">seven days</span></td><td>Each day ends in a run that finishes and a result you can check against a number.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>How a day works</h3>
+  <p class="prose">Each day has the same three parts. <b>Learn</b> is the idea, in plain words, with the detail folded away until you want it. <b>Build</b> is a numbered list of exactly what to click and type. <b>Check</b> is how to tell whether it worked, against a number rather than a feeling. Five questions close the day; answer them from memory before you open the answers.</p>
+
+  <p class="prose">The tick next to each day in the sidebar is yours to set, and your browser remembers it. It is stored only on this device.</p>
+
+  <p class="prose">There is an <b>Ask Peter</b> button in the bottom corner. It sends your question together with the section you are reading, and answers from this page rather than from general knowledge — so it is useful for "what does this step actually mean", and honest about saying when the guide does not cover something. It uses your own Claude account and asks your permission the first time. If it is not available in the view you are in, the button explains that instead.</p>
+
+  <div class="check">
+    <h4>The reference run</h4>
+    <p class="prose">Every number quoted in this guide came out of a real simulation. The case file is <code>iso9705_room.fds</code>, included in full on Day 3, and it was run on a MacBook Air with the same FDS 6.10.1 that your PyroSim carries. Your run will not match it digit for digit — a different machine, a different mesh and a different FDS build all move the numbers — but it should land in the same neighbourhood. Where it does not, Day 6 is about finding out why.</p>
+  </div>
+
+  <div class="watch">
+    <h4>Watch out</h4>
+    <p class="prose">The reference run uses 20 cm cells, which is coarse. It finishes in about two and a half hours instead of a day and a half, and it reads cooler than a real ISO 9705 room does. That is a deliberate trade, and Day 6 measures the size of it. Do not quote these numbers in a report as if they were the truth about a room fire.</p>
+  </div>
+</section>

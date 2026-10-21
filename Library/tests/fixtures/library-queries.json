@@ -1,0 +1,22 @@
+[
+  {"query":"Read a PDF with page citations","expected":"dev:command:md-pages","project":"."},
+  {"query":"OCR a scanned table","expected":"dev:skill:browser-docs","project":"."},
+  {"query":"Test a page in a browser","expected":"dev:skill:browser-docs","project":"."},
+  {"query":"Write a bilingual report page","expected":"dev:skill:bilingual-page","project":"."},
+  {"query":"Validate Markdown house format","expected":"dev:skill:markdown-format","project":"."},
+  {"query":"Draw technical architecture","expected":"dev:skill:archify","project":"."},
+  {"query":"Import a drawio diagram","expected":"dev:skill:diagram-design","project":"."},
+  {"query":"Explain one code module","expected":"dev:skill:understand-explain","project":"."},
+  {"query":"Graph a named codebase","expected":"dev:skill:understand","project":"."},
+  {"query":"Repair an FDS room fire model","expected":"dev:skill:pyrosim","project":"."},
+  {"query":"Improve a prompt for Cursor","expected":"dev:skill:prompt-master","project":"."},
+  {"query":"Install this GitHub tool","expected":"dev:skill:library-intake","project":"."},
+  {"query":"Budget a delegated review","expected":"dev:skill:delegate","project":"."},
+  {"query":"Study a video and exact frames","expected":"dev:command:video-study","project":"."},
+  {"query":"Test Python code with pytest","expected":"ecc:skill:python-testing","project":"."},
+  {"query":"Design a REST API","expected":"ecc:skill:api-design","project":"."},
+  {"query":"Review application security","expected":"ecc:skill:security-review","project":"."},
+  {"query":"Plan database migrations","expected":"ecc:skill:database-migrations","project":"."},
+  {"query":"Define domain vocabulary","expected":"pocock:skill:domain-modeling","project":"."},
+  {"query":"Check research paper citations","expected":"scholar:skill:citation-verification","project":"Projects/research"}
+]

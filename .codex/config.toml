@@ -1,0 +1,5 @@
+# Local account and model choices are intentionally omitted.
+model_auto_compact_token_limit = 300000
+
+[tui]
+status_line = ["model-with-reasoning", "current-dir", "git-branch", "context-remaining"]

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -eu
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+ROOT="$(cd "$(dirname "$src")/../.." && pwd)"
+exec python3 "$ROOT/tools/session.py" "$@"

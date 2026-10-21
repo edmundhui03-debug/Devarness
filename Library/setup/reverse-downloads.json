@@ -1,0 +1,40 @@
+{
+  "_comment": "Pinned downloads for the REA and reverse-skill runtimes. setup-reverse.py verifies each archive's SHA-256 against this manifest before unpacking it into Library/.runtime/<tool>/. Sizes are bytes as downloaded on 2026-10-08; hashes recorded here were recomputed from the fetched files with Get-FileHash/sha256sum and match dev-work/reverse/RECIPE.md section 3. The npm package rea-agents@4.1.0 is NOT listed here: it is installed from registry.npmjs.org and pinned by Library/setup/rea/package-lock.json (sha512 integrity).",
+  "tools": {
+    "jdk": {
+      "file": "OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+      "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",
+      "size": 205073461,
+      "sha256": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e",
+      "licence": "GPL-2.0 with Classpath Exception"
+    },
+    "ghidra": {
+      "file": "ghidra_12.1.4_PUBLIC_20260921.zip",
+      "url": "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip",
+      "size": 569649598,
+      "sha256": "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db",
+      "licence": "Apache-2.0"
+    },
+    "node": {
+      "file": "node-v24.21.0-win-x64.zip",
+      "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip",
+      "size": 37618919,
+      "sha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+      "licence": "MIT"
+    },
+    "jadx": {
+      "file": "jadx-1.5.6.zip",
+      "url": "https://github.com/skylot/jadx/releases/download/v1.5.6/jadx-1.5.6.zip",
+      "size": 72646741,
+      "sha256": "545ea2be9c242511bc145755cf4bda2485ade42966e096f8b4d3da2a230e8974",
+      "licence": "Apache-2.0"
+    },
+    "apktool": {
+      "file": "apktool_3.0.2.jar",
+      "url": "https://github.com/iBotPeaches/Apktool/releases/download/v3.0.2/apktool_3.0.2.jar",
+      "size": 15476804,
+      "sha256": "eee4669a704a14e0623407e6701b0b91887e61e1e4049cb7a82833e14ae8b5fd",
+      "licence": "Apache-2.0"
+    }
+  }
+}

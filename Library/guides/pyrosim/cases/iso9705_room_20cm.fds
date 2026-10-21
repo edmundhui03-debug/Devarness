@@ -1,0 +1,127 @@
+&HEAD CHID='iso9705_room_20cm', TITLE='ISO 9705 room on 20 cm cells (mesh study)' /
+
+ PyroSim 7-day guide - the reference case on 20 cm cells, for the Day 6 mesh
+ study. Only the meshes, the wall and the door hole change. FDS snaps the 0.1 m
+ burner height to a cell face; look at it in Smokeview.
+ PyroSim writes a file like this one; FDS reads it. Everything between a '&'
+ and the next '/' is an instruction. Text outside those pairs, like this, is
+ ignored, which is why it can hold comments.
+
+ GEOMETRY. Two meshes of 10 cm cubes. ROOM is the ISO 9705 room itself; its
+ boundaries act as the back wall, side walls, floor and ceiling. OUTSIDE is the
+ space beyond the door, 2.4 m deep and 3 m tall, so the smoke leaving the door
+ has room to rise before it reaches an open boundary. The front wall is an
+ obstruction with the door cut through it. Run with one MPI process per mesh.
+
+&MESH ID='ROOM',    IJK=18,12,12, XB=0.0,3.6,  0.0,2.4, 0.0,2.4 /
+&MESH ID='OUTSIDE', IJK=12,18,15, XB=3.6,6.0, -0.6,3.0, 0.0,3.0 /
+
+&TIME T_END=1200.0 /
+&DUMP DT_DEVC=1.0, DT_HRR=1.0, DT_SLCF=5.0 /
+
+ FIRE CHEMISTRY. Propane, with soot and CO yields for a well-ventilated flame.
+
+&REAC FUEL='PROPANE', SOOT_YIELD=0.024, CO_YIELD=0.005 /
+
+ LINING. Every wall, floor and ceiling that is not given another surface.
+ ISO 9705-1:2016 asks only for a non-combustible material of 600 +/- 200 kg/m3,
+ at least 20 mm thick. The properties below are aerated concrete from NUREG-1805
+ Table 2-3 (Klote and Milke 2002); 100 mm matches BRANZ's lightweight panels.
+
+&MATL ID='AERATED CONCRETE', CONDUCTIVITY=0.26, SPECIFIC_HEAT=0.96, DENSITY=500.0 /
+&SURF ID='ROOM LINING', MATL_ID='AERATED CONCRETE', THICKNESS=0.1, COLOR='GRAY 80', DEFAULT=.TRUE. /
+
+&OBST ID='Front wall', XB=3.6,3.8, 0.0,2.4, 0.0,2.4, SURF_ID='ROOM LINING' /
+&HOLE ID='Door', XB=3.59,3.81, 0.8,1.6, 0.0,2.0 /
+
+ OUTSIDE. Open boundaries on the far, side and top faces of the OUTSIDE mesh let
+ smoke leave and fresh air come in. The floor and the building face stay solid.
+
+&VENT ID='Open +x',  XB=6.0,6.0, -0.6,3.0, 0.0,3.0, SURF_ID='OPEN' /
+&VENT ID='Open -y',  XB=3.6,6.0, -0.6,-0.6, 0.0,3.0, SURF_ID='OPEN' /
+&VENT ID='Open +y',  XB=3.6,6.0,  3.0,3.0, 0.0,3.0, SURF_ID='OPEN' /
+&VENT ID='Open top', XB=3.6,6.0, -0.6,3.0, 3.0,3.0, SURF_ID='OPEN' /
+
+ BURNER. ISO 9705-1:2016 uses a 0.17 x 0.17 m propane sand burner in the corner
+ opposite the door, top 146 mm above the floor. The XB below asks for a top at
+ 0.1 m, but on 20 cm cells there is no face there: FDS snaps it up to 0.2 m, so
+ the burner this file actually runs is twice as tall as the one entered. That
+ is what a coarse mesh does to geometry, and it is worth seeing in Smokeview.
+ 7500 kW/m2 x 0.04 m2 = 300 kW at full output. The ramp below rises to one
+ third of that (99.99 kW) over the first 10 s, holds for 590 s, rises to full
+ over 10 s, and holds for the last 590 s. FDS interpolates linearly between the
+ points, so neither transition is a step and neither plateau is a full 600 s.
+
+&SURF ID='BURNER', HRRPUA=7500.0, RAMP_Q='ISO 9705 PROGRAMME', COLOR='RED' /
+&RAMP ID='ISO 9705 PROGRAMME', T=0.0,    F=0.0 /
+&RAMP ID='ISO 9705 PROGRAMME', T=10.0,   F=0.3333 /
+&RAMP ID='ISO 9705 PROGRAMME', T=600.0,  F=0.3333 /
+&RAMP ID='ISO 9705 PROGRAMME', T=610.0,  F=1.0 /
+&RAMP ID='ISO 9705 PROGRAMME', T=1200.0, F=1.0 /
+&OBST ID='Burner', XB=0.0,0.2, 0.0,0.2, 0.0,0.1, SURF_IDS='BURNER','ROOM LINING','ROOM LINING' /
+
+ DATASET SENSOR NODES. Each carries TEMPORAL_STATISTIC='INSTANT VALUE'. Without
+ it FDS reports a device as a TIME AVERAGE over the output interval, and the
+ DATASET contract takes its 5 s frames by decimation precisely so that nothing is
+ averaged. FED is left alone: that quantity is a running time integral by
+ definition. Check it in any run: search the .out file for TEMPORAL STATISTIC.
+ S1 at the room centre, S2 near the door. Thermocouple,
+ CO and smoke at the ceiling, where a detector would be; visibility, gases and
+ FED at head height.
+
+&DEVC ID='S1_T',   QUANTITY='THERMOCOUPLE', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=1.85,1.25,2.35 /
+&DEVC ID='S1_CO',  QUANTITY='VOLUME FRACTION', SPEC_ID='CARBON MONOXIDE', CONVERSION_FACTOR=1.0E6, UNITS='ppm', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=1.85,1.25,2.35 /
+&DEVC ID='S1_OD',  QUANTITY='OPTICAL DENSITY', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=1.85,1.25,2.35 /
+&DEVC ID='S1_VIS', QUANTITY='VISIBILITY', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=1.85,1.25,1.85 /
+&DEVC ID='S1_FED', QUANTITY='FED', XYZ=1.85,1.25,1.85 /
+&DEVC ID='S1_O2',  QUANTITY='VOLUME FRACTION', SPEC_ID='OXYGEN', CONVERSION_FACTOR=100.0, UNITS='%', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=1.85,1.25,1.85 /
+&DEVC ID='S1_CO2', QUANTITY='VOLUME FRACTION', SPEC_ID='CARBON DIOXIDE', CONVERSION_FACTOR=100.0, UNITS='%', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=1.85,1.25,1.85 /
+
+&DEVC ID='S2_T',   QUANTITY='THERMOCOUPLE', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=3.25,1.25,2.35 /
+&DEVC ID='S2_CO',  QUANTITY='VOLUME FRACTION', SPEC_ID='CARBON MONOXIDE', CONVERSION_FACTOR=1.0E6, UNITS='ppm', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=3.25,1.25,2.35 /
+&DEVC ID='S2_OD',  QUANTITY='OPTICAL DENSITY', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=3.25,1.25,2.35 /
+&DEVC ID='S2_VIS', QUANTITY='VISIBILITY', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=3.25,1.25,1.85 /
+&DEVC ID='S2_FED', QUANTITY='FED', XYZ=3.25,1.25,1.85 /
+&DEVC ID='S2_O2',  QUANTITY='VOLUME FRACTION', SPEC_ID='OXYGEN', CONVERSION_FACTOR=100.0, UNITS='%', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=3.25,1.25,1.85 /
+&DEVC ID='S2_CO2', QUANTITY='VOLUME FRACTION', SPEC_ID='CARBON DIOXIDE', CONVERSION_FACTOR=100.0, UNITS='%', TEMPORAL_STATISTIC='INSTANT VALUE', XYZ=3.25,1.25,1.85 /
+
+ THERMOCOUPLE TREE in the front corner, and one in the doorway.
+
+&DEVC ID='TC_025', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,0.25 /
+&DEVC ID='TC_065', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,0.65 /
+&DEVC ID='TC_105', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,1.05 /
+&DEVC ID='TC_145', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,1.45 /
+&DEVC ID='TC_185', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,1.85 /
+&DEVC ID='TC_225', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,2.25 /
+&DEVC ID='TC_235', QUANTITY='THERMOCOUPLE', XYZ=3.25,2.15,2.35 /
+
+&DEVC ID='DOOR_TC_015', QUANTITY='THERMOCOUPLE', XYZ=3.65,1.25,0.15 /
+&DEVC ID='DOOR_TC_055', QUANTITY='THERMOCOUPLE', XYZ=3.65,1.25,0.55 /
+&DEVC ID='DOOR_TC_095', QUANTITY='THERMOCOUPLE', XYZ=3.65,1.25,0.95 /
+&DEVC ID='DOOR_TC_135', QUANTITY='THERMOCOUPLE', XYZ=3.65,1.25,1.35 /
+&DEVC ID='DOOR_TC_175', QUANTITY='THERMOCOUPLE', XYZ=3.65,1.25,1.75 /
+&DEVC ID='DOOR_TC_195', QUANTITY='THERMOCOUPLE', XYZ=3.65,1.25,1.95 /
+
+ SMOKE LAYER, estimated along a vertical line through the corner tree.
+
+&DEVC ID='LAYER_H', QUANTITY='LAYER HEIGHT',      XB=3.25,3.25, 2.15,2.15, 0.0,2.4 /
+&DEVC ID='UPPER_T', QUANTITY='UPPER TEMPERATURE', XB=3.25,3.25, 2.15,2.15, 0.0,2.4 /
+&DEVC ID='LOWER_T', QUANTITY='LOWER TEMPERATURE', XB=3.25,3.25, 2.15,2.15, 0.0,2.4 /
+
+ FLASHOVER INDICATOR: heat flux reaching the floor at the room centre.
+
+&DEVC ID='FLOOR_FLUX', QUANTITY='GAUGE HEAT FLUX', XYZ=1.85,1.25,0.0, IOR=3 /
+
+ DOORWAY FLOWS: hot gas out through the top, fresh air in at the bottom.
+
+&DEVC ID='DOOR_OUT', QUANTITY='MASS FLUX X', SPATIAL_STATISTIC='AREA INTEGRAL', QUANTITY_RANGE(1)=0.0, XB=3.65,3.65, 0.8,1.6, 0.0,2.0 /
+&DEVC ID='DOOR_IN',  QUANTITY='MASS FLUX X', SPATIAL_STATISTIC='AREA INTEGRAL', QUANTITY_RANGE(2)=0.0, XB=3.65,3.65, 0.8,1.6, 0.0,2.0 /
+
+ SLICES for pictures in Smokeview or PyroSim Results.
+
+&SLCF PBY=1.25, QUANTITY='TEMPERATURE', VECTOR=.TRUE. /
+&SLCF PBY=1.25, QUANTITY='VOLUME FRACTION', SPEC_ID='CARBON MONOXIDE' /
+&SLCF PBZ=1.85, QUANTITY='VISIBILITY' /
+&SLCF PBX=3.65, QUANTITY='TEMPERATURE' /
+
+&TAIL /

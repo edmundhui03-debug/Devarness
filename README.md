@@ -1,0 +1,77 @@
+# Devarness is a harness development workspace
+
+> **2026-10-21** · Aster · `current`
+>
+> A Claude Code centred workspace that combines Harness²'s measured
+> improvement cycle with reusable Codex and Pi capabilities. Bring the
+> same rules, skill discovery, guards and tools to any project. Original
+> integration code is MIT; upstream tools retain their own licenses.
+
+## Start with a checkout that carries no account configuration
+
+Requires Python 3.9+ and Git. Windows shell tools need Git Bash;
+macOS and Linux can use Bash. Node.js is optional for JS tools and the
+dashboard. No API key, client login or paid model is required to run
+the core checks.
+
+```sh
+python3 tools/bootstrap.py --check
+python3 tools/check.py --core-only
+python3 tools/session.py --check --text
+```
+
+On Windows use `python` if `python3` is unavailable. Set the Python
+command used by your client hooks accordingly. Nothing in the default
+bootstrap changes your home profile, Git identity, SSH, client trust,
+MCP registration, services or scheduled jobs.
+
+## Fetch only the upstream capabilities you want
+
+```sh
+python3 tools/bootstrap.py --list
+python3 tools/bootstrap.py --fetch ponytail skills karpathy-skills superpowers harness2
+python3 tools/bootstrap.py --link-skills
+python3 -m venv .venv
+# Activate .venv, then install the locked parser:
+python3 -m pip install --require-hashes -r Library/library-requirements.txt
+python3 Library/bin/library refresh
+python3 Library/bin/library search "the task"
+```
+
+Fetch installs pinned source checkouts, without executing their code.
+It never fetches a home-folder personal manifest. Skill links remain
+inside this checkout. Windows may require Developer Mode for symlinks;
+the link command reports missing link permissions without changing user
+settings. Specialist runtime installers
+under Library are opt-in; read their guide before invoking them.
+
+## Claude Code leads while Codex and Pi share the same rules
+
+| Component | Role |
+| --- | --- |
+| CLAUDE.md and .claude/ | Primary rules, startup, guards and skills |
+| Harness² and harness-step | Reference, propose, probe, compose, retain evidence |
+| AGENTS.md, .agents/, .codex/ | Optional Codex review and shared skills |
+| .pi/ | Optional Pi design and local discovery adapter |
+| Library/bin/ | Reusable tools, checkers and optional integrations |
+| Library/repos.txt | Public pinned upstream sources |
+| tools/ | Neutral onboarding, session entry and release checks |
+
+Authenticate each client using its own user settings. Models and
+provider configuration are yours to choose. Codex hooks ship inactive;
+use the local session command until you configure and trust hooks in
+that client. Notifications, MCP services, reverse tools and external
+skill search are optional and never run in the default hooks.
+
+## Keep projects and secrets outside the reusable template
+
+Use this as a GitHub template or clone it beside your projects. Local
+project folders, book collections, task records, review boxes, runtime
+state and credential files are ignored. `tools/release_check.py` checks
+tracked files and Git history before publication. Do not rely only on
+ignore rules or a scanner to identify private content.
+
+See docs/ARCHITECTURE.md for integration boundaries, docs/TOOLS.md for
+the tool catalogue, docs/ADAPTATION.md for scope and verification, and
+THIRD_PARTY.md for attribution. Legacy device-completeness tests require
+a full optional installation and are separate from the portable core.

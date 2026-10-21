@@ -1,0 +1,473 @@
+#!/usr/bin/env python3
+"""agent-memory — find Peter's Claude Code memory folder for dev, and check it.
+
+  where [--dir DIR]           print the memory folder
+  check [--dir DIR] [--json]  check MEMORY.md and every memory file in it
+
+The folder is --dir, else $DEVARNESS_MEMORY_DIR, else <config>/projects/<slug>/memory,
+where <config> is $CLAUDE_CONFIG_DIR or ~/.claude and <slug> is Claude Code's
+name for this dev checkout. A linked git worktree maps to its main checkout
+first, as Claude Code does, so every worktree shares the main one's memory.
+
+check reads and never writes. It exits 0 when clean or with warnings and
+information only, 1 on any error, and 2 on a usage error or a missing folder.
+Text output is one `file:line: CODE message` line per finding, then a summary.
+
+  error    M001  an index line links a file that does not exist
+  error    M002  a memory file is not linked from the index
+  error    M003  front matter missing or unparseable
+  error    M004  name differs from the file stem, or is missing
+  error    M005  type missing or not user, feedback, project or reference
+  warning  M101  an index line longer than 300 characters
+  warning  M102  a project memory whose newest YYYY-MM-DD is over 14 days old
+  warning  M103  a feedback or project memory without Why: or How to apply:
+  warning  M104  two descriptions with word-set Jaccard similarity of 0.6+
+  info     M201  a [[link]] naming no existing memory
+
+Standard-library Python 3.9 or later. No network.
+"""
+from __future__ import annotations
+
+import argparse
+from datetime import date
+import json
+import os
+from pathlib import Path
+import re
+import sys
+from typing import NamedTuple
+import unicodedata
+
+ROOT = Path(__file__).resolve().parents[2]
+INDEX = "MEMORY.md"
+TYPES = ("user", "feedback", "project", "reference")
+LEVELS = {"M0": "error", "M1": "warning", "M2": "info"}
+SLUG_LIMIT = 200
+INDEX_LINE_LIMIT = 300
+STALE_DAYS = 14
+
+KEY = re.compile(r"([A-Za-z0-9_][A-Za-z0-9_.-]*):(?:[ \t]+(.*))?$")
+BLOCK = re.compile(r"[|>](?:[+-]?[1-9]?|[1-9][+-])(?:[ \t]+#.*)?$")
+BULLET = re.compile(r"\s*[-*+][ \t]")
+LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)[^)]*\)")
+URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+WIKI_LINK = re.compile(r"\[\[([^\[\]]+)\]\]")
+CODE_SPAN = re.compile(r"(`+).*?\1")
+FENCE = re.compile(r"\s*(```|~~~)")
+DATE = re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)")
+WORD = re.compile(r"\w+")
+MARK = r"\s*(?:[-*+>][ \t]+)*(?:\*\*|__|\*|_)?"
+WHY = re.compile(MARK + r"Why(?::|(?:\*\*|__|\*|_):)")
+HOW = re.compile(MARK + r"How to apply(?::|(?:\*\*|__|\*|_):)")
+ESCAPES = {"0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v", "f": "\f",
+           "r": "\r", "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\"}
+HEX_ESCAPES = {"x": 2, "u": 4, "U": 8}
+
+
+# ── where the memory lives ─────────────────────────────────────────────────
+# Claude Code 2.1.274 keeps memory in <config>/projects/<slug>/memory, the slug
+# taken from the NFC form of the project's canonical git root: each UTF-16 code
+# unit that is not an ASCII letter or digit becomes "-", and a name over 200
+# characters is cut there and given "-" plus its 32-bit string hash in base 36.
+# Claude Code also honours an autoMemoryDirectory setting and the variables
+# CLAUDE_CODE_REMOTE_MEMORY_DIR and CLAUDE_COWORK_MEMORY_PATH_OVERRIDE; dev sets
+# none of them, and this tool does not follow them.
+
+def _string_hash(text: str) -> int:
+    """JavaScript's `(h << 5) - h + charCodeAt(i) | 0` over UTF-16 code units."""
+    value = 0
+    data = text.encode("utf-16-le", "surrogatepass")
+    for index in range(0, len(data), 2):
+        value = (value * 31 + data[index] + (data[index + 1] << 8)) & 0xFFFFFFFF
+    return value - 0x100000000 if value & 0x80000000 else value
+
+
+def _base36(number: int) -> str:
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    text = ""
+    while True:
+        number, rest = divmod(number, 36)
+        text = digits[rest] + text
+        if not number:
+            return text
+
+
+def slug(path: str) -> str:
+    """Claude Code's project folder name for a path, POSIX or Windows."""
+    text = unicodedata.normalize("NFC", path)
+    name = "".join(ch if ch.isascii() and ch.isalnum() else "-" * (2 if ord(ch) > 0xFFFF else 1)
+                   for ch in text)
+    if len(name) <= SLUG_LIMIT:
+        return name
+    return f"{name[:SLUG_LIMIT]}-{_base36(abs(_string_hash(text)))}"
+
+
+def _read_small(path: str) -> str:
+    with open(path, encoding="utf-8") as handle:
+        return handle.read(4096).strip()
+
+
+def canonical_root(root: str) -> str:
+    """The main checkout for a linked git worktree, else root, as Claude Code resolves it."""
+    try:
+        text = _read_small(os.path.join(root, ".git"))
+        if not text.startswith("gitdir:"):
+            return root
+        gitdir = os.path.normpath(os.path.join(root, text[len("gitdir:"):].strip()))
+        common = os.path.normpath(os.path.join(gitdir, _read_small(os.path.join(gitdir, "commondir"))))
+        if os.path.normpath(os.path.dirname(gitdir)) != os.path.join(common, "worktrees"):
+            return root
+        back = os.path.join(gitdir, _read_small(os.path.join(gitdir, "gitdir")))
+        if os.path.realpath(back) != os.path.join(os.path.realpath(root), ".git"):
+            return root
+    except (OSError, UnicodeDecodeError):
+        return root
+    if os.path.basename(common) != ".git":
+        return root if os.path.exists(os.path.join(common, ".git")) else common
+    return os.path.dirname(common)
+
+
+def memory_folder(option: str | None, environ, home: str, root: str) -> str:
+    for chosen in (option, environ.get("DEVARNESS_MEMORY_DIR")):
+        if chosen:
+            return os.path.abspath(os.path.expanduser(chosen))
+    config = environ.get("CLAUDE_CONFIG_DIR") or os.path.join(home, ".claude")
+    return os.path.join(config, "projects", slug(canonical_root(root)), "memory")
+
+
+# ── the front matter reader ────────────────────────────────────────────────
+# Not a YAML library: the shapes Claude Code writes and people type by hand —
+# `key: value`, one indented level of keys or `- items` under an empty key,
+# plain, single- and double-quoted scalars, | and > blocks, # comments.
+
+class FrontMatterError(ValueError):
+    def __init__(self, line: int, message: str):
+        super().__init__(message)
+        self.line = line
+
+
+def _only_comment(rest: str) -> bool:
+    return not rest.strip() or re.match(r"[ \t]+#", rest) is not None
+
+
+def _double_quoted(value: str, line: int) -> str:
+    out, index = [], 1
+    while index < len(value):
+        ch = value[index]
+        if ch == '"':
+            if _only_comment(value[index + 1:]):
+                return "".join(out)
+            raise FrontMatterError(line, "text after a closing double quote")
+        if ch == "\\":
+            code = value[index + 1:index + 2]
+            if code in ESCAPES:
+                out.append(ESCAPES[code])
+                index += 2
+                continue
+            width = HEX_ESCAPES.get(code, 0)
+            digits = value[index + 2:index + 2 + width]
+            if width and len(digits) == width and all(c in "0123456789abcdefABCDEF" for c in digits):
+                out.append(chr(int(digits, 16)))
+                index += 2 + width
+                continue
+            raise FrontMatterError(line, f"unknown escape \\{code} in a double-quoted value")
+        out.append(ch)
+        index += 1
+    raise FrontMatterError(line, "double-quoted value is not closed on its line")
+
+
+def _single_quoted(value: str, line: int) -> str:
+    out, index = [], 1
+    while index < len(value):
+        if value[index] == "'":
+            if value[index + 1:index + 2] == "'":
+                out.append("'")
+                index += 2
+                continue
+            if _only_comment(value[index + 1:]):
+                return "".join(out)
+            raise FrontMatterError(line, "text after a closing single quote")
+        out.append(value[index])
+        index += 1
+    raise FrontMatterError(line, "single-quoted value is not closed on its line")
+
+
+def _scalar(value: str, line: int):
+    if value.startswith('"'):
+        return _double_quoted(value, line)
+    if value.startswith("'"):
+        return _single_quoted(value, line)
+    if value.startswith("#"):
+        return None
+    return re.split(r"[ \t]#", value, maxsplit=1)[0].rstrip()
+
+
+def _block(indicator: str, block: list, line: int) -> str:
+    if not BLOCK.match(indicator):
+        raise FrontMatterError(line, f"cannot read the block indicator {indicator!r}")
+    texts = [raw.strip() for _, raw in block]
+    while texts and not texts[-1]:
+        texts.pop()
+    return "\n".join(texts) if indicator[0] == "|" else " ".join(t for t in texts if t)
+
+
+def _children(parent: str, block: list, where: dict):
+    mapping, items, indent = {}, [], None
+    for number, raw in block:
+        text = raw.strip()
+        if not text or text.startswith("#"):
+            continue
+        depth = len(raw) - len(raw.lstrip(" \t"))
+        indent = depth if indent is None else indent
+        if depth > indent:
+            continue  # deeper nesting holds nothing this check reads
+        if depth < indent:
+            raise FrontMatterError(number, f"indentation under {parent!r} is inconsistent")
+        if text == "-" or text.startswith(("- ", "-\t")):
+            if mapping:
+                raise FrontMatterError(number, f"{parent!r} mixes keys and list items")
+            items.append(_scalar(text[1:].strip(), number) if text[1:].strip() else None)
+            continue
+        match = KEY.match(text)
+        if not match:
+            raise FrontMatterError(number, f"cannot read this front matter line: {text[:60]!r}")
+        if items:
+            raise FrontMatterError(number, f"{parent!r} mixes keys and list items")
+        child, value = match.group(1), (match.group(2) or "").strip()
+        if child in mapping:
+            raise FrontMatterError(number, f"duplicate key '{parent}.{child}'")
+        where[f"{parent}.{child}"] = number
+        mapping[child] = _scalar(value, number) if value and value[0] not in "|>" else None
+    return items or mapping or None
+
+
+def read_front_matter(lines: list) -> tuple:
+    """(fields, the line of each key, the index of the first body line)."""
+    if not lines or lines[0].rstrip() != "---":
+        raise FrontMatterError(1, "no front matter: the file must open with a --- line")
+    end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
+    if end is None:
+        raise FrontMatterError(1, "front matter is not closed by a --- line")
+    fields, where, index = {}, {}, 1
+    while index < end:
+        raw, number = lines[index], index + 1
+        index += 1
+        if not raw.strip() or raw.strip().startswith("#"):
+            continue
+        match = KEY.match(raw.rstrip())  # an indented line here has no key above it
+        if not match:
+            raise FrontMatterError(number, f"cannot read this front matter line: {raw.strip()[:60]!r}")
+        key, value = match.group(1), (match.group(2) or "").strip()
+        if key in fields:
+            raise FrontMatterError(number, f"duplicate key {key!r}")
+        where[key] = number
+        block = []
+        while index < end and (not lines[index].strip() or lines[index][0] in " \t"):
+            block.append((index + 1, lines[index]))
+            index += 1
+        if value[:1] in ("|", ">"):
+            fields[key] = _block(value, block, number)
+        elif value:
+            text = _scalar(value, number)
+            more = [(n, raw.strip()) for n, raw in block if raw.strip() and not raw.strip().startswith("#")]
+            for n, extra in more:
+                if value[0] in "\"'" or KEY.match(extra):
+                    raise FrontMatterError(n, f"indented line under the value of {key!r}")
+            fields[key] = " ".join([text or ""] + [extra for _, extra in more]) if more else text
+        else:
+            fields[key] = _children(key, block, where)
+    return fields, where, end + 1
+
+
+# ── the check ──────────────────────────────────────────────────────────────
+
+class Finding(NamedTuple):
+    level: str
+    code: str
+    file: str
+    line: int
+    message: str
+
+
+def _finding(code: str, file: str, line: int, message: str) -> Finding:
+    return Finding(LEVELS[code[:2]], code, file, line, message)
+
+
+def _lines(path: str, errors: str = "strict") -> list:
+    """Lines without their endings; a byte-order mark and CRLF read as plain LF."""
+    with open(path, encoding="utf-8-sig", errors=errors) as handle:
+        return handle.read().split("\n")
+
+
+def _memory_type(fields: dict, where: dict) -> tuple:
+    """metadata.type, else a top-level type: Claude Code merges both, metadata winning."""
+    metadata = fields.get("metadata")
+    if isinstance(metadata, dict) and "type" in metadata:
+        return metadata["type"], where.get("metadata.type", 1)
+    if "type" in fields:
+        return fields["type"], where["type"]
+    return None, where.get("metadata", 1)
+
+
+def _index_findings(folder: str, lines: list, findings: list) -> set:
+    """Index lines are the bullets; a heading or a paragraph of prose is not one."""
+    linked = set()
+    for number, line in enumerate(lines, 1):
+        if not BULLET.match(line):
+            continue
+        if len(line) > INDEX_LINE_LIMIT:
+            findings.append(_finding("M101", INDEX, number,
+                                     f"index line is {len(line)} characters, over {INDEX_LINE_LIMIT}"))
+        for target in LINK.findall(line):
+            if URL.match(target):
+                continue
+            full = os.path.normpath(os.path.join(folder, target))
+            if os.path.isfile(full):
+                linked.add(os.path.normcase(full))
+            else:
+                findings.append(_finding("M001", INDEX, number, f"links {target}, which does not exist"))
+    return linked
+
+
+def _newest_date(lines: list):
+    newest = None
+    for number, line in enumerate(lines, 1):
+        for match in DATE.finditer(line):
+            try:
+                day = date(*(int(part) for part in match.groups()))
+            except ValueError:
+                continue
+            if newest is None or day > newest[0]:
+                newest = (day, number)
+    return newest
+
+
+def _wiki_links(lines: list):
+    fenced = False
+    for number, line in enumerate(lines, 1):
+        if FENCE.match(line):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        for match in WIKI_LINK.finditer(CODE_SPAN.sub("", line)):
+            target = match.group(1).split("|", 1)[0].split("#", 1)[0].strip()
+            yield number, target[:-3] if target.endswith(".md") else target
+
+
+def check_folder(folder: str, today: date) -> dict:
+    findings = []
+    names = sorted(name for name in os.listdir(folder) if name.endswith(".md") and name != INDEX)
+    index_path = os.path.join(folder, INDEX)
+    index_lines = _lines(index_path, errors="replace") if os.path.isfile(index_path) else None
+    linked = _index_findings(folder, index_lines, findings) if index_lines is not None else set()
+
+    known, texts, parsed, descriptions = {name[:-3] for name in names}, {}, {}, []
+    for name in names:
+        if os.path.normcase(os.path.normpath(os.path.join(folder, name))) not in linked:
+            findings.append(_finding("M002", name, 1, f"is not linked from {INDEX}" if index_lines is not None
+                                     else f"is not linked from the index: {INDEX} is missing"))
+        try:
+            texts[name] = _lines(os.path.join(folder, name))
+            parsed[name] = read_front_matter(texts[name])
+        except (OSError, UnicodeDecodeError) as exc:
+            findings.append(_finding("M003", name, 1, f"cannot be read as UTF-8 text: {exc}"))
+        except FrontMatterError as exc:
+            findings.append(_finding("M003", name, exc.line, str(exc)))
+        if name in parsed and isinstance(parsed[name][0].get("name"), str) and parsed[name][0]["name"]:
+            known.add(parsed[name][0]["name"])
+
+    for name, (fields, where, body) in parsed.items():
+        stem, value = name[:-3], fields.get("name")
+        if not isinstance(value, str) or not value:
+            findings.append(_finding("M004", name, where.get("name", 1),
+                                     f"name is missing; it must equal the file stem '{stem}'"))
+        elif value != stem:
+            findings.append(_finding("M004", name, where["name"],
+                                     f"name '{value}' differs from the file stem '{stem}'"))
+        kind, line = _memory_type(fields, where)
+        if kind is None or kind == "":
+            findings.append(_finding("M005", name, line, "type is missing; metadata.type must be one of "
+                                     + ", ".join(TYPES)))
+        elif kind not in TYPES:
+            findings.append(_finding("M005", name, line, f"type '{kind}' is not one of " + ", ".join(TYPES)))
+        if kind in ("feedback", "project"):
+            missing = [label for label, rule in (("Why:", WHY), ("How to apply:", HOW))
+                       if not any(rule.match(text) for text in texts[name][body:])]
+            if missing:
+                findings.append(_finding("M103", name, 1, f"{kind} memory has no "
+                                         + " or ".join(f"'{label}'" for label in missing) + " line"))
+        if kind == "project":
+            newest = _newest_date(texts[name])
+            if newest and (today - newest[0]).days > STALE_DAYS:
+                findings.append(_finding("M102", name, newest[1], f"project memory's newest date is "
+                                         f"{newest[0]}, {(today - newest[0]).days} days before {today}"))
+        if isinstance(fields.get("description"), str):
+            words = set(WORD.findall(fields["description"].lower()))
+            if words:
+                descriptions.append((name, where["description"], words))
+
+    for later in range(len(descriptions)):
+        for earlier in range(later):
+            (first, _, words_a), (second, line, words_b) = descriptions[earlier], descriptions[later]
+            shared, together = len(words_a & words_b), len(words_a | words_b)
+            if shared * 5 >= together * 3:
+                findings.append(_finding("M104", second, line, f"description is {shared / together:.2f} "
+                                         f"similar to {first}'s (word-set Jaccard)"))
+
+    sources = ([(INDEX, index_lines)] if index_lines is not None else []) + list(texts.items())
+    for file, lines in sources:
+        for number, target in _wiki_links(lines):
+            if target and target not in known:
+                findings.append(_finding("M201", file, number, f"[[{target}]] names no existing memory"))
+
+    findings.sort(key=lambda f: (f.file, f.line, f.code, f.message))
+    count = {level: sum(f.level == level for f in findings) for level in ("error", "warning", "info")}
+    return {"folder": folder, "files": len(names), "errors": count["error"], "warnings": count["warning"],
+            "info": count["info"], "findings": [f._asdict() for f in findings]}
+
+
+def _plural(number: int, word: str) -> str:
+    return f"{number} {word}" if number == 1 else f"{number} {word}s"
+
+
+def main(argv: list | None = None, today=date.today) -> int:
+    parser = argparse.ArgumentParser(prog="agent-memory", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", metavar="{where,check}")
+    where = commands.add_parser("where", help="print the memory folder")
+    where.add_argument("--dir", help="use this folder, before $DEVARNESS_MEMORY_DIR and the derived one")
+    check = commands.add_parser("check", help="check the index and every memory file")
+    check.add_argument("--dir", help="use this folder, before $DEVARNESS_MEMORY_DIR and the derived one")
+    check.add_argument("--json", action="store_true", help="print the report as JSON")
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 2
+    if args.command is None:
+        parser.print_usage(sys.stderr)
+        return 2
+    folder = memory_folder(args.dir, os.environ, os.path.expanduser("~"), str(ROOT))
+    if args.command == "where":
+        print(folder)
+        return 0
+    if not os.path.isdir(folder):
+        print(f"agent-memory: no memory folder at {folder}", file=sys.stderr)
+        return 2
+    report = check_folder(folder, today())
+    if args.json:
+        print(json.dumps(report, indent=2))
+    else:
+        for f in report["findings"]:
+            print(f"{f['file']}:{f['line']}: {f['code']} {f['message']}")
+        print(f"checked {_plural(report['files'], 'memory file')} in {folder}: "
+              f"{_plural(report['errors'], 'error')}, {_plural(report['warnings'], 'warning')}, "
+              f"{report['info']} info")
+    return 1 if report["errors"] else 0
+
+
+if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
+    sys.exit(main())

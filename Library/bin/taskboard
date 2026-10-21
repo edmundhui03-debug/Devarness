@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""taskboard — start the Codex Taskboard in its safe shape, on demand.
+
+  taskboard start     run the board in this window until Ctrl+C; open http://127.0.0.1:47823
+  taskboard status    say whether it answers; exit 1 when it does not
+  taskboard zh-hk check|apply [RUNTIME]|extract OUT
+                      its Chinese as Hong Kong Traditional, from Library/taskboard-zh-hk.json
+
+The intake of 2026-10-09 read the board at its pin: the server listens on
+every address unless told otherwise, has no login, and starts Codex by
+itself. So this launcher always binds 127.0.0.1, keeps the board's data
+outside the runtime copy, points the board's Codex at a program that does
+not exist, and passes on no key, token or secret from the environment.
+Codex in the developer's dashboard goes through
+Library/dashboard/codex-bridge.mjs instead. Never started at sign-in.
+
+The board ships its Chinese in Simplified only. On the owner's word of
+2026-10-10 its runtime copy gets Hong Kong Traditional instead: `zh-hk apply`
+rewrites each Chinese phrase of the copy from a reviewed table and sets the
+date locale to zh-HK, so the pinned clone stays as upstream ships it;
+`zh-hk check` fails while the clone holds a phrase the table lacks.
+Standard-library Python 3.9 or later.
+"""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import urllib.request
+
+HERE = Path(__file__).resolve().parents[1]
+RUNTIME = Path(os.environ.get("DEVARNESS_TASKBOARD_RUNTIME") or HERE / ".runtime" / "dashi-taskboard")
+PORT = os.environ.get("DEVARNESS_TASKBOARD_PORT", "47823")
+SECRET = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL", re.I)
+# The pinned clone, read only; a worktree points this at the dev root's copy.
+SOURCE = Path(os.environ.get("DEVARNESS_TASKBOARD_SOURCE") or HERE / "dashi-taskboard")
+TABLE = HERE / "taskboard-zh-hk.json"
+# Where the board keeps its words: the web app, the server and their shared code.
+SCANNED = (("web/src", (".ts", ".tsx")), ("server", (".mjs", ".js")), ("shared", (".mjs", ".js")))
+# A phrase starts at a Chinese character and runs on through Chinese, CJK and
+# full-width punctuation, ASCII letters, digits and spaces; a quote ends it.
+PHRASE = re.compile(r"[一-鿿][一-鿿　-〿＀-￯0-9A-Za-z “”·《》]*")
+CODE = re.compile(r"[A-Za-z0-9_]+")
+# Common characters found only in Simplified Chinese, never in standard
+# Traditional: a table value holding one was not translated. Characters that
+# Traditional also uses (示 新 目 表 行 航 云 余 and the like) stay off this list.
+SIMPLIFIED = set("们这说过来时会对为发后头还进关门问间题类样见长马车东书买卖读写记认让请经给结钱银张总线组织区产业务项设计报价单"
+                 "变换应该个么从动态开闭启显隐删编辑选择确输复贴销载连续链网络页码导栏标签优级阶归档历录调试错误异权账验钥储备"
+                 "迁数库队统图筛规则执运处团负责评论视频声简体无专义乐习亏亚亲仅仓众伟传伤伦伪侠侣侦侧侨状")
+
+
+def server_env(base: dict) -> dict:
+    env = {k: v for k, v in base.items() if not SECRET.search(k)}
+    home = base.get("LOCALAPPDATA") or str(Path.home() / ".local" / "share")
+    env.update(CODEX_TASKBOARD_HOST="127.0.0.1", CODEX_TASKBOARD_PORT=PORT,
+               CODEX_TASKBOARD_DATA_DIR=str(Path(home) / "dev" / "taskboard"),
+               CODEX_EXECUTABLE=str(Path(home) / "dev" / "taskboard" / "codex-is-off.exe"))
+    return env
+
+
+def server_command() -> tuple[list, str]:
+    return ["node", str(RUNTIME / "server" / "index.mjs")], str(RUNTIME)
+
+
+def start() -> int:
+    argv, cwd = server_command()
+    if not (RUNTIME / "dist" / "web" / "index.html").is_file():
+        print("The taskboard is not installed at %s; see the setup card Library/setup/dev-taskboard.md." % RUNTIME)
+        return 1
+    env = server_env(dict(os.environ))
+    Path(env["CODEX_TASKBOARD_DATA_DIR"]).mkdir(parents=True, exist_ok=True)
+    print("Codex Taskboard on http://127.0.0.1:%s (this computer only); Ctrl+C stops it." % PORT)
+    try:
+        return subprocess.call(argv, cwd=cwd, env=env)
+    except KeyboardInterrupt:
+        return 0
+
+
+def status() -> int:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%s/" % PORT, timeout=2) as r:
+            print("running on http://127.0.0.1:%s (HTTP %d)" % (PORT, r.status))
+            return 0
+    except OSError:
+        print("not running; start it with: taskboard start")
+        return 1
+
+
+def board_files(root: Path):
+    for folder, suffixes in SCANNED:
+        for path in sorted((root / folder).rglob("*")):
+            if path.suffix in suffixes and path.is_file():
+                yield path
+
+
+def zh_phrases(root: Path) -> dict:
+    """Each Chinese phrase in the board's code, with where it first appears."""
+    found = {}
+    for path in board_files(root):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for phrase in PHRASE.findall(line):
+                found.setdefault(phrase, "%s:%d: %s" % (path.relative_to(root).as_posix(), number, line.strip()[:160]))
+    return found
+
+
+def load_zh_hk(path: Path = TABLE) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))["phrases"]
+
+
+def table_problems(table: dict) -> list:
+    """A value still holding Simplified, or code (names, numbers) the translation changed."""
+    problems = []
+    for simplified, traditional in table.items():
+        left = sorted(set(traditional) & SIMPLIFIED)
+        if not traditional.strip() or left:
+            problems.append("%s -> %s: still Simplified %s" % (simplified, traditional, "".join(left) or "(empty)"))
+        if CODE.findall(simplified) != CODE.findall(traditional):
+            problems.append("%s -> %s: names or numbers changed" % (simplified, traditional))
+    return problems
+
+
+def apply_zh_hk(runtime: Path, table: dict) -> list:
+    """Rewrite the runtime copy's phrases from the table; return those it lacks."""
+    missing = set()
+
+    def swap(match):
+        phrase = match.group(0)
+        if phrase not in table:
+            missing.add(phrase)
+        return table.get(phrase, phrase)
+
+    for path in board_files(runtime):
+        text = path.read_text(encoding="utf-8")
+        changed = PHRASE.sub(swap, text).replace('"zh-CN"', '"zh-HK"')
+        if changed != text:
+            path.write_text(changed, encoding="utf-8")
+    return sorted(missing)
+
+
+def zh_hk(args: list) -> int:
+    sys.stdout.reconfigure(encoding="utf-8")  # Chinese through a Windows pipe
+    if args[:1] == ["check"]:
+        table, found = load_zh_hk(), zh_phrases(SOURCE)
+        missing, problems = sorted(set(found) - set(table)), table_problems(table)
+        for line in missing:
+            print("untranslated: %s" % line)
+        for line in problems:
+            print("table: %s" % line)
+        print("zh-hk: %d phrases in %s, %d untranslated" % (len(found), SOURCE, len(missing)))
+        return 1 if missing or problems else 0
+    if args[:1] == ["apply"]:
+        missing = apply_zh_hk(Path(args[1]) if len(args) > 1 else RUNTIME, load_zh_hk())
+        for phrase in missing:
+            print("untranslated, left as it was: %s" % phrase)
+        return 1 if missing else 0
+    if args[:1] == ["extract"] and len(args) == 2:
+        Path(args[1]).write_text(json.dumps(zh_phrases(SOURCE), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        return 0
+    print("usage: taskboard zh-hk check | apply [RUNTIME] | extract OUT")
+    return 2
+
+
+def main(argv=None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if args[:1] == ["start"]:
+        return start()
+    if args[:1] == ["status"]:
+        return status()
+    if args[:1] == ["zh-hk"]:
+        return zh_hk(args[1:])
+    if args[:1] in (["-h"], ["--help"]):
+        print("\n\n".join(__doc__.split("\n\n")[:2]))
+        return 0
+    print(__doc__.split("\n\n")[0])
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

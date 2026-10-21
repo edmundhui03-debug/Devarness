@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""library: search, pick and check the offline catalogue of every tool, skill, agent and guide."""
+import os
+import subprocess
+from pathlib import Path
+import sys
+
+LIBRARY = Path(__file__).resolve().parents[1]
+# Only refresh parses YAML, so only refresh moves to the isolated parser runtime;
+# pick runs on every prompt and stays in this interpreter (stdlib only).
+python = LIBRARY / '.runtime/library' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+if 'refresh' in sys.argv[1:] and python.is_file() and \
+        Path(sys.executable).resolve() != python.resolve():
+    # Windows execv can lose the child's exit status; wait and propagate it.
+    raise SystemExit(subprocess.run(
+        [str(python), str(LIBRARY / 'library.py'), *sys.argv[1:]]).returncode)
+sys.path.insert(0, str(LIBRARY))
+from library import main
+raise SystemExit(main(sys.argv[1:]))

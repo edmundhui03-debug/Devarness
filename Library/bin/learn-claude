@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Portable entry point; help and --check never launch a model."""
+from pathlib import Path
+import runpy
+
+runpy.run_path(str(Path(__file__).resolve().parents[1] / "setup-learn-claude.py"), run_name="__main__")

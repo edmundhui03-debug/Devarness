@@ -1,0 +1,7 @@
+interface:
+  display_name: "Task Support"
+  short_description: "Clear task progress and practical reentry notes"
+  default_prompt: "Use $task-support to keep this task clear and easy to resume."
+
+policy:
+  allow_implicit_invocation: false

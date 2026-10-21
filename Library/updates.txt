@@ -1,0 +1,38 @@
+# What update-tools may do with each clone in repos.txt, and what to run after it moves.
+# Format: path<TAB>policy<TAB>after<TAB>check   ("-" for none; a missing row is "auto" with nothing to run)
+# policy: auto | hold <reason> | report <reason>
+# after/check run from the dev root: a .py under Library/ with python3, a .sh with bash, bin/<tool> as itself.
+# A clone from ~/.config/devarness/personal-repos.txt is always report: its pin is the owner's to move, in that file.
+# How the two phases work: the docstring of Library/bin/update-tools.
+Library/reverse-skill	hold the tools run from Library/.runtime, placed from Library/setup/reverse-downloads.json by SHA-256; this clone is the documentation; move it and the downloads together after a review	-	-
+Library/rea	hold the runtime is rea-agents from the tracked lock Library/setup/rea/package-lock.json; this clone is the documentation; move it and the lock together after a review	-	-
+Library/docling	auto	setup-browser-docs.py --install	setup-browser-docs.py --check
+Library/playwright-cli	auto	setup-browser-docs.py --install	setup-browser-docs.py --check
+Library/Understand-Anything	auto	knowledge-tools-sync.py --install	knowledge-tools-sync.py --check
+Library/diagram-design	auto	knowledge-tools-sync.py --install	knowledge-tools-sync.py --check
+Library/learn-claude-code	auto	setup-learn-claude.py --install	setup-learn-claude.py --check
+Library/i-have-adhd	hold the task-support adaptation is reviewed at one pin; setup-task-support.py refuses any other, so a move needs a new review	-	-
+Library/archify	auto	bin/archify --install	bin/archify --check
+# claude-scholar is library-only in dev: its curated install (scholar-sync.sh) belongs to a research project, which dev does not carry.
+Library/claude-scholar	auto	-	-
+Library/prompt-master	auto	setup-prompt-master.py --install	setup-prompt-master.py --check
+Library/ponytail	auto	tieitup-check.py --notify	ponytail-check.py
+Library/markitdown	auto	-	-
+Library/ECC	auto	-	-
+Library/codex-plugin-cc	auto	-	-
+Library/cship	auto	-	-
+Library/skills	auto	-	-
+Library/pcb/KiCAD-MCP-Server	auto	-	-
+Library/pcb/kicad-happy	report the PCB toolchain; the owner or Aster releases an update	-	-
+Library/pcb/pcb-designer-ai-agent	report the PCB toolchain; the owner or Aster releases an update	-	-
+Library/pcb/Konnect	auto	-	-
+Library/karpathy-skills	report the always-on coding card; review a change before it moves	-	-
+Library/dashi-taskboard	hold re-inspect before any move: intake read the server, its Codex use and network calls at 6a79ef5 only	-	-
+Library/laya	auto	setup-laya.py --install	setup-laya.py --check
+Library/anthropic-design	hold owner-approved design subset; review overlap and licenses before changing the pin	-	-
+Library/vercel-skills	hold review search, telemetry and locked runtime before moving	setup-vercel-skills.py --install	setup-vercel-skills.py --check
+Library/harness2	report the method source behind harness-step and the GitHub demo workflow; review prompts.py before it moves	-	-
+# PCB source updates only; runtime review and activation: setup/mcp/heypcb.md.
+Library/pcb/heypcb-mcp	auto	-	-
+Library/pstack	hold owner-approved review integration; re-audit executable and activation surfaces before moving	-	-
+Library/superpowers	hold review process skills and client activation before moving	-	-
