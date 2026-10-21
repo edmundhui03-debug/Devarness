@@ -99,7 +99,6 @@
     "**/Library/harness2/**",
     "**/Library/pcb/heypcb-mcp/**",
     "**/Library/pstack/**",
-    "**/Library/superpowers/**",
     "**/Library/superpowers/**"
   ]
 }

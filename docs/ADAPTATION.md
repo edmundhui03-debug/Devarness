@@ -41,23 +41,34 @@ and credentials are absent.
 - Windows, macOS and Linux CI results are recorded before broad claims.
 - GitHub contents, commit and visibility match the reviewed local version.
 
-## Local verification passed and hosted checks follow the private push
+## Verification passed locally and on all three hosted platforms
 
-`partial` · local release gate passed; hosted checks and remote verification
-follow the initial private push
+`done` · the privacy gate and portable checks passed before public reuse
+
+The repository was created private and pushed with fresh history. Remote
+main matched the reviewed local commit. GitHub Actions passed Windows,
+macOS and Linux for source commit
+`64961ddc48458a5a412fb870fafd1300e4c23b6e`:
+[portable verification run](https://github.com/edmundhui03-debug/Devarness/actions/runs/39630741614).
+Final bookkeeping preserves the Prompt Master MIT notice, clarifies tool
+wording and removes a duplicate exclusion with unchanged semantics.
 
 Windows validation passed all 17 commands in `tools/check.py`, including
-13 portable controls and the deterministic tool suites. Dashboard masking
+13 portable controls and the deterministic tool suites: 253 tests,
+including 11 explicit skips. Dashboard masking
 tests passed separately: 46 Codex and 23 Claude tests. The local catalogue
 contains 126 entries with zero diagnostics. Optional full-catalogue and
 unavailable shell/runtime cases retain explicit test skips.
 
-The staged-content scanner and Gitleaks 8.30.1 reported no findings. An
-additional scan rejected the original user's private identifiers and
-project-root names as forbidden content, and found none. The independent
+The staged-content/history scanner and Gitleaks 8.30.1 reported no
+findings. Additional deny rules covered the original user's private
+identifiers and project-root names; none matched. The independent
 review exposed index, metadata and symlink-text gaps; real Git negative
 controls now prove those rejection paths. Historical credentials removed
 from the current tree are tested too. No inherited Git history is used.
+
+The release carries 411 tracked files, including 31 internal skill links.
+Upstream clones, installed runtimes and local scan reports remain ignored.
 
 The review inspected 20 source/configuration files. Parent verification
 closed its final symlink finding. This is a same-model independent read,

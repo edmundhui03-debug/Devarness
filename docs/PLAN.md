@@ -17,10 +17,11 @@
 6. Commit fresh history, push privately and verify remote CI.
 7. Record limitations and change visibility only after the gate passes.
 
-## The next action is private publication and hosted verification
+## The release gate passed before public reuse
 
-`partial` · local checks, independent review and secret scans passed;
-private push and hosted verification remain
+`done` · inventory, export, local checks, independent review, secret scans,
+private push and hosted Windows/macOS/Linux verification passed
 
 The implementation record and done rubric are in docs/ADAPTATION.md.
-Do not replace this task with unrelated source-workspace changes.
+The owner authorized public reuse after the privacy gate; GitHub settings
+hold the repository's current visibility and template status.

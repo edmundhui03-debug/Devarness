@@ -18,6 +18,8 @@ use. Source availability is not a blanket redistribution grant.
 - Archify adaptation: Library/ARCHIFY-LICENSE.txt.
 - pstack review guidance: Library/PSTACK-LICENSE.txt.
 - Task-support skill: Library/task-support/task-support/LICENSE.
+- Prompt Master adaptation: Library/PROMPT-MASTER-LICENSE.txt, from
+  nidhinjs/prompt-master at its public manifest pin.
 - Ponytail, Karpathy guidance, Superpowers, Matt Pocock skills,
   Harness² and other collections remain separate pinned sources.
 

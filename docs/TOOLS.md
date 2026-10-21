@@ -17,7 +17,7 @@ repository does not execute its code or register it with a client.
 
 | Command | Purpose |
 | --- | --- |
-| agent-memory | agent-memory — find Peter's Claude Code memory folder for dev, and check it.  |
+| agent-memory | Find and check the current checkout's optional Claude Code memory folder. |
 | archify | Pinned Archify: --install links this device; --check verifies; other args forward. |
 | books | books — the book library as page-marked Markdown in Books/text/, never tracked or synced.  |
 | browser | Pinned shared Playwright CLI. Use --agent peter/aster/may to isolate sessions. |
