@@ -15,6 +15,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import runpy
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -190,11 +192,39 @@ class CodeCheckTests(unittest.TestCase):
                 self.assertIn("tieitup check", text)
                 self.assertIn("[stub 0000abcd]", text)
 
-    def test_a_clean_file_or_a_fault_says_nothing(self):
-        for body in ("clean\n", "fault\n"):
-            with self.subTest(body):
-                done = self.fire(self.write("Setup/tool.py", body))
-                self.assertEqual((done.returncode, done.stdout), (0, ""), done.stderr)
+    def test_a_clean_file_says_nothing(self):
+        done = self.fire(self.write("Setup/tool.py", "clean\n"))
+        self.assertEqual((done.returncode, done.stdout), (0, ""), done.stderr)
+
+    def test_a_checker_fault_is_unverified_and_never_blocks_the_edit(self):
+        done = self.fire(self.write("Setup/tool.py", "fault\n"))
+        self.assertEqual(done.returncode, 0)
+        text = self.context(done)
+        self.assertIsNotNone(text)
+        self.assertIn("UNVERIFIED", text)
+        self.assertNotIn("a finding", text)
+
+    def test_a_nonzero_checker_exit_is_unverified(self):
+        (self.root / "Library/bin/tieitup").write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
+        done = self.fire(self.write("Setup/tool.py", "x = 1\n"))
+        self.assertEqual(done.returncode, 0)
+        self.assertIn("exit 2", self.context(done))
+
+    def test_checker_timeout_or_launch_failure_is_unverified(self):
+        report = runpy.run_path(str(HOOK))["code_report"]
+        failures = (subprocess.TimeoutExpired(["checker"], 25), OSError("cannot start"))
+        for error in failures:
+            with self.subTest(error=type(error).__name__), mock.patch.object(subprocess, "run", side_effect=error):
+                self.assertIn("UNVERIFIED", report(Path("tool.py"), self.root))
+
+    def test_stderr_does_not_hide_findings_or_copy_diagnostics_into_context(self):
+        report = runpy.run_path(str(HOOK))["code_report"]
+        done = subprocess.CompletedProcess([], 0, "tool.py:1 [stub] a finding\n", "private diagnostic")
+        with mock.patch.object(subprocess, "run", return_value=done):
+            text = report(Path("tool.py"), self.root)
+        self.assertIn("UNVERIFIED", text)
+        self.assertIn("[stub] a finding", text)
+        self.assertNotIn("private diagnostic", text)
 
     def test_an_extensionless_script_is_checked_by_its_shebang(self):
         self.assertIsNotNone(self.context(self.fire(self.write("Library/bin/tool", "#!/usr/bin/env python3\nx = 1\n"))))
@@ -204,6 +234,8 @@ class CodeCheckTests(unittest.TestCase):
 
     def test_code_in_a_separate_project_is_checked_in_that_repository(self):
         project = self.root / "Projects/WORK/EXAMPLE001_example-terminal"
+        (self.root / "Library/separate-projects.txt").write_text(
+            "Projects/WORK/EXAMPLE001_example-terminal\n", encoding="utf-8")
         project.mkdir(parents=True)
         self.git("init", "-q", cwd=project)
         text = self.context(self.fire(self.write("Projects/WORK/EXAMPLE001_example-terminal/src/main.ts", "x = 1\n")))

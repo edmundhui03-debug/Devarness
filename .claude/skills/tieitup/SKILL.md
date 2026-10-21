@@ -24,8 +24,9 @@ The design and its evidence are `docs/ADAPTATION.md`.
    Every other kept rule, each conflict and each refused rule is in
    `references/rules.md`.
 
-If any of this skill's files is missing, the start check reports DEGRADED: use
-`.claude/skills/ponytail/SKILL.md` alone, as before TieItUp.
+If any required skill file is missing, report its path and use the Ponytail
+adapter alone after verifying its upstream instructions. The portable core
+start check does not establish that these optional instructions are loaded.
 
 ## The 18 rules
 
@@ -40,7 +41,7 @@ design pattern waits until a second real implementation exists.
 | 4 | Signal failure the way the codebase already does: exceptions in new Python and JS, status codes in C and Bash. At a trust boundary, reject and report; substitute a value only where the domain defines a safe one, and log it | Clean Code p.60-61, p.114 |
 | 5 | Never put work the program needs inside an assert: `python -O` and C's `NDEBUG` remove asserts | Code Complete p.62 |
 | 6 | Write files inside a `with` block, naming `encoding='utf-8'` and the newline; replace a file that matters through a temp file and `os.replace` | Python Crash Course p.182; Beginning Python p.226 |
-| 7 | Use only what every target machine provides: the Mac runs Python 3.9, so no `Path.write_text(newline=)` and no `match` | The Practice of Programming p.156-158 |
+| 7 | Honor the portable core's Python 3.9 floor: no `Path.write_text(newline=)` and no `match` | The Practice of Programming p.156-158 |
 | 8 | Run subprocesses with an argument list; use `shell=True` only with `shlex.quote` on every part that comes from input | Python Cookbook p.576-577 |
 | 9 | Name things for what they mean in the problem, with the specific word; no noise-word twins such as `customer` beside `customer_info` | Clean Code p.34 |
 | 10 | One name per concept; a rename covers code, tests, documents and messages in the same change | Domain-Driven Design p.39-40 |
@@ -85,7 +86,8 @@ Label the review self-review when you wrote the code.
 
 ## TieItUp improves itself in the session that teaches it
 
-The owner made this automatic on 15 October; the design is in SPEC.html 06.
+Use the current owner's scope and the router's verification rules. A past
+workspace's permission does not authorize a new user's experiment.
 
 - **narrow** or **missed**, at the end of each final review: apply at most
   one. Write a failing test in `Library/tests/test_tieitup.py`, narrow the
@@ -104,12 +106,15 @@ The owner made this automatic on 15 October; the design is in SPEC.html 06.
   update that leaves its skills alone is never stale. The daily
   `update-tools` sends the owner one `needs-owner` alert per new skills tree.
 - **harness**, when Claude Code or the model moved past the newest
-  benchmark: run `python -B Library/tieitup-bench.py auto` in the background.
-  It decides by itself: the pilot only, with a $5 stop line, at most once in
-  seven days, and never when the model changed until `OPUS` in the runner
-  names the new one. When it spends, add the row to `Setup/AGENT_LEDGER.md`
-  and report the spend. For a new model, re-audit the lines `learn` lists
-  with the `claude-api` skill's `prompt-audit`; do not rewrite them unasked.
+  benchmark: record the drift and propose a bounded experiment through
+  `harness-step`. Paid runs require this owner's explicit model, scope and
+  budget authorization; record actual spend in the local task ledger.
+  `Library/tieitup-bench.py` is a legacy specialist runner: `probe`, `run`
+  and `auto` spend money, and `auto` has an inherited USD 5 allocation.
+  Its time/cost heuristics do not grant permission or match every cap.
+  Never launch it automatically or in the background on that basis. For
+  a new model, inspect the runner's model and evidence before choosing a
+  benchmark; do not rewrite checks from model advice alone.
 
 ## The other commands do Ponytail's other jobs
 

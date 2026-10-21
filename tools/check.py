@@ -9,10 +9,13 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_TAIL = 8000
+DEFAULT_TIMEOUT = 600
+TIEITUP_TIMEOUT = 900
 PORTABLE_SUITES = (
     '.claude/hooks/test_guard_git_amend.py',
     '.claude/hooks/test_guard_heredoc.py',
     '.claude/hooks/test_guard_vendor_code.py',
+    '.claude/hooks/test_post_edit_check.py',
     'Library/tests/test_line_endings.py',
     'Library/tests/test_delegate_refs.py',
     'Library/tests/test_library.py',
@@ -43,7 +46,10 @@ def main():
     failures = []
     for command in commands:
         print('\nCHECK ' + ' '.join(command[1:]), flush=True)
-        result = subprocess.run(command, cwd=ROOT, timeout=600, capture_output=True,
+        # A Windows full-suite run took 600.7s;
+        # its per-call deadlines and performance assertions remain in place.
+        timeout = TIEITUP_TIMEOUT if command[-1] == 'Library/tests/test_tieitup.py' else DEFAULT_TIMEOUT
+        result = subprocess.run(command, cwd=ROOT, timeout=timeout, capture_output=True,
                                 text=True, encoding='utf-8', errors='replace',
                                 env=dict(os.environ, PYTHONIOENCODING='utf-8'),
                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))

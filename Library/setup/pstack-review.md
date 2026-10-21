@@ -1,21 +1,30 @@
-# pstack review is an optional Devarness capability
+# pstack contributes concrete review checks through the local adaptation
 
-> **2026-10-21** · Aster · `current`
+> **2026-10-22** · Devarness · `current`
 >
-> This portable edition carries reusable source and pinned upstream
-> references. Installation and authentication are local choices; no
-> previous device readiness or project evidence is inherited.
+> TieItUp includes compact pstack review guidance beside its own rules.
+> The complete upstream remains optional and library-only; it does not
+> take over Ponytail or the process gates.
 
-## Start from the current tool catalogue
+## Start with the shipped review guidance
 
-Read README.md and docs/TOOLS.md from the repository root, then
-inspect the selected Library/bin command or setup script and its
-`--help` output. Library/repos.txt records public source pins.
-Optional installers may change your user environment or download
-runtimes; they are never invoked by the default bootstrap.
+Read [the local adaptation](../../.claude/skills/tieitup/references/review.md)
+before the final diff review. Trace callers and persisted contracts, keep
+concrete reachable failures, and prove critical checks reject bad cases.
+Label self-review and unverified evidence. The root router owns precedence;
+the complete walkthrough is [the setup guide](../../docs/GETTING_STARTED.md).
 
-## Readiness requires a real local check
+## Fetch the full public source only when its other skills are needed
 
-Source present does not mean installed, configured, exposed or
-tested. Verify the selected integration after setup. Keep keys
-outside this checkout and do not reuse cached results.
+Run from the root, using `python` on Windows if needed:
+
+```bash
+python3 tools/bootstrap.py --fetch pstack
+git -C Library/pstack rev-parse HEAD
+git -C Library/pstack status --short
+```
+
+Match the public pin in `Library/repos.txt` and keep the clone clean.
+Read the selected upstream skill and its prerequisites before invoking it.
+Fetching source does not install its plugin or activate all upstream skills.
+Preserve attribution in `THIRD_PARTY.md` and the retained license notices.

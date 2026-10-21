@@ -25,7 +25,7 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[4]  # .claude/skills/harness-step/scripts -> dev root
-# Bash is denied unless named: a probe edits its worktree and checks its work, nothing else.
+# Automatic approval patterns; these do not remove other tools or provide a sandbox.
 DEFAULT_TOOLS = "Read,Grep,Glob,Edit,Write,Skill,Bash(md-format:*),Bash(git status:*),Bash(git diff:*)"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 # Git-ignored state a dev session reads besides the clones Library/repos.txt names.
@@ -240,7 +240,7 @@ def main() -> int:
     r.add_argument("--out", required=True, help="evidence folder for the step")
     r.add_argument("--patch", help="candidate harness as a git diff against --ref")
     r.add_argument("--ref", default="HEAD", help="commit the harness is taken from")
-    r.add_argument("--tools", default=DEFAULT_TOOLS, help="allowed tools, comma separated")
+    r.add_argument("--tools", default=DEFAULT_TOOLS, help="automatic approval patterns, comma separated; not a sandbox")
     r.add_argument("--max-usd", type=float, default=3.0, help="per-run spend cap passed to claude")
     r.add_argument("--timeout", type=int, default=1200, help="seconds before the run is killed")
     r.add_argument("--model", help="model alias; default is the session default")

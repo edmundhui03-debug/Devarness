@@ -28,6 +28,7 @@ tokens.json
 /Library/dashboard/app/dist/
 node_modules/
 .venv/
+.venv-html/
 venv/
 __pycache__/
 *.pyc

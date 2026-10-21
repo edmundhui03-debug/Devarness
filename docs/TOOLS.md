@@ -63,3 +63,22 @@ retain assumptions about a fully installed workspace. They are source
 references and optional integration checks, not part of portable core
 readiness. Do not run global installers or migration tools until their
 effects match your intended local setup.
+
+The bilingual checker is a Bash launcher. Run `bash Library/bin/i18n` with
+a Python interpreter that has Beautiful Soup; select its executable with
+`DEVARNESS_I18N_PYTHON` if `python3` on PATH is unsuitable. The bootstrap
+does not install that dependency. Markdown checks use Python directly.
+
+For example, from Git Bash on Windows, create an isolated HTML environment:
+
+```bash
+python -m venv .venv-html
+.venv-html/Scripts/python.exe -m pip install beautifulsoup4
+export DEVARNESS_I18N_PYTHON="$PWD/.venv-html/Scripts/python.exe"
+bash Library/bin/i18n selftest
+```
+
+On macOS/Linux use `python3` for the first command and
+`.venv-html/bin/python` for the interpreter paths. Installation downloads
+the optional dependency; record its resolved version in your project's lock
+file when reproducibility is required. No global launcher is needed.

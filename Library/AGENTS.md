@@ -1,21 +1,14 @@
-# AGENTS is an optional Devarness capability
+# Library agents use the root instructions and scoped source rules
 
-> **2026-10-21** · Aster · `current`
+> **2026-10-22** · Devarness · `current`
 >
-> This portable edition carries reusable source and pinned upstream
-> references. Installation and authentication are local choices; no
-> previous device readiness or project evidence is inherited.
+> The root AGENTS.md and router govern work in this folder. The Library
+> note adds the rules for clean upstreams and explicit capability checks.
 
-## Start from the current tool catalogue
+## Follow the shared rules before editing a capability
 
-Read README.md and docs/TOOLS.md from the repository root, then
-inspect the selected Library/bin command or setup script and its
-`--help` output. Library/repos.txt records public source pins.
-Optional installers may change your user environment or download
-runtimes; they are never invoked by the default bootstrap.
-
-## Readiness requires a real local check
-
-Source present does not mean installed, configured, exposed or
-tested. Verify the selected integration after setup. Keep keys
-outside this checkout and do not reuse cached results.
+Read [root AGENTS.md](../AGENTS.md), then [Library guidance](CLAUDE.md).
+The root router owns process, privacy, verification and session compaction.
+The Library note owns source hygiene and capability navigation. Read a
+selected tool's instructions before using it; source presence is separate
+from client exposure and runtime readiness.

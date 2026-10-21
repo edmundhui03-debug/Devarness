@@ -214,6 +214,7 @@ class Source:
         self._scan = None
         self._tree = False
         self._parents = None
+        self._nodes = None
 
     @property
     def codes(self):
@@ -257,7 +258,9 @@ class Source:
                    if 0 < line <= len(self.notes))
 
     def nodes(self, *kinds):
-        return [node for node in ast.walk(self.tree) if isinstance(node, kinds)] if self.tree else []
+        if self._nodes is None:
+            self._nodes = list(ast.walk(self.tree)) if self.tree else []
+        return [node for node in self._nodes if isinstance(node, kinds)]
 
 
 class Context:

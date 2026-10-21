@@ -1,9 +1,9 @@
 ---
 name: ponytail
-description: "Ponytail full mode and a final simplification review for dev's coding tasks. The tieitup skill loads this first on every coding task; use it alone only when the start check says TieItUp is missing."
+description: "Ponytail full mode and a final simplification review for Devarness coding tasks. TieItUp loads this first; use this base directly when TieItUp is unavailable."
 ---
 
-# Ponytail keeps dev's code necessary and maintainable
+# Ponytail keeps Devarness code necessary and maintainable
 
 Paths are relative to this Devarness checkout. From its root, run
 `python3 Library/bin/<tool>` to select this checkout explicitly.
@@ -19,7 +19,7 @@ Apply justified improvements within the current task and run relevant tests.
 Record broader opportunities in the task handoff; a clean review can conclude
 that no simplification is justified. Identify author self-review as such.
 
-## dev's correctness and process rules remain authoritative
+## The router's correctness and process rules remain authoritative
 
 The root router and superpowers own approval, testing and verification.
 Preserve required behaviour, input validation, recovery, security,
@@ -33,9 +33,9 @@ before/after measurements. Never invent benchmark gains from line counts.
 
 ## Activation follows coding work throughout the session
 
-dev's instruction-based activation applies to Peter and Aster, including after
-resume. The start check checks the pin and adapters and reminds sessions to load
-this skill. This is guidance for active agents, not an unattended code-changing
-service. Upstream lifecycle hooks, global mode files and statusline changes are
-not installed. New sessions discover the adapter; current sessions read it
-directly. See `Library/PONYTAIL.md` for restoration and verification.
+Instruction-based activation applies to Claude Code, Codex and Pi, including
+after resume. The portable core start check does not verify the upstream pin
+or client loading; follow `Library/PONYTAIL.md` for those checks. This is
+guidance for active agents, not an unattended code-changing service. Upstream
+lifecycle hooks, global mode files and statusline changes are not installed.
+New sessions discover the adapter; current sessions read it directly.

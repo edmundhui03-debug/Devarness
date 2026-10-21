@@ -33,13 +33,13 @@ use this checkout's `Library/bin/` commands from its root. The design and its ev
 | Harness² part | Claude Code (Peter) | Codex (Aster) | In context |
 | --- | --- | --- | --- |
 | System prompt | `CLAUDE.md` files, plugin SessionStart text | `AGENTS.md` | Always, every turn |
-| Guardrails | PreToolUse guards in `.claude/hooks/`, router safety rules | `.codex/hooks.json` guards | Guards act in the tool loop; rules always |
+| Guardrails | PreToolUse guards in `.claude/hooks/`, router safety rules | Router rules; hooks ship inactive | Claude guards act in the tool loop; rules always |
 | Memory | `MEMORY.md` index (always); memory files, `LESSONS.md` (on demand) | `LESSONS.md`, task records | Index always, the rest on demand |
-| Tool guidance | Hook `additionalContext` (`prompt-start`), skill text | Same hooks | Every prompt |
+| Tool guidance | Local prompt-hook context, skill text | AGENTS.md and manual local session check | Claude hook on prompts; Codex instructions/manual check |
 | Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>` links | Name and description always; body on demand |
 | Subagents | Agent types, `delegate` briefs | `codex exec` workers through `delegate` | Their own context; return text |
 | Scripts | `Library/bin/*`, a skill's `scripts/` | Same | Run on demand |
-| Middleware | PostToolUse, UserPromptSubmit and Stop hooks | `.codex/hooks.json` | Every matching call |
+| Middleware | PostToolUse and UserPromptSubmit hooks | `.codex/hooks.json` is empty by default | Configured Claude hooks on matching calls |
 
 ## Put a fix in the cheapest part that can hold it
 
@@ -152,10 +152,14 @@ allows.
 ## What a probe may and may not do
 
 - `probe.py` runs `claude -p` in a fresh, detached worktree under
-  `.claude/worktrees/`, which it removes afterwards. It allows only Read,
-  Grep, Glob, Edit, Write, Skill, `md-format` and `git status`/`git diff`,
-  unless `--tools` widens that for this task. It never pushes or commits to a
-  branch.
+  `.claude/worktrees/`, which it removes afterwards. Its `--tools` argument
+  supplies automatic approval patterns through Claude's `--allowedTools`;
+  this does not remove other available tools or provide a sandbox. The
+  default patterns cover Read, Grep, Glob, Edit, Write, Skill, `md-format`
+  and `git status`/`git diff`. Review the task and candidate before running;
+  use separately reviewed execution controls when tool isolation is required.
+  Candidate patches are locally committed in the detached worktree; the
+  runner itself does not push or commit to a branch.
 - The start check reports status instead of pulling (`DEVARNESS_START_GATE_DONE`).
   Other hooks run. Before checkout, `probe.py` links each git-ignored clone
   in `Library/repos.txt`, `Library/.runtime` and the library index from the

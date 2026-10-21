@@ -9,8 +9,8 @@ and it says nothing at all when the file is clean, is not a document, or is not
 dev's to check: a vendored clone, a separate project, an ignored path, a
 template, or anything outside this checkout.
 
-Anything it cannot read or decide exits 0 with no output: a hook that breaks
-ordinary editing gets switched off, and then it checks nothing.
+Unrecognized inputs stay silent. A code checker fault reports UNVERIFIED
+without blocking the edit; it must not look like a clean check.
 """
 import json
 import os
@@ -21,7 +21,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ("Edit", "Write", "MultiEdit")
 CHECKERS = {".md": ("Library/bin/md-format", "check"), ".html": ("Library/bin/i18n", "check")}
-# Code goes to tieitup, which always exits 0: any line on its stdout is a finding.
+# TieItUp findings use stdout; stderr or a failed subprocess means unverified.
 TIEITUP = "Library/bin/tieitup"
 CODE = {".py", ".sh", ".bash", ".c", ".h", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx"}
 SHEBANGS = ("python", "bash", "sh")
@@ -95,20 +95,29 @@ def code_repository(path: Path):
 
 
 def code_report(path: Path, repository: Path):
-    """tieitup's findings for this file, or None when it says nothing or cannot run."""
+    """TieItUp findings or an unverified status; None only for a clean check."""
     argv = [sys.executable, str(ROOT / TIEITUP), "check", "--", str(path)]
     try:
         done = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=BOUND, env=dict(os.environ, PYTHONIOENCODING="utf-8"),
-                              cwd=str(repository), stdin=subprocess.DEVNULL)
+                              cwd=str(repository), stdin=subprocess.DEVNULL,
+                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    except subprocess.TimeoutExpired:
+        return "tieitup check on %s: UNVERIFIED; no answer within %ds" % (path.name, BOUND)
     except (OSError, subprocess.SubprocessError):
-        return None    # a fault in the check never reaches the edit
+        return "tieitup check on %s: UNVERIFIED; checker could not run" % path.name
+    status = None
+    if done.returncode or done.stderr.strip():
+        reason = "exit %d" % done.returncode if done.returncode else "checker wrote to stderr"
+        status = "UNVERIFIED (%s); rerun tieitup check and inspect stderr locally" % reason
     lines = [line for line in done.stdout.splitlines() if line.strip()]
     if not lines or path.name not in done.stdout:
-        return None
+        return "tieitup check on %s: %s" % (path.name, status) if status else None
     shown = lines[:LINES]
     if len(lines) > LINES:
         shown.append("... %d more lines; run `tieitup check -- %s`" % (len(lines) - LINES, path.name))
+    if status:
+        shown.insert(0, status)
     return "tieitup check on %s:\n%s" % (path.name, "\n".join(shown))
 
 

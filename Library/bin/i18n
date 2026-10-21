@@ -14,17 +14,8 @@
 # extract is idempotent: a page already carrying data-i18n keys keeps them, so
 # re-running after an edit only adds keys for the new text.
 set -uo pipefail
-PY="$HOME/.local/share/uv/tools/markitdown/bin/python"
-# uv keeps tools under %APPDATA%\uv\tools on Windows, with Scripts/python.exe in
-# each environment. Ask uv for its tool directory rather than assume this layout.
-if [ ! -x "$PY" ] && command -v uv >/dev/null 2>&1; then
-  UV_TOOLS="$(uv tool dir 2>/dev/null)"
-  [ -n "$UV_TOOLS" ] && command -v cygpath >/dev/null 2>&1 && UV_TOOLS="$(cygpath -u "$UV_TOOLS")"
-  [ -n "$UV_TOOLS" ] && [ -x "$UV_TOOLS/markitdown/Scripts/python.exe" ] && PY="$UV_TOOLS/markitdown/Scripts/python.exe"
-fi
-# The parenthesis says what the uv lookup saw: the 2026-10-10 daily check failed
-# here while every replay passed.
-[ -x "$PY" ] || { echo "i18n: needs markitdown's python at $PY (uv: $(command -v uv || echo none); uv tool dir: ${UV_TOOLS:-none})" >&2; exit 1; }
+# The selected interpreter needs beautifulsoup4; installation is explicit.
+PY="${DEVARNESS_I18N_PYTHON:-python3}"
 exec "$PY" - "$@" <<'PYEOF'
 import sys, json, re, hashlib, os
 from bs4 import BeautifulSoup, NavigableString, Comment

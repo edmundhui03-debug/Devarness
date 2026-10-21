@@ -1,21 +1,35 @@
-# harness2 is an optional Devarness capability
+# Harness² informs a bounded local Propose–Probe–Compose step
 
-> **2026-10-21** · Aster · `current`
+> **2026-10-22** · Devarness · `current`
 >
-> This portable edition carries reusable source and pinned upstream
-> references. Installation and authentication are local choices; no
-> previous device readiness or project evidence is inherited.
+> The public Harness² source is pinned and optional. Devarness's local
+> harness-step adapter applies its improvement method without installing
+> an upstream runtime or inheriting anyone's provider credentials.
 
-## Start from the current tool catalogue
+## Use the local procedure before changing the harness
 
-Read README.md and docs/TOOLS.md from the repository root, then
-inspect the selected Library/bin command or setup script and its
-`--help` output. Library/repos.txt records public source pins.
-Optional installers may change your user environment or download
-runtimes; they are never invoked by the default bootstrap.
+Read [harness-step](../../.claude/skills/harness-step/SKILL.md) and
+[the operating walkthrough](../../docs/GETTING_STARTED.md). Freeze one task,
+acceptance checks, committed reference and model. Run a reference and two
+scoped candidates; compose only supported edits or keep the reference.
+Record confounded evidence and actual spend. A different composition needs
+its own probe within the agreed budget.
 
-## Readiness requires a real local check
+The local runner uses Claude Code. Codex and Pi can propose and review;
+their presence does not turn one provider's run into a cross-model test.
+Paid experiments require the current owner's explicit authorization.
+Keep raw traces, local task records and credentials out of the shared repo.
 
-Source present does not mean installed, configured, exposed or
-tested. Verify the selected integration after setup. Keep keys
-outside this checkout and do not reuse cached results.
+## Fetch upstream source for study without claiming runtime activation
+
+From the root, use `python` on Windows if needed:
+
+```bash
+python3 tools/bootstrap.py --fetch harness2
+git -C Library/harness2 rev-parse HEAD
+git -C Library/harness2 status --short
+```
+
+Match `Library/repos.txt` and preserve a clean upstream. Read its own setup
+and dependency instructions before running anything. Fetching is not runtime
+installation, provider authentication or a successful benchmark.

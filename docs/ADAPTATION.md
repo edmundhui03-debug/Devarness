@@ -41,9 +41,13 @@ and credentials are absent.
 - Windows, macOS and Linux CI results are recorded before broad claims.
 - GitHub contents, commit and visibility match the reviewed local version.
 
-## Verification passed locally and on all three hosted platforms
+## The original export passed locally and on three hosted platforms
 
-`fixed` · the privacy gate and portable checks passed before public reuse
+`fixed` · historical export evidence, 2026-10-21; counts are from that release
+
+For later measurements and checks, see [the improvement report](TIEITUP_IMPROVEMENT.md)
+and [the coverage audit](COVERAGE.md). The counts below describe the original
+export rather than a live inventory.
 
 The repository was created private and pushed with fresh history. Remote
 main matched the reviewed local commit. GitHub Actions passed Windows,

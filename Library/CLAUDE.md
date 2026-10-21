@@ -1,21 +1,27 @@
-# CLAUDE is an optional Devarness capability
+# The Library follows the root router and preserves upstream sources
 
-> **2026-10-21** · Aster · `current`
+> **2026-10-22** · Devarness · `current`
 >
-> This portable edition carries reusable source and pinned upstream
-> references. Installation and authentication are local choices; no
-> previous device readiness or project evidence is inherited.
+> Read the root router before changing tools or skills here. Public pins,
+> local adapters and runtime activation are separate; no earlier device's
+> setup record establishes readiness on your machine.
 
-## Start from the current tool catalogue
+## Reuse existing tools and leave fetched clones unchanged
 
-Read README.md and docs/TOOLS.md from the repository root, then
-inspect the selected Library/bin command or setup script and its
-`--help` output. Library/repos.txt records public source pins.
-Optional installers may change your user environment or download
-runtimes; they are never invoked by the default bootstrap.
+Follow [the shared router](../CLAUDE.md), [the tool catalogue](../docs/TOOLS.md)
+and [the setup guide](../docs/GETTING_STARTED.md). Search the local catalogue
+before adding a duplicate capability. Use checkout-local commands, for
+example `python3 Library/bin/library search "task"`; shell launchers need
+Bash. On Windows use Git Bash for shell tools and an available Python.
+
+`repos.txt` pins public upstreams. Keep fetched clones clean and unmodified;
+put integration changes in local adapters and preserve third-party notices.
+Review a pin update and its affected instructions before adopting it.
 
 ## Readiness requires a real local check
 
-Source present does not mean installed, configured, exposed or
-tested. Verify the selected integration after setup. Keep keys
-outside this checkout and do not reuse cached results.
+Use `python3 tools/check.py` from the root for the portable release gate.
+Specialist applications, MCP servers, plugins and provider logins need their
+own explicit setup and checks. Never infer activation from a source path.
+Keep authentication and local evidence outside tracked files. See
+[the coverage audit](../docs/COVERAGE.md) for what was retained and tested.

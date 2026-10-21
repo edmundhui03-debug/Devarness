@@ -17,8 +17,8 @@ Paths are relative to this Devarness checkout. From its root, run
 ```bash
 cp Library/templates/markdown-doc.md mydoc.md   # the template is a worked example
 # ...write it...
-md-format toc mydoc.md                    # only if it passes 150 lines
-md-format check mydoc.md                  # must exit 0 before you call it done
+python3 Library/bin/md-format toc mydoc.md    # only above 150 lines
+python3 Library/bin/md-format check mydoc.md  # must exit 0
 ```
 
 `md-format check` with no argument checks every tracked `.md` in dev. `md-format
@@ -26,7 +26,7 @@ status` prints every marked section across the workspace, grouped by state —
 that is the map the owner reads to find what is still open. `md-format fix`
 repairs trailing whitespace and the final newline, nothing else; it will never
 rewrap your prose and never touches a line inside a fence, because those bytes
-may be a fixture or a tab-separated field. `md-format selftest` runs 36 fixtures
+may be a fixture or a tab-separated field. `md-format selftest` runs fixtures
 covering every rule, fired and not fired. Run it after changing
 `Library/bin/md-format`; each case is a defect found during the build, so a
 failure means one has come back.

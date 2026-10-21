@@ -10,7 +10,9 @@ Cantonese on a toggle. That is a house rule, not a per-request feature. A page
 shipped English-only is unfinished.
 
 Paths are relative to this Devarness checkout. From its root, run
-`python3 Library/bin/<tool>` to select this checkout explicitly.
+`bash Library/bin/i18n` to select this checkout explicitly. Windows uses
+Git Bash. The launcher needs Python with Beautiful Soup installed; set
+`DEVARNESS_I18N_PYTHON` to that interpreter's executable path when needed.
 
 Before authoring or revising any page, read the Archify adapter at
 `.claude/skills/archify/SKILL.md`. Decide whether a technical diagram adds
@@ -21,10 +23,10 @@ clarity; apply its review criteria to the whole page either way.
 ```bash
 cp "Library/templates/bilingual-page.html" mypage.html
 # ...write the page in English...
-i18n extract mypage.html -o mypage.en.json     # tags text, dumps English
+bash Library/bin/i18n extract mypage.html -o mypage.en.json
 # ...translate mypage.en.json -> mypage.zh.json...
-i18n inject  mypage.html --zh mypage.zh.json   # toggle + dictionary + script
-i18n check   mypage.html                       # must say full coverage
+bash Library/bin/i18n inject mypage.html --zh mypage.zh.json
+bash Library/bin/i18n check mypage.html        # must say full coverage
 ```
 
 `i18n check` exits non-zero when anything is untranslated or the toggle is
@@ -105,5 +107,5 @@ belongs to, so the page can be updated in place later instead of forked.
 | Thing | Path |
 | --- | --- |
 | Template | `Library/templates/bilingual-page.html` |
-| Tool | `Library/bin/i18n`, symlinked to `~/.local/bin` |
+| Tool | `bash Library/bin/i18n`; no global launcher required |
 | Worked example | `Library/guides/pyrosim/PyroSim_7Day_Guide.html` |

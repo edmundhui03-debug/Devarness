@@ -16,11 +16,56 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
 TOOL = Path(__file__).resolve().parents[1] / "bin" / "i18n"
-BASH = shutil.which("bash")
+BASH = (str(Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe")
+        if os.name == "nt" else shutil.which("bash"))
+if BASH and not Path(BASH).is_file():
+    BASH = None
+I18N_ENV = dict(os.environ)
+I18N_ENV.setdefault("DEVARNESS_I18N_PYTHON", sys.executable)
+
+
+@unittest.skipUnless(BASH, "Git Bash on Windows or bash runs i18n")
+class LauncherTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="i18n-launcher-")
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.home = self.root / "empty-home"
+        self.home.mkdir()
+        self.capture = self.root / "arguments"
+
+    def interpreter(self, name):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$CAPTURE"\nexit "${FAKE_EXIT:-0}"\n')
+        path.chmod(0o755)
+        return path
+
+    def launch(self, **changes):
+        env = dict(os.environ, HOME=self.home.as_posix(), CAPTURE=self.capture.as_posix(),
+                   DEVARNESS_I18N_PYTHON="")
+        env.update(changes)
+        return subprocess.run([BASH, str(TOOL), "argument with spaces", "$literal"], cwd=self.root,
+                              env=env, capture_output=True, text=True, timeout=30,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    def test_explicit_interpreter_path_is_literal_and_failure_propagates(self):
+        python = self.interpreter("fake interpreter $(touch SENTINEL)/python")
+        done = self.launch(DEVARNESS_I18N_PYTHON=python.as_posix(), FAKE_EXIT="37")
+        self.assertEqual(done.returncode, 37, done.stdout + done.stderr)
+        self.assertEqual(self.capture.read_text().splitlines(), ["-", "argument with spaces", "$literal"])
+        self.assertFalse((self.root / "SENTINEL").exists())
+
+    def test_clean_home_uses_python3_on_path(self):
+        python = self.interpreter("path-bin/python3")
+        done = self.launch(PATH=str(python.parent) + os.pathsep + os.environ.get("PATH", ""))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.capture.read_text().splitlines(), ["-", "argument with spaces", "$literal"])
 
 HARNESS = r"""
 const [script, language, saved, click] = process.argv.slice(2);
@@ -179,8 +224,8 @@ class SelftestTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         probe = subprocess.run([BASH, str(TOOL), "--help"], capture_output=True, text=True,
-                               encoding="utf-8", timeout=60)
-        if probe.returncode and "needs markitdown's python" in probe.stderr:
+                               encoding="utf-8", timeout=60, env=I18N_ENV)
+        if probe.returncode and "No module named 'bs4'" in probe.stderr:
             raise unittest.SkipTest(probe.stderr.strip())
         cls.tmp = tempfile.TemporaryDirectory(prefix="i18n-selftest-test-")
         cls.addClassCleanup(cls.tmp.cleanup)
@@ -188,6 +233,7 @@ class SelftestTests(unittest.TestCase):
         cls.source = TOOL.read_bytes().decode("utf-8")
 
     def selftest(self, tool, **kwargs):
+        kwargs.setdefault("env", I18N_ENV)
         return subprocess.run([BASH, str(tool), "selftest"], capture_output=True, text=True,
                               encoding="utf-8", timeout=300, **kwargs)
 
@@ -218,7 +264,7 @@ class SelftestTests(unittest.TestCase):
         # this one, and its fixture page would be staged into it.
         caller = Path(self.tmp.name) / "caller"
         subprocess.run(["git", "init", "-q", str(caller)], capture_output=True, check=True)
-        done = self.selftest(TOOL, env=dict(os.environ, GIT_DIR=str(caller / ".git")))
+        done = self.selftest(TOOL, env=dict(I18N_ENV, GIT_DIR=str(caller / ".git")))
         staged = subprocess.run(["git", "-C", str(caller), "ls-files"], capture_output=True,
                                 text=True, check=True).stdout
         self.assertEqual(staged, "")
@@ -232,7 +278,7 @@ class SelftestTests(unittest.TestCase):
         ignore.write_text("*.html\n", encoding="utf-8")
         (config / "git" / "config").write_text(
             "[core]\n\texcludesFile = {}\n".format(ignore.as_posix()), encoding="utf-8")
-        env = dict(os.environ, XDG_CONFIG_HOME=str(config))
+        env = dict(I18N_ENV, XDG_CONFIG_HOME=str(config))
         probe = config / "probe"
         subprocess.run(["git", "init", "-q", str(probe)], capture_output=True, check=True, env=env)
         (probe / "page.html").write_text("<p>x</p>\n", encoding="utf-8")
@@ -256,8 +302,8 @@ class WorkspaceCheckTests(unittest.TestCase):
             (nested / "page.html").write_text("<p>Upstream's page, with no toggle.</p>\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(nested), "add", "page.html"], capture_output=True, check=True)
             done = subprocess.run([BASH, str(TOOL), "check"], cwd=tmp, capture_output=True, text=True,
-                                  encoding="utf-8", timeout=120)
-        if done.returncode and "needs markitdown's python" in done.stderr:
+                                  encoding="utf-8", timeout=120, env=I18N_ENV)
+        if done.returncode and "No module named 'bs4'" in done.stderr:
             self.skipTest(done.stderr.strip())
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("docling.partial", done.stdout)
@@ -271,8 +317,8 @@ class WorkspaceCheckTests(unittest.TestCase):
             (Path(tmp) / rel).write_text("<p>The vendor's page, with no toggle.</p>\n", encoding="utf-8")
             subprocess.run(["git", "-C", tmp, "add", rel], capture_output=True, check=True)
             done = subprocess.run([BASH, str(TOOL), "check"], cwd=tmp, capture_output=True, text=True,
-                                  encoding="utf-8", timeout=120)
-        if done.returncode and "needs markitdown's python" in done.stderr:
+                                  encoding="utf-8", timeout=120, env=I18N_ENV)
+        if done.returncode and "No module named 'bs4'" in done.stderr:
             self.skipTest(done.stderr.strip())
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("lesson.html", done.stdout)
@@ -288,8 +334,8 @@ class WorkspaceCheckTests(unittest.TestCase):
                 (Path(tmp) / rel).write_text("<p>A page with no toggle.</p>\n", encoding="utf-8")
                 subprocess.run(["git", "-C", tmp, "add", rel], capture_output=True, check=True)
             done = subprocess.run([BASH, str(TOOL), "check"], cwd=tmp, capture_output=True, text=True,
-                                  encoding="utf-8", timeout=120)
-        if done.returncode and "needs markitdown's python" in done.stderr:
+                                  encoding="utf-8", timeout=120, env=I18N_ENV)
+        if done.returncode and "No module named 'bs4'" in done.stderr:
             self.skipTest(done.stderr.strip())
         self.assertNotIn("index.html", done.stdout)
         self.assertIn("page.html: no toggle", done.stdout)
@@ -306,11 +352,11 @@ class WorkspaceCheckTests(unittest.TestCase):
 
             def check(page, cwd):
                 return subprocess.run([BASH, str(TOOL), "check", page], cwd=cwd, capture_output=True,
-                                      text=True, encoding="utf-8", timeout=120)
+                                      text=True, encoding="utf-8", timeout=120, env=I18N_ENV)
             skipped = [check(str(Path(tmp) / "Library/dashboard/index.html"), str(TOOL.parent)),
                        check("Library/dashboard/index.html", tmp)]
             checked = check(str(Path(tmp) / "Research/Library/dashboard/page.html"), tmp)
-        if checked.returncode and "needs markitdown's python" in checked.stderr:
+        if checked.returncode and "No module named 'bs4'" in checked.stderr:
             self.skipTest(checked.stderr.strip())
         for done in skipped:
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

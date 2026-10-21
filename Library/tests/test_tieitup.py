@@ -154,6 +154,32 @@ class Base(unittest.TestCase):
         return done.returncode, done.stdout, done.stderr
 
 
+class SourceTraversal(unittest.TestCase):
+    def test_nodes_reuses_one_walk_and_keeps_fresh_ordered_results(self):
+        import ast
+        source = M.Source('sample.py', 'import os\ndef run():\n    return os.getcwd()\n', {1, 2, 3})
+        expected = list(ast.walk(source.tree))
+        real_walk = ast.walk
+        with mock.patch.object(M.ast, 'walk', wraps=real_walk) as walk:
+            imports = source.nodes(ast.Import)
+            calls = source.nodes(ast.Call)
+            imports.clear()
+            self.assertEqual(source.nodes(ast.Import, ast.Call),
+                             [node for node in expected if isinstance(node, (ast.Import, ast.Call))])
+            self.assertEqual(calls, [node for node in expected if isinstance(node, ast.Call)])
+            self.assertEqual(walk.call_count, 1)
+
+    def test_nodes_does_not_reuse_another_files_tree_or_reject_partial_syntax(self):
+        import ast
+        first = M.Source('one.py', 'import os\n', {1})
+        second = M.Source('two.py', 'import sys\n', {1})
+        self.assertEqual(first.nodes(ast.Import)[0].names[0].name, 'os')
+        self.assertEqual(second.nodes(ast.Import)[0].names[0].name, 'sys')
+        partial = M.Source('partial.py', 'def broken(\n', {1})
+        self.assertEqual(partial.nodes(ast.Call), [])
+        self.assertEqual(partial.nodes(ast.Import), [])
+
+
 class ChecksFireAndStaySilent(Base):
     def test_bare_except(self):
         self.fires('bare-except', 'a.py', 'try:\n    go()\nexcept:\n    raise\n', 3)

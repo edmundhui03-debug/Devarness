@@ -50,4 +50,4 @@ Say what you did not do, and what would settle it. A document that lists only
 what worked is not evidence, and the next agent will not know where the edge
 was.
 
-Run `md-format check FILE` before calling it done.
+Run `python3 Library/bin/md-format check FILE` before calling it done.

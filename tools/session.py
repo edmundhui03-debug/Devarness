@@ -35,7 +35,7 @@ def main():
                 context += '\n' + '\n'.join(warnings)
                 context += '\n' + '\n'.join(p['entry']['id'] + ' - ' + p['entry']['path'] for p in picks)
             except library.CliError:
-                context += '\nLocal catalogue unavailable; run Library/bin/library refresh.'
+                context += '\nLocal catalogue unavailable; run python3 Library/bin/library refresh.'
         print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit',
                                                 'additionalContext': context}}))
         return 0

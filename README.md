@@ -9,6 +9,9 @@
 
 ## Start with a checkout that carries no account configuration
 
+Follow [the new-project guide](docs/GETTING_STARTED.md) for Windows,
+macOS and Linux setup with Claude Code, Codex and Pi.
+
 Requires Python 3.9+ and Git. Windows shell tools need Git Bash;
 macOS and Linux can use Bash. Node.js is optional for JS tools and the
 dashboard. No API key, client login or paid model is required to run
@@ -65,6 +68,25 @@ skill search are optional and never run in the default hooks.
 
 ## Keep projects and secrets outside the reusable template
 
+For a versioned product, create a **private repository using this template**
+and clone that new repository, with its own remote. Put tracked source in
+`app/` or `src/` and project intent in `docs/PROJECT.md`; `Projects/` and
+`PRDs and Specs/` are ignored here. The public template receives only generic
+harness changes. A template copy does not automatically receive later updates.
+
+Pi project resources require trust, and its discovery extension specifically
+runs `python3`, including on Windows. Fetching a plugin's source does not
+activate that client plugin. Check the client's loaded resources separately.
+
+Harness probes execute through Claude Code. Freeze the task, committed ref
+and actual model for each comparison; uncommitted candidates need `--patch`.
+The runner's `--tools` argument configures automatic approval through Claude's
+`--allowedTools`; it is not a sandbox or an available-tool restriction.
+Linked upstream clones and runtime remain shared with the main checkout.
+Budget each run explicitly, including a composed rerun: four runs capped at
+USD 1 each give a USD 4 planned maximum. Check reported spend after every run.
+`delivered` records CLI completion; inspect the artifact for task acceptance.
+
 Use this as a GitHub template or clone it beside your projects. Local
 project folders, book collections, task records, review boxes, runtime
 state and credential files are ignored. `tools/release_check.py` checks
@@ -75,3 +97,8 @@ See docs/ARCHITECTURE.md for integration boundaries, docs/TOOLS.md for
 the tool catalogue, docs/ADAPTATION.md for scope and verification, and
 THIRD_PARTY.md for attribution. Legacy device-completeness tests require
 a full optional installation and are separate from the portable core.
+
+The [TieItUp improvement report](docs/TIEITUP_IMPROVEMENT.md) records local
+timing, regression controls and the bounded onboarding experiment.
+The [three-pass coverage audit](docs/COVERAGE.md) records retained skills,
+tools, document styles, repairs and optional-source limitations.
