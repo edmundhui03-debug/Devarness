@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_TAIL = 8000
@@ -29,9 +30,36 @@ PORTABLE_SUITES = (
     'Library/tests/test_tieitup.py',
 )
 
+def run_check(command, timeout):
+    started = time.perf_counter()
+    try:
+        result = subprocess.run(command, cwd=ROOT, timeout=timeout, capture_output=True,
+                                text=True, encoding='utf-8', errors='replace',
+                                env=dict(os.environ, PYTHONIOENCODING='utf-8'),
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        outputs = (result.stdout, result.stderr)
+        status = 'PASS' if result.returncode == 0 else 'FAIL'
+    except subprocess.TimeoutExpired as error:
+        outputs = (error.stdout, error.stderr)
+        status = 'TIMEOUT'
+    except OSError as error:
+        outputs = ('', str(error))
+        status = 'ERROR'
+    for output in outputs:
+        if isinstance(output, bytes):
+            output = output.decode('utf-8', errors='replace')
+        print((output or '')[-LOG_TAIL:], end='', flush=True)
+    print('\n%s (%.2fs)' % (status, time.perf_counter() - started), flush=True)
+    return status == 'PASS'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--core-only', action='store_true')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('--core-only', action='store_true')
+    names = ['bootstrap', 'core', 'release'] + [Path(path).stem for path in PORTABLE_SUITES]
+    modes.add_argument('--only', nargs='+', choices=names,
+                       help='partial rerun of named checks; full acceptance still requires the default run')
     args = parser.parse_args()
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
     for relative in tracked:
@@ -43,23 +71,23 @@ def main():
                 [sys.executable, 'tools/release_check.py', '--history']]
     if not args.core_only:
         commands += [[sys.executable, path] for path in PORTABLE_SUITES]
+    if args.only:
+        commands = [commands[names.index(name)] for name in dict.fromkeys(args.only)]
+    scope = 'PARTIAL ' if args.core_only or args.only else ''
+    if scope:
+        print('PARTIAL verification; run without selection flags for full acceptance.', flush=True)
     failures = []
     for command in commands:
         print('\nCHECK ' + ' '.join(command[1:]), flush=True)
         # A Windows full-suite run took 600.7s;
         # its per-call deadlines and performance assertions remain in place.
         timeout = TIEITUP_TIMEOUT if command[-1] == 'Library/tests/test_tieitup.py' else DEFAULT_TIMEOUT
-        result = subprocess.run(command, cwd=ROOT, timeout=timeout, capture_output=True,
-                                text=True, encoding='utf-8', errors='replace',
-                                env=dict(os.environ, PYTHONIOENCODING='utf-8'),
-                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        print(result.stdout[-LOG_TAIL:] + result.stderr[-LOG_TAIL:], flush=True)
-        if result.returncode:
+        if not run_check(command, timeout):
             failures.append(' '.join(command[1:]))
     if failures:
-        print('\nFAILED: ' + '; '.join(failures))
+        print('\n' + scope + 'FAILED: ' + '; '.join(failures))
         return 1
-    print('\nPASS: %d portable check commands; optional runtime integrations not claimed.' % len(commands))
+    print('\n%sPASS: %d portable check commands; optional runtime integrations not claimed.' % (scope, len(commands)))
     return 0
 
 if __name__ == '__main__':

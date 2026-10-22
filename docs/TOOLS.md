@@ -10,6 +10,8 @@
 ## Core onboarding runs without provider credentials
 
 Use tools/bootstrap.py, tools/session.py and tools/check.py first.
+See [verification commands](VERIFICATION.md) for full acceptance and explicit
+partial reruns after a failure.
 The source manifest lists public URLs and exact commits. Fetching a
 repository does not execute its code or register it with a client.
 
