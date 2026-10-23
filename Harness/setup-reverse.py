@@ -9,7 +9,7 @@
   python3 Harness/setup-reverse.py --check --doctor   also run, through dev's own launchers, REA's
                                                   scoped doctor (rea doctor --provider ghidra --json)
                                                   and reverse jadx/apktool --version; exit 1 naming
-                                                  whatever is not ready (6 s on the build PC)
+                                                  whatever is not ready
 
 DIR may be flat (every archive in DIR) or one folder per tool (DIR/jdk/..., DIR/node/...).
 Every archive's SHA-256 is checked against the manifest BEFORE it is unpacked; a mismatch
@@ -17,7 +17,7 @@ refuses the whole install and nothing is written. Each tool unpacks into a fresh
 Harness/.runtime and is skipped on a second run once its stamp matches. REA installs from the
 tracked lock with the local Node, its cache kept inside Harness/.runtime/npm-cache, scripts off.
 The dev root is derived from this file's location; no absolute machine path is written. Standard
-library only. Owner request 2026-10-08; dev-work/reverse/RECIPE.md sections 4 and 5.
+library only. Archive pins and integrity values live in the tracked manifest.
 """
 import argparse
 import hashlib

@@ -20,6 +20,9 @@ tokens.json
 /.claude/worktrees/
 /.claude/hooks/*.state
 /.claude/hooks/*.log
+/.claude/hooks/task-recall.memo.json
+/.claude/hooks/update-tools.lock
+/.claude/hooks/update-tools/
 /.claude/hooks/library/
 /.claude/hooks/dev-check-daily/
 /Harness/.runtime/

@@ -25,7 +25,7 @@ def clone_paths():
 
     A vendored clone arrives with its own CLAUDE.md and its own .claude/skills,
     and a session working inside one would load them — which is the thing this
-    guard exists to stop. dev carries no mirrors; the old workspace's SAMPLE_FIRMWARE mirrors stayed there.
+    guard exists to stop. Vendored mirrors are optional, separately managed clones.
     """
     return [line.split("\t")[0] for line in MANIFEST.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.startswith("#")]

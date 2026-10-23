@@ -19,6 +19,94 @@ def module(name):
     return loaded
 
 class ReleaseTests(unittest.TestCase):
+    def test_current_tree_rejects_personal_values_in_index_and_working_files(self):
+        scanner = module('release_check')
+        home = 'C:/Users/' + 'privacy-control' + '/notes'
+        email = 'privacy-control' + chr(64) + 'contact.dev'
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            subprocess.run(['git', 'init', '-q', folder], check=True)
+            path = root / 'sample.txt'
+            path.write_text(home + '\n' + email, encoding='utf-8')
+            subprocess.run(['git', '-C', folder, 'add', '.'], check=True)
+            path.write_text('clean working file', encoding='utf-8')
+            staged = scanner.scan_tree(root)
+            self.assertEqual({item['kind'] for item in staged if item['rule'] == 'personal-value'},
+                             {'home path naming a user', 'email address'})
+            self.assertNotIn(home, json.dumps(staged))
+            self.assertNotIn(email, json.dumps(staged))
+            subprocess.run(['git', '-C', folder, 'add', '.'], check=True)
+            path.write_text(email, encoding='utf-8')
+            self.assertTrue(scanner.scan_tree(root))
+
+    def test_generic_privacy_checks_allow_public_placeholders_without_reading_profiles(self):
+        scanner = module('release_check')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            subprocess.run(['git', 'init', '-q', folder], check=True)
+            (root / 'readme.txt').write_text(
+                'C:/Users/<user>/notes\n/home/runner/project\n'
+                'test@example.invalid\n123+noreply@users.noreply.github.com', encoding='utf-8')
+            subprocess.run(['git', '-C', folder, 'add', '.'], check=True)
+            with patch.object(Path, 'home', side_effect=AssertionError('profile access')):
+                self.assertEqual(scanner.scan_tree(root), [])
+
+    def test_personal_symlink_metadata_is_checked_without_opening_its_target(self):
+        scanner = module('release_check')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            subprocess.run(['git', 'init', '-q', folder], check=True)
+            link = '/home/' + 'privacy-control' + '/private-target'
+            oid = subprocess.check_output(['git', '-C', folder, 'hash-object', '-w', '--stdin'],
+                                          input=link.encode()).decode().strip()
+            subprocess.run(['git', '-C', folder, 'update-index', '--add', '--cacheinfo',
+                            '120000', oid, 'link'], check=True)
+            with patch.object(Path, 'read_bytes', side_effect=AssertionError('target access')):
+                rules = {item['rule'] for item in scanner.scan_tree(root)}
+            self.assertIn('personal-value', rules)
+            self.assertIn('escaping-symlink', rules)
+
+    def test_outward_working_directory_link_cannot_expose_local_content(self):
+        scanner = module('release_check')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / 'repo'
+            outside = Path(folder) / 'excluded'
+            root.mkdir()
+            outside.mkdir()
+            source = root / 'source'
+            source.mkdir()
+            (source / 'sample.txt').write_text('tracked content', encoding='utf-8')
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+            (source / 'sample.txt').unlink()
+            source.rmdir()
+            (outside / 'sample.txt').write_text('excluded local content', encoding='utf-8')
+            try:
+                source.symlink_to(outside, target_is_directory=True)
+            except OSError as error:
+                self.skipTest('Native symlinks unavailable: ' + str(error))
+            with patch.object(Path, 'read_bytes', side_effect=AssertionError('excluded content access')):
+                findings = scanner.scan_tree(root)
+            self.assertIn('escaping-working-path', {item['rule'] for item in findings})
+
+    def test_retained_history_does_not_apply_current_personal_value_policy(self):
+        scanner = module('release_check')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            def git(*args):
+                subprocess.run(['git', '-C', folder, *args], check=True, capture_output=True)
+            git('init', '-q')
+            git('config', 'user.name', 'Test')
+            git('config', 'user.email', 'test@example.invalid')
+            path = root / 'readme.txt'
+            path.write_text('/home/' + 'privacy-control' + '/notes', encoding='utf-8')
+            git('add', '.')
+            git('commit', '-qm', 'retained example')
+            path.write_text('removed from current source', encoding='utf-8')
+            git('add', '.')
+            git('commit', '-qm', 'remove example')
+            self.assertEqual(scanner.scan_history(root), [])
+
     def test_personal_dashboard_paths_are_rejected_from_the_release_tree(self):
         scanner = module('release_check')
         paths = ['Harness/dashboard/app/src/App.tsx', 'Harness/bin/dashboard',
@@ -40,6 +128,22 @@ class ReleaseTests(unittest.TestCase):
     def test_unrelated_visualization_source_is_allowed(self):
         scanner = module('release_check')
         self.assertEqual(scanner.scan_text('app/dashboard.py', 'ordinary source'), [])
+
+    def test_runtime_cache_lock_and_logs_are_rejected_even_if_force_staged(self):
+        scanner = module('release_check')
+        paths = ['.claude/hooks/task-recall.memo.json', '.claude/hooks/update-tools.lock',
+                 '.claude/hooks/update-tools/fixture.log']
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            subprocess.run(['git', 'init', '-q', folder], check=True)
+            for relative in paths:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('synthetic local state', encoding='utf-8')
+            subprocess.run(['git', '-C', folder, 'add', '-f', *paths], check=True)
+            rejected = {item['path'] for item in scanner.scan_tree(root)
+                        if item['rule'] == 'private-runtime-state'}
+            self.assertEqual(rejected, set(paths))
 
     def test_symlink_targets_are_scanned_before_first_commit(self):
         scanner = module('release_check')
@@ -160,7 +264,7 @@ class BootstrapTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bootstrap.parse_manifest('../escape\thttps://github.com/a/b.git\t' + 'a' * 40)
         with self.assertRaises(ValueError):
-            bootstrap.parse_manifest('Harness/a\thttps://' + 'user:pass@github.com/a/b.git\t' + 'a' * 40)
+            bootstrap.parse_manifest('Harness/a\thttps://' + 'user:pass' + chr(64) + 'github.com/a/b.git\t' + 'a' * 40)
 
     def test_check_has_no_home_or_network_side_effects(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -1,4 +1,4 @@
-"""Render room-fire variants of the ISO 9705 reference case for DATASET.
+"""Render room-fire variants of the ISO 9705 reference case for an educational sensor dataset.
 
 Each scenario changes four things a real room fire changes: how big the fire
 gets (peak HRR), how fast it grows (a t-squared class), where it is (burner

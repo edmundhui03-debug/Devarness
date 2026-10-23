@@ -272,7 +272,7 @@ class ChecksFireAndStaySilent(Base):
 
     def test_commented_code(self):
         self.fires('commented-code', 'a.py', 'x = 1\n# y = compute(x)\n', 2)
-        self.fires('commented-code', 'c.py', 'x = 1  # written by Edmund\n', 1)
+        self.fires('commented-code', 'c.py', 'x = 1  # written by Example Author\n', 1)
         self.fires('commented-code', 'd.js', 'let x = 1;\n// go(x);\n', 2)
         self.fires('commented-code', 'e.sh', 'x=1\n# y=2\n', 2)
         self.fires('commented-code', 'f.c', '/* @author someone */\nint x;\n', 1)

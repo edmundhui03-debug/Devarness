@@ -3,8 +3,8 @@
 > **2026-10-15** · Peter · `current`
 >
 > Read this file when a change edits C or a header. It adds the study's C-only
-> rules, most of them for the SAMPLE_FIRMWARE detector firmware's style, to the 18 core
-> rules. Generated from the study's evidence file.
+> rules to the 18 core rules. Book titles and page references retain their
+> bibliographic attribution.
 
 ## 14 rules apply to C beyond the core
 

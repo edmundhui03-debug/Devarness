@@ -525,7 +525,7 @@ class SystemTests(unittest.TestCase):
                  "md-pages understand diagram archify learn-claude ngspice-setup fds-setup rea reverse")
         text = BOOTSTRAP.read_text(encoding="utf-8")
         self.assertIn("for b in %s; do" % names, text)
-        for gone in ("hindsight", "Hindsight", "mirror", "Example App", "Example_App"):
+        for gone in ("hindsight", "Hindsight", "mirror", "Demo Widget", "Demo_Widget"):
             self.assertNotIn(gone, text)
 
 

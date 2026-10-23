@@ -3,8 +3,8 @@
 > **2026-10-15** · Peter · `current`
 >
 > Read this file when a change edits Python. It adds the study's Python-only
-> rules to the 18 core rules; dev targets Python 3.9, the Mac's version, so
-> nothing newer is used. Generated from the study's evidence file.
+> rules to the 18 core rules. Devarness supports Python 3.9 and later, so
+> shared code must remain compatible with that minimum.
 
 ## 6 rules apply to Python beyond the core
 

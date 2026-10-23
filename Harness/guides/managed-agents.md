@@ -26,7 +26,7 @@
 - [Today's SDK breaks the workshop before any request](#todays-sdk-breaks-the-workshop-before-any-request)
 - [The lab proves the wire and is opt-in on each device](#the-lab-proves-the-wire-and-is-opt-in-on-each-device)
 - [Peter and Aster carry four rules and four design habits into dev](#peter-and-aster-carry-four-rules-and-four-design-habits-into-dev)
-- [Open after this study](#open-after-this-study)
+- [Live behavior requires a separate local check](#live-behavior-requires-a-separate-local-check)
 - [What this could not establish](#what-this-could-not-establish)
 
 ## The study used every track, and each caught what the others missed
@@ -270,22 +270,17 @@ The design habits need no new file, only attention when building agents here:
    (`incident-triage-runbook/SKILL.md`). `LESSONS.md` is dev's list of past
    causes.
 
-## Open after this study
+## Live behavior requires a separate local check
 
 | Item | State | What settles it |
 | --- | --- | --- |
-| A live run of the workshop on the owner's account | `needs-owner` | The owner exporting `ANTHROPIC_API_KEY` in their own shell and running `Harness/bin/managed-agents --live`. The guarded runner (`Harness/managed-agents-live.py`) follows `e2e.py` under a US$3 session budget it confirms before asking anything, stops at 10 minutes, tears down what it made and writes `Harness/verification/managed-agents-live.json`. It has run only against a fake client |
-| Aster's adversarial review of this work | `open` | Aster's quota, recorded as returning 2026-09-19 22:28 |
-| `agents-that-remember`, `production-ready-agent` and six more workshops in the same clone | `fixed` | Studied at `068b84b` on 2026-09-17: five study records, removed 2026-10-02, and what the old workspace took from them are in its history and archive |
-| Neutralising spreadsheet formulas in Example App's CSV exports, such as BOMs | `open` | Example App's own session. Research Desk prefixes a cell starting with `=`, `+`, `-`, `@`, tab or carriage return with an apostrophe (`research-desk/src/lib/scorecard.ts:127-130`, tested at `research-desk/tests/scorecard.test.ts:54-57`, both at `068b84b`) |
-| Memory consolidation for agent memory, the talk's "dreaming" | `open` | Its own grilling round and design |
+| A live run of the workshop | `not checked` | After authorizing paid execution, export `ANTHROPIC_API_KEY` in your own shell and run `Harness/bin/managed-agents --live`. The guarded runner (`Harness/managed-agents-live.py`) follows `e2e.py` under a US$3 session budget it confirms before asking anything, stops at 10 minutes, tears down what it made and writes `Harness/verification/managed-agents-live.json`. The public checks use a fake client |
 
 ## What this could not establish
 
-Server behaviour today is documented, not observed: the relative mount path,
-the `agent_id` filter and the newer stop reasons were not exercised against the
-API. The talk's performance figures appear nowhere in the reference. Whether
-the first live run finished rests on the delegated screen log, not a frame
-Peter read. The presenter's slides and audio were paraphrased from a
-caption-derived transcript and screen frames; where they disagreed with the
-source, the source was taken as authoritative.
+Server behaviour today is documented, not observed: the relative mount path, the
+`agent_id` filter and the newer stop reasons were not exercised against the API.
+The talk's performance figures appear nowhere in the reference. The presenter's
+slides and audio were paraphrased from a caption-derived transcript and screen
+frames; where they disagreed with the source, the source was taken as
+authoritative.

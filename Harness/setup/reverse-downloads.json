@@ -1,5 +1,5 @@
 {
-  "_comment": "Pinned downloads for the REA and reverse-skill runtimes. setup-reverse.py verifies each archive's SHA-256 against this manifest before unpacking it into Harness/.runtime/<tool>/. Sizes are bytes as downloaded on 2026-10-08; hashes recorded here were recomputed from the fetched files with Get-FileHash/sha256sum and match dev-work/reverse/RECIPE.md section 3. The npm package rea-agents@4.1.0 is NOT listed here: it is installed from registry.npmjs.org and pinned by Harness/setup/rea/package-lock.json (sha512 integrity).",
+  "_comment": "Pinned downloads for the REA and reverse-skill runtimes. setup-reverse.py verifies each archive's SHA-256 against this manifest before unpacking it into Harness/.runtime/<tool>/. Sizes are archive bytes; hashes are SHA-256 of the downloaded files. The npm package rea-agents@4.1.0 is NOT listed here: it is installed from registry.npmjs.org and pinned by Harness/setup/rea/package-lock.json (sha512 integrity).",
   "tools": {
     "jdk": {
       "file": "OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip",

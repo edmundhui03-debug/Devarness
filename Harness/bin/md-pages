@@ -3,11 +3,11 @@
 #
 # Why this exists: `markitdown` produces one flat stream with no page
 # boundaries, but a datasheet finding has to cite a page ("SOA curve, p.4") or
-# nobody can check it. The Emergency Button review already established the
-# convention `=====PAGE N=====`; this keeps it.
+# nobody can check it. The `=====PAGE N=====` markers keep findings locatable
+# in the original document.
 #
-# PDFs are split per page with pdfplumber, which already lives inside
-# markitdown's own virtualenv, so this adds no dependencies. Anything that is
+# PDFs are split per page with pdfplumber from the selected markitdown
+# virtualenv; check that installation before use. Anything that is
 # not a PDF is handed to plain markitdown, which has no pages to mark anyway.
 #
 #   md-pages input.pdf              -> stdout

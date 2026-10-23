@@ -139,9 +139,8 @@ class NamingTests(Case):
     """named() is the gate the prompt hook reads: does the prompt NAME this subject?
 
     find() ranks by shared words, which is right for a question typed at task-recall and
-    wrong for a sentence typed at an agent. On 2026-09-22, the day after Research,
-    DATASET and SAMPLE_FIRMWARE tripled the documents, 19 of 28 ordinary prompts shared a word
-    with some path: "test", "rest", "bugs". People name a project with words that
+    wrong for a sentence typed at an agent. Common words such as "test", "rest"
+    and "bugs" can overlap unrelated paths. People name a project with words that
     stand together, and a name is where those words stand together too.
     """
 
@@ -156,7 +155,7 @@ class NamingTests(Case):
         self.assertEqual(hit.file, "Setup/device-sync-sheet.md")
 
     def test_one_shared_word_never_names_a_subject(self):
-        self.ws.doc("SAMPLE_FIRMWARE/docs/unit-test-coverage.md", "Unit test coverage for the server",
+        self.ws.doc("DEMO_FIRMWARE/docs/unit-test-coverage.md", "Unit test coverage for the server",
                     "The server suite was counted", "The mobile suite was not")
         self.assertIsNone(self.named("little test, can still remember what we discussed before?"))
 
@@ -170,7 +169,7 @@ class NamingTests(Case):
         self.assertIsNone(self.named("no matter which device I start, the agent should follow the guide"))
 
     def test_words_far_apart_in_the_prompt_are_not_said_together(self):
-        self.ws.doc("SAMPLE_FIRMWARE/docs/quick-start-guide.md", "Quick start guide",
+        self.ws.doc("DEMO_FIRMWARE/docs/quick-start-guide.md", "Quick start guide",
                     "The install is described", "The first run is not")
         self.assertIsNone(self.named("start the server and then open up the guide"))
 
@@ -198,35 +197,34 @@ class NamingTests(Case):
         self.assertEqual(hit.file, "Setup/round-seven.md")
 
     def test_the_document_whose_path_carries_the_name_beats_one_that_mentions_it(self):
-        self.ws.doc("Setup/zz-emergency-button.md", "A review", "Something done", "Something open")
-        self.ws.doc("Setup/aa-notes.md", "Notes", "The emergency button was discussed",
-                    "The emergency button needs a rerun")
-        hit = self.named("what is left on the emergency button")
-        self.assertEqual(hit.file, "Setup/zz-emergency-button.md",
+        self.ws.doc("Setup/zz-demo-toggle.md", "A review", "Something done", "Something open")
+        self.ws.doc("Setup/aa-notes.md", "Notes", "The demo toggle was discussed",
+                    "The demo toggle needs a rerun")
+        hit = self.named("what is left on the demo toggle")
+        self.assertEqual(hit.file, "Setup/zz-demo-toggle.md",
                          "a path names its subject; a heading only mentions it")
 
     def test_a_dated_memory_snapshot_never_names_a_subject_a_live_document_also_names(self):
-        # Setup/handoff/ holds dated copies of Peter's memory, and a copy's file name
-        # is the project's name — so both copies outranked every live record of the
-        # emergency button review. The live memory is already shown with the box.
+        # Dated memory copies can repeat a project name. A live document should
+        # outrank them; the live memory is already shown with its subject box.
         for day in ("18", "20"):
-            self.ws.doc("Setup/handoff/claude-memory-2026-09-%s/project-emergency-button-review.md" % day,
-                        "Emergency button review", "Reviewed twice", "The v0.2 page is pending")
+            self.ws.doc("Setup/handoff/claude-memory-2026-09-%s/project-demo-toggle-review.md" % day,
+                        "Demo toggle review", "Reviewed twice", "The v0.2 page is pending")
         self.ws.doc("PCB Tools/reviews/report.md", "A review report",
-                    "The emergency button was reviewed twice", "The emergency button page is pending")
-        hit = self.named("what is left on the emergency button review")
+                    "The demo toggle was reviewed twice", "The demo toggle page is pending")
+        hit = self.named("what is left on the demo toggle review")
         self.assertIsNotNone(hit)
         self.assertEqual(hit.file, "PCB Tools/reviews/report.md")
 
     def test_a_snapshot_still_answers_when_nothing_live_does(self):
-        self.ws.doc("Setup/handoff/claude-memory-2026-09-20/project-rf433-nano-bench.md",
-                    "RF433 nano bench", "The sketches were written", "Nothing has been flashed")
-        hit = self.named("rf433 nano bench, what is next")
+        self.ws.doc("Setup/handoff/claude-memory-2026-09-20/project-widget-sensor-bench.md",
+                    "Widget sensor bench", "The sketches were written", "Nothing has been flashed")
+        hit = self.named("widget sensor bench, what is next")
         self.assertIsNotNone(hit, "the only record there is should still be found")
 
     def test_titles_come_from_the_index_so_no_document_is_opened_to_learn_its_name(self):
-        # The hook runs on every prompt. Opening 1,134 documents to read their first
-        # line is most of what made it slow; md-format status --json publishes the titles.
+        # The hook runs on every prompt. Use indexed titles instead of reopening
+        # every document just to learn its name.
         status = self.ws.status()
         status["files"] = ["Setup/not-on-disk.md"]
         status["titles"] = {"Setup/not-on-disk.md": "The smoke detector routing is planned"}
@@ -368,13 +366,13 @@ class BoxTests(Case):
         self.assertIn("Windows-only", box)
 
     def test_only_the_closest_memories_are_shown_not_every_one_that_shares_a_word(self):
-        # "pcb studio" used to drag in every memory holding the word "pcb".
-        self.ws.doc("PCB Tools/studio.md", "Example App", "The port landed", "Aster has not reviewed")
-        self.ws.remember("project-pcb-studio-build", "Example App build state and its checkpoints")
-        self.ws.remember("project-emergency-button", "A PCB review of the emergency button")
-        box = self.tool.box(self.find("pcb studio")[0], self.ws.root, memory=self.ws.memory)
-        self.assertIn("project-pcb-studio-build", box)
-        self.assertNotIn("project-emergency-button", box)
+        # Invented "pcb sandbox" must not select every memory sharing "pcb".
+        self.ws.doc("PCB Tools/sandbox.md", "Demo Widget", "The port landed", "Aster has not reviewed")
+        self.ws.remember("project-pcb-sandbox-build", "Demo Widget build state and its checkpoints")
+        self.ws.remember("project-demo-toggle", "A PCB review of the demo toggle")
+        box = self.tool.box(self.find("pcb sandbox")[0], self.ws.root, memory=self.ws.memory)
+        self.assertIn("project-pcb-sandbox-build", box)
+        self.assertNotIn("project-demo-toggle", box)
 
     def test_a_subject_with_nothing_open_says_so_rather_than_printing_an_empty_list(self):
         self.ws.plan("Setup/superpowers/plans/2026-09-18-finished.md", "A finished plan")
@@ -456,18 +454,24 @@ class CommandTests(Case):
 class RealWorkspaceTests(unittest.TestCase):
     """Against this checkout. These say what they found; they pin no count."""
 
+    def setUp(self):
+        self.memory = tempfile.TemporaryDirectory(prefix="recall-empty-memory-")
+        self.addCleanup(self.memory.cleanup)
+
     def run_tool(self, *argv):
         return subprocess.run([sys.executable, str(TOOL), *argv], capture_output=True, text=True,
-                              timeout=300, cwd=str(ROOT), env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+                              timeout=300, cwd=str(ROOT),
+                              env=dict(os.environ, PYTHONIOENCODING="utf-8",
+                                       DEVARNESS_MEMORY_DIR=self.memory.name))
 
     def test_a_real_subject_of_this_workspace_is_found_and_named(self):
-        # Example App was the subject here until it stayed in the old workspace; dev's own design is one.
-        done = self.run_tool("--json", "dev", "workspace")
+        # The public task record is a real subject without private project files.
+        done = self.run_tool("--json", "verified", "changes")
         self.assertEqual(done.returncode, 0, done.stderr[:400])
         data = json.loads(done.stdout)
-        self.assertTrue(data["subjects"], "nothing in dev matched 'dev workspace'")
+        self.assertTrue(data["subjects"], "nothing matched the public task record")
         top = data["subjects"][0]["file"].lower()
-        self.assertIn("dev-workspace", top, data["subjects"][0]["file"])
+        self.assertEqual("docs/plan.md", top)
 
     def test_the_hook_path_keeps_a_memo_and_the_plain_path_writes_nothing(self):
         with tempfile.TemporaryDirectory(prefix="task-recall-memo-") as temp:

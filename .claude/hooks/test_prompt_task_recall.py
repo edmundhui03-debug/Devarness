@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 HERE = Path(__file__).resolve().parent
@@ -68,12 +69,17 @@ class ContextTests(unittest.TestCase):
 
 
 class FiringTests(unittest.TestCase):
+    def setUp(self):
+        self.memory = tempfile.TemporaryDirectory(prefix="recall-empty-memory-")
+        self.addCleanup(self.memory.cleanup)
+
     def fire(self, prompt, raw=None):
         payload = raw if raw is not None else json.dumps(
             {"hook_event_name": "UserPromptSubmit", "prompt": prompt, "cwd": str(ROOT)})
         return subprocess.run([sys.executable, str(HOOK)], input=payload, capture_output=True,
                               text=True, timeout=120, cwd=str(ROOT),
-                              env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+                              env=dict(os.environ, PYTHONIOENCODING="utf-8",
+                                       DEVARNESS_MEMORY_DIR=self.memory.name))
 
     def said(self, done):
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -82,9 +88,8 @@ class FiringTests(unittest.TestCase):
         return json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
 
     def test_a_prompt_naming_a_real_project_gets_its_state(self):
-        # "dev workspace design" names nothing: dev, workspace and design are each in
-        # a quarter of the documents, so only the "workspace prd" pair is telling.
-        text = self.said(self.fire("where did we get to with the dev workspace prd?"))
+        # The public task record has this pair in its title.
+        text = self.said(self.fire("where did we get to with verified changes?"))
         self.assertIsNotNone(text, "the hook said nothing about a project dev is tracking")
         self.assertIn("dev is tracking this", text)
 
@@ -95,11 +100,11 @@ class FiringTests(unittest.TestCase):
                 self.assertIsNone(self.said(self.fire(prompt)))
 
     def test_it_does_not_answer_a_prompt_that_is_already_about_the_tool(self):
-        self.assertIsNone(self.said(self.fire("run task-recall pcb studio for me")))
+        self.assertIsNone(self.said(self.fire("run task-recall pcb sandbox for me")))
 
     def test_anything_it_cannot_read_never_costs_a_turn(self):
         for raw in ("", "not json", "null", json.dumps({"prompt": None}),
-                    json.dumps({"hook_event_name": "PreToolUse", "prompt": "pcb studio"}),
+                    json.dumps({"hook_event_name": "PreToolUse", "prompt": "pcb sandbox"}),
                     json.dumps({"prompt": "hi"})):
             with self.subTest(raw[:14]):
                 done = self.fire(None, raw=raw)
@@ -107,31 +112,26 @@ class FiringTests(unittest.TestCase):
 
     def test_a_harness_notification_is_not_the_owner_speaking(self):
         # A finished background task is delivered to this hook as a prompt. The text
-        # is long and machine-written, so it clears any word-overlap bar: on
-        # 2026-09-22 one dragged a Example App resume record into a turn the owner
-        # never typed. What it quotes here is a prompt that does speak.
+        # is long and machine-written, so word overlap alone is insufficient.
+        # The quoted project prompt below is an invented example, not user input.
         note = ("<system-reminder>\n[SYSTEM NOTIFICATION - NOT USER INPUT]\n<task-notification>\n"
                 "<summary>Agent finished</summary>\n<result>where did we get to with the pcb "
-                "studio windows port?</result>\n</task-notification>\n</system-reminder>")
+                "sandbox windows port?</result>\n</task-notification>\n</system-reminder>")
         self.assertIsNone(self.said(self.fire(note)))
 
     def test_one_ordinary_word_that_happens_to_be_in_a_path_names_nothing(self):
-        # The three that misfired on 2026-09-22, the day after Research, DATASET and
-        # SAMPLE_FIRMWARE came in and tripled the documents: "test" is in UNIT_TEST_COVERAGE.md,
-        # "rest" in a REST API plan, "bugs" in a web-bugs plan. One shared word was
-        # enough to speak, and 19 of 28 ordinary prompts cleared that bar.
+        # Common words such as "test", "rest" and "bugs" can occur in unrelated
+        # document paths. One shared word must not interrupt ordinary prompts.
         for prompt in ("little test, can still remember what we discussed before?",
-                       "nice. Take some rest Peter",
+                       "nice. Take some rest Example",
                        "fix the bugs and continue improve"):
             with self.subTest(prompt):
                 self.assertIsNone(self.said(self.fire(prompt)))
 
     def test_prose_alone_is_never_enough_to_interrupt_a_turn(self):
-        # "can you fix the typo" scored 4.9 against a Example App handover, on
-        # prose and frequency alone — every closed section in dev says "fixed".
-        # The gate is the path-and-heading part of the score, never the total.
-        # Since 2026-09-22 the gate is task-recall's own: `--named` answers only when
-        # the prompt names a subject, and no total or count decides it here.
+        # Generic editing prose can overlap unrelated handovers. The gate is
+        # task-recall's own: `--named` answers only when the prompt names a subject,
+        # and no aggregate prose score or document count decides it here.
         hook = load()
         self.assertIn('"--named"', Path(hook.__file__).read_text(encoding="utf-8"),
                       "the gate must be task-recall --named, never a score read here")

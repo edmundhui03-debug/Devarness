@@ -1,196 +1,141 @@
 <section id="day6">
-  <div class="day-head">
-    <div><p class="kicker">Day 6</p><h2>A run that finishes is not a run that is right, and three checks tell you which one you have</h2></div>
-    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
-  </div>
-  <div class="goal"><span class="g-l">Goal</span><p>By the end of today you can say why you believe a result: the burner released what you asked it to release, you know how much the cell size is moving the answer, and your room temperature sits beside a hand calculation and a measurement.</p></div>
+<div class="day-head">
+<div><p class="kicker">Day 6</p><h2>A run that finishes is not a run that is right, and three checks tell you which one you have</h2></div>
+<div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+</div>
+<div class="goal"><span class="g-l">Goal</span><p>By the end of today you can say why you believe a result: the burner released what you asked it to release, you know how much the cell size is moving the answer, and your room temperature sits beside a hand calculation and a measurement.</p></div>
+<p class="phase">Learn</p>
+<p class="prose">Every day so far has ended with a run that finished. Today is about the gap between finishing and being right. FDS checks its own arithmetic, not your intention. It has no way to know that the rectangle you cut was meant to be a door, or that the number you typed was meant to be a total instead of a rate per square metre.</p>
+<p class="prose">The operating system will not tell you either. On the machine used to prepare this guide, FDS returned an exit code of 0 after every set-up error that was tested and after a numerical instability that stopped the run part-way. The exit code proves nothing. One line proves a run finished, and it is the last line of the console and of <code>CHID.out</code>:</p>
+<ul class="plain">
+<li><code>STOP: FDS completed successfully</code></li>
+</ul>
+<p class="prose">In PyroSim that console text is the log pane of the <span class="ui">FDS Simulation</span> dialog, and <span class="ui">Save Log</span> writes it to a text file you can keep beside the results.</p>
+<p class="prose">A finished run then has to pass three checks. They are in this order because each one is cheap compared with the next.</p>
+<ul class="plain">
+<li>Did the fire do what you asked? Compare the <code>HRR</code> column against arithmetic you can do on paper.</li>
+<li>Is the mesh fine enough for the answer you care about? Halve the cell size and see whether the answer moves.</li>
+<li>Does the answer sit near a hand calculation and near a measurement? If it does not, know why before you quote it.</li>
+</ul>
+<details class="deeper"><summary>Why FDS cannot do these checks for you</summary><div class="d-in"><p class="prose">The mistakes FDS can catch are the ones that make the input file unreadable or physically impossible to set up: a misspelt keyword, a burner surface with no reaction, a vent floating in mid-air. Those stop the run before the first time step. Everything else is a modelling choice, and FDS has no opinion about your choices. The FDS User's Guide puts the boundary plainly: physical problems such as fires that do not ignite or flames that do not spread may be related to the mesh resolution or to how the scenario was set up, and you need to investigate the problem yourself before reporting it.</p></div></details>
+<p class="prose">Check one is the cheapest of the three. Your burner surface carries a heat release rate per unit area in kW/m², and the vent or obstruction face it sits on has an area in m². Multiply them and you have the heat release rate you asked for. In the reference case the burner top is 0.2 × 0.2 m, which is 0.04 m², and the surface carries 7500 kW/m². That is 300 kW at full output, and the ramp holds one third of it for the first 600 s, which is the 100 kW stage of the ISO 9705 programme.</p>
+<p class="prose">Now open <code>CHID_hrr.csv</code> and read the <code>HRR</code> column, which is the heat release rate from gas-phase combustion. It will not be a flat line, because the fire breathes. In the reference run on 20 cm cells it read 109 kW at 60 s, 102 kW at 300 s and 106 kW at 590 s during the 100 kW stage, then 255 kW at 620 s, 323 kW at 900 s and 317 kW at 1195 s after the step to 300 kW. Across the whole 100 kW stage that run swung between 84 kW and 124 kW, and across the 300 kW stage between 215 kW and 401 kW, so judge a plateau rather than any single row. A third either way is the flame moving. A factor of ten is a mistake in the input.</p>
+<p class="phase">Build</p>
+<ol class="steps">
+<li><div><p>Open your run folder. PyroSim writes results into a sub-directory beside the model file, so <code>iso9705.psm</code> produces a folder named <code>iso9705</code> holding <code>iso9705.fds</code> and every FDS output file.</p></div></li>
+<li><div><p>Open <code>CHID.out</code> in a text editor and read the last line. If it is not <code>STOP: FDS completed successfully</code>, stop here and read what it says instead.</p></div></li>
+<li><div><p>Scroll back up the same file to the set-up section, before the run-time diagnostics begin, and look for a block headed <code>Pressure Zone Information</code>. The reference case does not print one. If yours lists a zone whose volume is close to your room's volume, a space in your model is sealed.</p></div></li>
+<li><div><p>Open <code>CHID_hrr.csv</code>. The second row names the columns. The reference run's last column is <code>MLR_PRODUCTS</code>; if your file has an extra column named <code>ZONE_1</code> in Pa, FDS has created a pressure zone and is tracking its pressure, which is the same warning in a different place.</p></div></li>
+<li><div><p><span class="path">Results › View Time History Results</span> — choose <code>CHID_hrr.csv</code> and plot the <code>HRR</code> column. Compare the plateau against your own multiplication.</p></div></li>
+<li><div><p><span class="path">Model › Edit Model Checks › New › Surface</span> — this check reports the maximum heat release rate per applicable surface, so you can catch the arithmetic before you spend an hour running. Run the checks from <span class="path">Analysis › Run Model Checks</span>.</p></div></li>
+</ol>
+<div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The time-history plot of the <code>HRR</code> column for your own run, with the two plateaux visible and the step between them. Capture the whole plot window including the axis labels, so the units are readable.</p></div></div>
+<p class="prose">Now the exercise. The file below runs to completion and prints no error. On the guide's own machine a six-second check run of it under FDS 6.10.1 ended with <code>STOP: FDS completed successfully</code>, and the whole of its output held one console warning. Three things in it are wrong. Find all three before you open the answer.</p>
+<!--FDSBLOCK:day6_broken-->
+<ol class="steps">
+<li><div><p><span class="path">File › Import FDS/CAD File</span> — open <code>cases/day6_broken.fds</code>. The FDS Version Selection dialog defaults to <code>FDS6</code>, which is correct for this file. You can also read the listing above without opening PyroSim at all.</p></div></li>
+<li><div><p>Set <span class="ui">End Time</span> to <span class="val">60</span> s under <span class="path">Analysis › Simulation Parameters › Time</span>. A short run is sufficient to inspect these exercise faults. Measure runtime locally rather than inheriting a timing from another computer.</p></div></li>
+<li><div><p><span class="path">Analysis › Run FDS Parallel</span> — the file has two meshes, so use one MPI process per mesh. Then apply the three checks above, in order, before reading any further.</p></div></li>
+<li><div><p>Look at the model in the 3D view as well as the numbers. Devices are drawn in the view, and one of the three faults is visible there without reading a single CSV file.</p></div></li>
+</ol>
+<div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The set-up section of <code>day6_broken.out</code> showing the <code>Pressure Zone Information</code> block, with the volume and cell count legible. This is the single most useful thing to recognise on sight.</p></div></div>
+<details class="deeper"><summary>The answer: three faults, and the signal each one leaves</summary><div class="d-in">
+<p class="prose">Fault one, the door was cut inside the room instead of through the wall. The front wall is an obstruction from x 3.6 to 3.7 m. The hole is drawn from 3.40 to 3.50 m, which is a rectangle of open air inside the room that removes nothing. A hole has to reach past both faces of the wall it cuts, which is why the working case punches from 3.59 to 3.71 m rather than 3.60 to 3.70 m. The room is therefore sealed, and FDS says so twice: <code>day6_broken.out</code> lists <code>1 Volume: 2.0732E+01 m3, Cells: 20732</code> under <code>Pressure Zone Information</code>, which is the room's own volume, and <code>day6_broken_hrr.csv</code> gains a <code>ZONE_1</code> column, which is that zone's background pressure in Pa climbing away from atmospheric: 86 Pa by 6 s in the guide's check run, and still rising. Leave the door fault in place but repair the burner, and the same six seconds reach 2031 Pa. Meanwhile the two doorway devices collapse to nothing — under 1 × 10⁻⁸ kg/s by 6 s, against about 0.11 kg/s in the reference case.</p>
+<p class="prose">Fault two, the heat release rate per unit area was entered as a total. The burner surface carries <code>HRRPUA=300.0</code>, read by FDS as 300 kW/m². On the 0.2 × 0.2 m burner top that is 300 × 0.04 = 12 kW at full output and 4 kW on the first stage, instead of 100 kW. In the guide's six-second check the <code>HRR</code> column read 2.15 kW where the reference case reads about 51 kW at the same instant, and it is climbing towards 4 kW rather than 100 kW. The fire is 25 times too small and nothing in the run objects.</p>
+<p class="prose">Fault three, a sensor was placed above the ceiling. The S2 group puts three devices at the ceiling and four at head height. Its other two ceiling devices, <code>S2_CO</code> and <code>S2_OD</code>, sit at z = 2.35 m, five centimetres below the ceiling, and <code>S2_T</code> belongs beside them; it sits at z = 2.45 m instead — five centimetres above the ceiling. The room mesh stops at 2.4 m, and the second mesh covers only the space beyond the door, so that point lies outside every mesh. FDS drops the device, writes <code>WARNING: DEVC S2_T is not within any mesh.</code> and runs on to a clean finish. The <code>S2_T</code> column is absent from <code>day6_broken_devc.csv</code>: not zero, not wrong, gone.</p>
+<p class="prose">That warning is the part to remember. It goes to the console only — it never reaches <code>CHID.out</code> — so if you close the run dialog without reading it, you have lost the only notice you were given. Use <span class="ui">Save Log</span> on any run you mean to keep, and when a column you expected is missing from a CSV, look for this line before looking anywhere else.</p>
+<p class="prose">A near neighbour of this fault is worse, because it produces no warning at all. Had the sensor been moved sideways instead, out past the front wall into the second mesh that covers the open air beyond the door, it would still have been inside a mesh. FDS would have said nothing, the column would have been present, and it would have held plausible outdoor temperatures all run. A device in the wrong place is caught only by checking its coordinates against the room.</p>
+</div></details>
+<p class="phase">Check</p>
+<div class="check"><h4>Check your result</h4><p class="prose">You found all three faults from the output files alone, and you can say which file showed you each one: the <code>Pressure Zone Information</code> block and the <code>ZONE_1</code> column for the sealed room, the <code>HRR</code> column against your own multiplication for the burner, and the device coordinates against the room dimensions for the sensor. If you found only two, go back and look for the one you missed before reading the answer again.</p></div>
+<p class="prose">One error does stop a run part-way, and it is the one you will meet if you push the fire too hard. It reads:</p>
+<ul class="plain">
+<li><code>ERROR(374): Numerical Instability - FDS stopped (CHID: your_case)</code></li>
+</ul>
+<p class="prose">It means the time step collapsed. FDS halves the time step when the flow field demands it, and stops when the step falls below one ten-thousandth of the initial step, on the grounds that the answer has stopped being physical. The message goes to both the console and <code>CHID.out</code>, and FDS writes one final Plot3D file so you can see where the trouble is. The FDS User's Guide lists the causes:</p>
+<ul class="plain">
+<li>Cells with an aspect ratio worse than 2 to 1.</li>
+<li>A change in cell size of more than a factor of 2 across a mesh interface, or obstructions that do not line up there.</li>
+<li>High-speed flow through a small opening, especially an opening meant to represent leakage.</li>
+<li>A large, sudden change in the heat release rate.</li>
+<li>An <code>ADIABATIC</code> solid boundary, which the guide says should only be used for testing.</li>
+<li>An obstruction being created or removed during the run, such as a door opening.</li>
+<li>A fuel above 100 g/mol that is not in the FDS database, or a long sealed tunnel, or many small pressure zones generated automatically from thin imported walls.</li>
+</ul>
+<p class="prose">Thunderhead's own troubleshooting page adds the practical version: in their experience these instabilities are an error in the model, not an error in FDS, and the usual causes are no open vent on the boundary, a velocity boundary condition on both supply and exhaust, and flow forced into a closed space.</p>
+<p class="prose">The judgement part matters more than the fix. In a test of this same room at 20 cm cells, a 3000 kW fire that reached full size in about a second produced 39 messages reading <code>WARNING: Minimum density, 0.120 kg/m3, clipped in Mesh 1</code> and then stopped with <code>ERROR(374)</code> at 9.74 s. Adding <code>&amp;PRES MAX_PRESSURE_ITERATIONS=30 /</code> let a similar case run to the end, but with 468 of those clipping warnings and an upper layer near 1320 °C. The setting stopped the crash. It did not make the case physical. A run that had to be coaxed into finishing is a run to explain, not to quote.</p>
+<p class="phase">Learn</p>
+<p class="prose">Check two is resolution. There is no cell size that is correct in the abstract; there is only a cell size fine enough for the quantity you want. The usual measure for a buoyant plume is the characteristic fire diameter D*, from the FDS User's Guide:</p>
+<ul class="plain">
+<li><code>D* = ( Q / (ρ∞ · cp · T∞ · √g) )^(2/5)</code> — Q is the total heat release rate in kW, and D* comes out in m.</li>
+<li><code>D*/δx</code> — the number of cells spanning that diameter, where δx is the nominal cell size.</li>
+</ul>
+<p class="prose">With air at 20 °C the denominator is about 1111 kW/m^2.5, so D* is roughly <code>(Q/1111)^0.4</code> m. For the two stages of the ISO 9705 programme that gives:</p>
+<div class="scroll"><table>
+<thead><tr><th>Fire size</th><th class="num">D*</th><th class="num">D*/δx at 20 cm</th><th class="num">at 10 cm</th><th class="num">at 5 cm</th></tr></thead>
+<tbody>
+<tr><td><b>100 kW</b></td><td class="num">0.38 m</td><td class="num">1.9</td><td class="num">3.8</td><td class="num">7.6</td></tr>
+<tr><td><b>300 kW</b></td><td class="num">0.59 m</td><td class="num">3.0</td><td class="num">5.9</td><td class="num">11.8</td></tr>
+</tbody>
+</table></div>
+<p class="prose">For its own simulations of an ISO 9705 compartment, NIST used values of D*/δx between 3.8 and 14. That is a useful bracket, not a pass mark, and NIST says so: the values in its Validation Guide range over two orders of magnitude, and taking any of them as an acceptable minimum is inappropriate. What the guide recommends instead is a mesh sensitivity study — build the file on a relatively coarse mesh, then refine it until the answer you care about stops changing.</p>
 
-  <p class="phase">Learn</p>
-
-  <p class="prose">Every day so far has ended with a run that finished. Today is about the gap between finishing and being right. FDS checks its own arithmetic, not your intention. It has no way to know that the rectangle you cut was meant to be a door, or that the number you typed was meant to be a total instead of a rate per square metre.</p>
-
-  <p class="prose">The operating system will not tell you either. On the machine used to prepare this guide, FDS returned an exit code of 0 after every set-up error that was tested and after a numerical instability that stopped the run part-way. The exit code proves nothing. One line proves a run finished, and it is the last line of the console and of <code>CHID.out</code>:</p>
-
-  <ul class="plain">
-    <li><code>STOP: FDS completed successfully</code></li>
-  </ul>
-
-  <p class="prose">In PyroSim that console text is the log pane of the <span class="ui">FDS Simulation</span> dialog, and <span class="ui">Save Log</span> writes it to a text file you can keep beside the results.</p>
-
-  <p class="prose">A finished run then has to pass three checks. They are in this order because each one is cheap compared with the next.</p>
-
-  <ul class="plain">
-    <li>Did the fire do what you asked? Compare the <code>HRR</code> column against arithmetic you can do on paper.</li>
-    <li>Is the mesh fine enough for the answer you care about? Halve the cell size and see whether the answer moves.</li>
-    <li>Does the answer sit near a hand calculation and near a measurement? If it does not, know why before you quote it.</li>
-  </ul>
-
-  <details class="deeper"><summary>Why FDS cannot do these checks for you</summary><div class="d-in"><p class="prose">The mistakes FDS can catch are the ones that make the input file unreadable or physically impossible to set up: a misspelt keyword, a burner surface with no reaction, a vent floating in mid-air. Those stop the run before the first time step. Everything else is a modelling choice, and FDS has no opinion about your choices. The FDS User's Guide puts the boundary plainly: physical problems such as fires that do not ignite or flames that do not spread may be related to the mesh resolution or to how the scenario was set up, and you need to investigate the problem yourself before reporting it.</p></div></details>
-
-  <p class="prose">Check one is the cheapest of the three. Your burner surface carries a heat release rate per unit area in kW/m², and the vent or obstruction face it sits on has an area in m². Multiply them and you have the heat release rate you asked for. In the reference case the burner top is 0.2 × 0.2 m, which is 0.04 m², and the surface carries 7500 kW/m². That is 300 kW at full output, and the ramp holds one third of it for the first 600 s, which is the 100 kW stage of the ISO 9705 programme.</p>
-
-  <p class="prose">Now open <code>CHID_hrr.csv</code> and read the <code>HRR</code> column, which is the heat release rate from gas-phase combustion. It will not be a flat line, because the fire breathes. In the reference run on 20 cm cells it read 109 kW at 60 s, 102 kW at 300 s and 106 kW at 590 s during the 100 kW stage, then 255 kW at 620 s, 323 kW at 900 s and 317 kW at 1195 s after the step to 300 kW. Across the whole 100 kW stage that run swung between 84 kW and 124 kW, and across the 300 kW stage between 215 kW and 401 kW, so judge a plateau rather than any single row. A third either way is the flame moving. A factor of ten is a mistake in the input.</p>
-
-  <p class="phase">Build</p>
-
-  <ol class="steps">
-    <li><div><p>Open your run folder. PyroSim writes results into a sub-directory beside the model file, so <code>iso9705.psm</code> produces a folder named <code>iso9705</code> holding <code>iso9705.fds</code> and every FDS output file.</p></div></li>
-    <li><div><p>Open <code>CHID.out</code> in a text editor and read the last line. If it is not <code>STOP: FDS completed successfully</code>, stop here and read what it says instead.</p></div></li>
-    <li><div><p>Scroll back up the same file to the set-up section, before the run-time diagnostics begin, and look for a block headed <code>Pressure Zone Information</code>. The reference case does not print one. If yours lists a zone whose volume is close to your room's volume, a space in your model is sealed.</p></div></li>
-    <li><div><p>Open <code>CHID_hrr.csv</code>. The second row names the columns. The reference run's last column is <code>MLR_PRODUCTS</code>; if your file has an extra column named <code>ZONE_1</code> in Pa, FDS has created a pressure zone and is tracking its pressure, which is the same warning in a different place.</p></div></li>
-    <li><div><p><span class="path">Results › View Time History Results</span> — choose <code>CHID_hrr.csv</code> and plot the <code>HRR</code> column. Compare the plateau against your own multiplication.</p></div></li>
-    <li><div><p><span class="path">Model › Edit Model Checks › New › Surface</span> — this check reports the maximum heat release rate per applicable surface, so you can catch the arithmetic before you spend an hour running. Run the checks from <span class="path">Analysis › Run Model Checks</span>.</p></div></li>
-  </ol>
-
-  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The time-history plot of the <code>HRR</code> column for your own run, with the two plateaux visible and the step between them. Capture the whole plot window including the axis labels, so the units are readable.</p></div></div>
-
-  <p class="prose">Now the exercise. The file below runs to completion and prints no error. On the guide's own machine a six-second check run of it under FDS 6.10.1 ended with <code>STOP: FDS completed successfully</code>, and the whole of its output held one console warning. Three things in it are wrong. Find all three before you open the answer.</p>
-
-  <!--FDSBLOCK:day6_broken-->
-
-  <ol class="steps">
-    <li><div><p><span class="path">File › Import FDS/CAD File</span> — open <code>cases/day6_broken.fds</code>. The FDS Version Selection dialog defaults to <code>FDS6</code>, which is correct for this file. You can also read the listing above without opening PyroSim at all.</p></div></li>
-    <li><div><p><span class="path">Analysis › Simulation Parameters › Time</span> — set End Time to <span class="val">60</span> s. The faults all show inside the first minute, and a short run keeps the exercise short. The guide's own six-second check of this file took 26 s of wall clock on a Mac with two MPI processes, so allow a few minutes for 60 s; your desktop will differ.</p></div></li>
-    <li><div><p><span class="path">Analysis › Run FDS Parallel</span> — the file has two meshes, so use one MPI process per mesh. Then apply the three checks above, in order, before reading any further.</p></div></li>
-    <li><div><p>Look at the model in the 3D view as well as the numbers. Devices are drawn in the view, and one of the three faults is visible there without reading a single CSV file.</p></div></li>
-  </ol>
-
-  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The set-up section of <code>day6_broken.out</code> showing the <code>Pressure Zone Information</code> block, with the volume and cell count legible. This is the single most useful thing to recognise on sight.</p></div></div>
-
-  <details class="deeper"><summary>The answer: three faults, and the signal each one leaves</summary><div class="d-in">
-    <p class="prose">Fault one, the door was cut inside the room instead of through the wall. The front wall is an obstruction from x 3.6 to 3.7 m. The hole is drawn from 3.40 to 3.50 m, which is a rectangle of open air inside the room that removes nothing. A hole has to reach past both faces of the wall it cuts, which is why the working case punches from 3.59 to 3.71 m rather than 3.60 to 3.70 m. The room is therefore sealed, and FDS says so twice: <code>day6_broken.out</code> lists <code>1 Volume: 2.0732E+01 m3, Cells: 20732</code> under <code>Pressure Zone Information</code>, which is the room's own volume, and <code>day6_broken_hrr.csv</code> gains a <code>ZONE_1</code> column, which is that zone's background pressure in Pa climbing away from atmospheric: 86 Pa by 6 s in the guide's check run, and still rising. Leave the door fault in place but repair the burner, and the same six seconds reach 2031 Pa. Meanwhile the two doorway devices collapse to nothing — under 1 × 10⁻⁸ kg/s by 6 s, against about 0.11 kg/s in the reference case.</p>
-    <p class="prose">Fault two, the heat release rate per unit area was entered as a total. The burner surface carries <code>HRRPUA=300.0</code>, read by FDS as 300 kW/m². On the 0.2 × 0.2 m burner top that is 300 × 0.04 = 12 kW at full output and 4 kW on the first stage, instead of 100 kW. In the guide's six-second check the <code>HRR</code> column read 2.15 kW where the reference case reads about 51 kW at the same instant, and it is climbing towards 4 kW rather than 100 kW. The fire is 25 times too small and nothing in the run objects.</p>
-    <p class="prose">Fault three, a sensor was placed above the ceiling. The S2 group puts three devices at the ceiling and four at head height. Its other two ceiling devices, <code>S2_CO</code> and <code>S2_OD</code>, sit at z = 2.35 m, five centimetres below the ceiling, and <code>S2_T</code> belongs beside them; it sits at z = 2.45 m instead — five centimetres above the ceiling. The room mesh stops at 2.4 m, and the second mesh covers only the space beyond the door, so that point lies outside every mesh. FDS drops the device, writes <code>WARNING: DEVC S2_T is not within any mesh.</code> and runs on to a clean finish. The <code>S2_T</code> column is absent from <code>day6_broken_devc.csv</code>: not zero, not wrong, gone.</p>
-    <p class="prose">That warning is the part to remember. It goes to the console only — it never reaches <code>CHID.out</code> — so if you close the run dialog without reading it, you have lost the only notice you were given. Use <span class="ui">Save Log</span> on any run you mean to keep, and when a column you expected is missing from a CSV, look for this line before looking anywhere else.</p>
-    <p class="prose">A near neighbour of this fault is worse, because it produces no warning at all. Had the sensor been moved sideways instead, out past the front wall into the second mesh that covers the open air beyond the door, it would still have been inside a mesh. FDS would have said nothing, the column would have been present, and it would have held plausible outdoor temperatures all run. A device in the wrong place is caught only by checking its coordinates against the room.</p>
-  </div></details>
-
-  <p class="phase">Check</p>
-
-  <div class="check"><h4>Check your result</h4><p class="prose">You found all three faults from the output files alone, and you can say which file showed you each one: the <code>Pressure Zone Information</code> block and the <code>ZONE_1</code> column for the sealed room, the <code>HRR</code> column against your own multiplication for the burner, and the device coordinates against the room dimensions for the sensor. If you found only two, go back and look for the one you missed before reading the answer again.</p></div>
-
-  <p class="prose">One error does stop a run part-way, and it is the one you will meet if you push the fire too hard. It reads:</p>
-
-  <ul class="plain">
-    <li><code>ERROR(374): Numerical Instability - FDS stopped (CHID: your_case)</code></li>
-  </ul>
-
-  <p class="prose">It means the time step collapsed. FDS halves the time step when the flow field demands it, and stops when the step falls below one ten-thousandth of the initial step, on the grounds that the answer has stopped being physical. The message goes to both the console and <code>CHID.out</code>, and FDS writes one final Plot3D file so you can see where the trouble is. The FDS User's Guide lists the causes:</p>
-
-  <ul class="plain">
-    <li>Cells with an aspect ratio worse than 2 to 1.</li>
-    <li>A change in cell size of more than a factor of 2 across a mesh interface, or obstructions that do not line up there.</li>
-    <li>High-speed flow through a small opening, especially an opening meant to represent leakage.</li>
-    <li>A large, sudden change in the heat release rate.</li>
-    <li>An <code>ADIABATIC</code> solid boundary, which the guide says should only be used for testing.</li>
-    <li>An obstruction being created or removed during the run, such as a door opening.</li>
-    <li>A fuel above 100 g/mol that is not in the FDS database, or a long sealed tunnel, or many small pressure zones generated automatically from thin imported walls.</li>
-  </ul>
-
-  <p class="prose">Thunderhead's own troubleshooting page adds the practical version: in their experience these instabilities are an error in the model, not an error in FDS, and the usual causes are no open vent on the boundary, a velocity boundary condition on both supply and exhaust, and flow forced into a closed space.</p>
-
-  <p class="prose">The judgement part matters more than the fix. In a test of this same room at 20 cm cells, a 3000 kW fire that reached full size in about a second produced 39 messages reading <code>WARNING: Minimum density, 0.120 kg/m3, clipped in Mesh 1</code> and then stopped with <code>ERROR(374)</code> at 9.74 s. Adding <code>&amp;PRES MAX_PRESSURE_ITERATIONS=30 /</code> let a similar case run to the end, but with 468 of those clipping warnings and an upper layer near 1320 °C. The setting stopped the crash. It did not make the case physical. A run that had to be coaxed into finishing is a run to explain, not to quote.</p>
-
-  <p class="phase">Learn</p>
-
-  <p class="prose">Check two is resolution. There is no cell size that is correct in the abstract; there is only a cell size fine enough for the quantity you want. The usual measure for a buoyant plume is the characteristic fire diameter D*, from the FDS User's Guide:</p>
-
-  <ul class="plain">
-    <li><code>D* = ( Q / (ρ∞ · cp · T∞ · √g) )^(2/5)</code> — Q is the total heat release rate in kW, and D* comes out in m.</li>
-    <li><code>D*/δx</code> — the number of cells spanning that diameter, where δx is the nominal cell size.</li>
-  </ul>
-
-  <p class="prose">With air at 20 °C the denominator is about 1111 kW/m^2.5, so D* is roughly <code>(Q/1111)^0.4</code> m. For the two stages of the ISO 9705 programme that gives:</p>
-
-  <div class="scroll"><table>
-    <thead><tr><th>Fire size</th><th class="num">D*</th><th class="num">D*/δx at 20 cm</th><th class="num">at 10 cm</th><th class="num">at 5 cm</th></tr></thead>
-    <tbody>
-      <tr><td><b>100 kW</b></td><td class="num">0.38 m</td><td class="num">1.9</td><td class="num">3.8</td><td class="num">7.6</td></tr>
-      <tr><td><b>300 kW</b></td><td class="num">0.59 m</td><td class="num">3.0</td><td class="num">5.9</td><td class="num">11.8</td></tr>
-    </tbody>
-  </table></div>
-
-  <p class="prose">For its own simulations of an ISO 9705 compartment, NIST used values of D*/δx between 3.8 and 14. That is a useful bracket, not a pass mark, and NIST says so: the values in its Validation Guide range over two orders of magnitude, and taking any of them as an acceptable minimum is inappropriate. What the guide recommends instead is a mesh sensitivity study — build the file on a relatively coarse mesh, then refine it until the answer you care about stops changing.</p>
-
-  <details class="deeper"><summary>Why a finer mesh costs so much more</summary><div class="d-in"><p class="prose">Halving the cell size multiplies the number of cells by 8 in three dimensions, and the time step shrinks with the cells, so the run takes roughly 16 times as long. The reference case at 20 cm cells took 8868 s of wall clock for the full 1200 s programme with two MPI processes. The same case at 10 cm would be expected to take something near 16 times that, which is well over a day. That estimate comes from the scaling rule, not from a finished run, so treat it as an order of magnitude. It is also the reason a mesh study is done on a short window rather than on the whole programme.</p></div></details>
-
-  <p class="prose">One trap before you change the number. Halving the cell size does not change only the cell size. Anything thinner than a cell has to be redrawn, and anything that does not land on a cell face gets snapped. The guide's own 20 cm variant of the reference case had to thicken the front wall from 0.1 m to 0.2 m and widen the door hole to match, and FDS snapped the burner top from 0.1 m up to 0.2 m, which the <code>.smv</code> file records as the burner occupying cells 0 to 1 in the vertical. The burner area, and therefore the heat release rate, stayed the same. The distance from the burner to the ceiling did not. When two runs disagree, be sure you know which differences are the mesh and which are the geometry.</p>
-
-  <p class="prose">Check three is the outside world. Two references are available for this room without leaving your desk: a hand correlation, and somebody else's measurement. The hand correlation is MQH, published by McCaffrey, Quintiere and Harkleroad and reproduced in NUREG-1805, which estimates the upper-layer temperature rise in a naturally ventilated compartment:</p>
-
-  <ul class="plain">
-    <li><code>ΔT = 6.85 · [ Q² / ( (A_v √h_v) · (A_T · h_k) ) ]^(1/3)</code> — ΔT is the upper-layer rise above ambient in K, which is the same size as a rise in °C, and Q is the heat release rate in kW.</li>
-    <li><code>A_v</code> is the area of the opening in m² and <code>h_v</code> its height in m, so <code>A_v √h_v</code> is the ventilation factor in m^2.5.</li>
-    <li><code>A_T = [2(w·l) + 2(h·w) + 2(h·l)] − A_v</code> — the total area of the walls, floor and ceiling that bound the room, minus the opening, in m².</li>
-    <li><code>h_k</code> is the effective heat transfer coefficient of the lining in kW/(m²·K). It has two branches, split by the thermal penetration time <code>t_p = (ρ · c / k) · (δ/2)²</code> in s.</li>
-    <li>Before the heat has worked through the lining, for <code>t ≤ t_p</code>, use <code>h_k = √(k·ρ·c / t)</code>.</li>
-    <li>Once it has, for <code>t &gt; t_p</code>, use <code>h_k = k/δ</code>.</li>
-    <li>Units for that last group: k in kW/(m·K), ρ in kg/m³, c in kJ/(kg·K), δ the lining thickness in m, t the time since ignition in s.</li>
-  </ul>
-
-  <p class="prose">The two branches do not meet smoothly at <code>t = t_p</code>, so always say which one you used and at what time. For this room the numbers are fixed by the standard: the door is 0.8 × 2.0 m, so <code>A_v</code> = 1.60 m², <code>h_v</code> = 2.0 m and <code>A_v √h_v</code> = 2.263 m^2.5. The room is 3.6 × 2.4 × 2.4 m, so <code>A_T</code> = 46.08 − 1.60 = 44.48 m². The lining decides <code>h_k</code>, and the standard does not specify one, which is why the guide's case states its own: aerated concrete, k 0.26 W/m·K, ρ 500 kg/m³, c 0.96 kJ/kg·K, 0.1 m thick, from NUREG-1805 Table 2-3. With those values <code>t_p</code> is about 4600 s, so through the whole 1200 s programme the lining is still soaking up heat and the first branch applies.</p>
-
-  <p class="prose">The same chapter of NUREG-1805 gives three estimates of the heat release rate needed for flashover in a compartment, and ISO 9705 gives a definition of its own.</p>
-
-  <div class="scroll"><table>
-    <thead><tr><th>Estimate</th><th>Expression</th><th class="num">For this room</th></tr></thead>
-    <tbody>
-      <tr><td><b>Babrauskas</b></td><td><code>750 · A_v √h_v</code></td><td class="num">1697 kW</td></tr>
-      <tr><td><b>Thomas</b></td><td><code>7.8 · A_T + 378 · A_v √h_v</code></td><td class="num">1202 kW</td></tr>
-      <tr><td><b>MQH</b></td><td><code>610 · √( h_k · A_T · A_v √h_v )</code></td><td class="num">618–735 kW</td></tr>
-      <tr><td><b>ISO 9705-1:2016</b></td><td>Definition, not a correlation: source plus product reaches 1000 kW</td><td class="num">1000 kW</td></tr>
-      <tr><td><b>Measured, 33 ISO room tests</b></td><td>Reported by Babrauskas, Peacock and Reneke</td><td class="num">median 1700 kW</td></tr>
-    </tbody>
-  </table></div>
-
-  <p class="prose">The MQH entry is a range rather than a number because <code>h_k</code> falls as the lining heats through: with this room's own aerated concrete it gives 735 kW at the end of the 100 kW stage and 618 kW at the end of the 300 kW stage. The correlations are lower bounds in any case: the measured median across those 33 tests was 1700 kW, and only three of the 33 flashed over at or below 1000 kW. Alongside the 1000 kW definition, two working criteria from the experimental literature are worth carrying: an upper layer above 600 °C, or 20 kW/m² reaching the floor. The burner programme you are running tops out at 300 kW, so none of these should be approached, and the reference run ended at 297 °C in the upper layer and 3.7 kW/m² at the floor. That is the point of the check. You are confirming that a burner-only ISO 9705 room stays far from flashover, and if your run says otherwise, your run is wrong.</p>
-
-  <p class="phase">Build</p>
-
-  <ol class="steps">
-    <li><div><p>Save a copy of your model under a new name, so the coarse and fine runs write to different folders and neither overwrites the other.</p></div></li>
-    <li><div><p><span class="path">Model › Edit Meshes</span> — click the <span class="ui">Cell Size (m)</span> link to open <span class="ui">Set Cell Size</span> and enter <span class="val">0.1</span>. Read the cell counts the dialog reports before and after: for the room alone, 18 × 12 × 12 at 20 cm becomes 36 × 24 × 24 at 10 cm, which is 2592 cells becoming 20 736.</p></div></li>
-    <li><div><p>Check every obstruction that is now thinner than a cell, and every surface that has to sit on a cell face. Redraw what needs redrawing, and note down what you changed so you can separate mesh effects from geometry effects afterwards.</p></div></li>
-    <li><div><p><span class="path">Analysis › Simulation Parameters › Time</span> — set End Time to <span class="val">120</span> s for both runs. A short window is enough to see whether the answer moves, and it keeps the fine run to minutes rather than hours.</p></div></li>
-    <li><div><p><span class="path">Analysis › Run FDS Parallel</span> — run both, then open the two <code>CHID_devc.csv</code> files and compare the same device over the same 120 s. The ceiling thermocouple in the corner tree, <code>TC_235</code> in the reference case, is the one to start with because it responds fastest.</p></div></li>
-    <li><div><p>Do the MQH arithmetic for your own room on paper, at the end of the 100 kW stage. You need <code>A_v √h_v</code>, <code>A_T</code>, your lining's k, ρ, c and thickness, and a decision about which <code>h_k</code> branch applies. Write the answer down before you look at your run, so you cannot talk yourself into it afterwards.</p></div></li>
-  </ol>
-
-  <p class="phase">Check</p>
-
-  <p class="prose">The guide ran that comparison on its own reference case, and the answer moved a long way. Over the first 90 s, from the moment the fire is properly alight, the corner thermocouple 5 cm below the ceiling reads 28 to 47 per cent hotter on 10 cm cells than on 20 cm cells — 105 °C against 74 °C at 20 s, 165 °C against 121 °C at 60 s — and the smoke layer sits about 0.4 m higher, averaging 1.33 m against 0.92 m over the last minute of that window. Neither run changed anything but the cell size.</p>
-
-  <p class="prose">Two things follow. The 20 cm result was not converged, so any number taken from it is a method check and nothing more. And the direction of the error is the useful part: a coarse mesh smears the plume across cells that are too big to hold it, loses temperature to that smearing, and lets the hot layer sink further than it should. If your own refinement moves the answer like this, you have not found a bug — you have found the resolution your question actually needs.</p>
-
-  <!--CHART:mesh-->
-
-  <p class="prose">Now put the coarse run beside the hand calculation and beside a measurement, which is the third check. Dillon measured gas temperatures in a real ISO 9705 room with the standard corner burner and read about 305 °C at 2.35 m during the 100 kW stage and about 615 °C during the 300 kW stage. MQH predicts an upper-layer average, and the corner correction of 1.7 attributed to Mowrer and Williamson is applied because the burner sits in a corner rather than in the open.</p>
-
-  <div class="scroll"><table>
-    <thead><tr><th>End of stage</th><th class="num">20 cm run, upper layer</th><th class="num">20 cm run, ceiling</th><th class="num">MQH, centre</th><th class="num">MQH, corner ×1.7</th><th class="num">Dillon, 2.35 m</th></tr></thead>
-    <tbody>
-      <tr><td><b>100 kW, 590 s</b></td><td class="num">135 °C</td><td class="num">147 °C</td><td class="num">150 °C</td><td class="num">242 °C</td><td class="num">about 305 °C</td></tr>
-      <tr><td><b>300 kW, 1195 s</b></td><td class="num">297 °C</td><td class="num">342 °C</td><td class="num">324 °C</td><td class="num">537 °C</td><td class="num">about 615 °C</td></tr>
-    </tbody>
-  </table></div>
-
-  <p class="prose">Read the table carefully, because the columns are not the same quantity. The upper-layer column and both MQH columns are layer averages. The ceiling column and Dillon's column are single points near the ceiling, which in a corner-fire room run hotter than the layer average. The MQH figures were worked for this room with its own lining — aerated concrete, 100 mm — rather than for a generic one, and Dillon's values were read off a printed figure to about ±10 °C in a room that had steel plates and insulation board near the burner, with the burner top at 300 mm rather than 100 mm.</p>
-
-  <!--INCLUDE:calc.html-->
-
-  <p class="prose">With all that allowed for, the verdict still holds. The 20 cm run reads low. It sits below the centre-fire MQH value at both stages, well under the corner value that actually applies, and roughly half of what Dillon measured at 2.35 m. Two reasons account for most of it. The mesh is coarse — D*/δx is 1.9 at 100 kW and 3.0 at 300 kW, below the 3.8 to 14 that NIST used for this compartment, so barely two cells span the characteristic fire diameter and the plume is smeared over cells far larger than the flame. And the lining absorbs: 0.1 m of aerated concrete has a penetration time of about 4600 s, so for the whole 1200 s programme the walls are still drinking heat out of the gas. A finer mesh runs hotter. That is the direction to expect, and it is the direction your own 10 cm window should show.</p>
-
-  <div class="watch"><h4>Watch out</h4><p class="prose">MQH was fitted to about 100 experimental fires with the fire away from the walls, and NUREG-1805 states that the correlation is not valid with the coefficient 6.85 if the fire is flush with a wall or in a corner. The 1.7 corner factor is a documented repair, but this guide has it second-hand through two papers rather than from the 1987 original, and Steckler's own corner data suggest something closer to 1.4. Treat the corner column as a bracket, not a target. A hand calculation that disagrees with your run is a reason to go looking, never a reason to adjust the run until it agrees.</p></div>
-
-  <div class="check"><h4>Check your result</h4><p class="prose">You can now say three things about your own run, in one sentence each: the burner released what the arithmetic says it should; halving the cell size moved the ceiling temperature by an amount you have measured and written down; and the room temperature sits in a band you derived by hand, or it does not and you know which way and why. That sentence is what turns a finished run into a result.</p></div>
-
-  <div class="quiz">
-    <details class="q"><summary><span class="qt">FDS exited with code 0 and your batch script called the run a success. What actually proves the run finished?</span></summary><div class="qa"><p class="prose">Only the last line of the console or of <code>CHID.out</code> reading <code>STOP: FDS completed successfully</code>. FDS returns 0 after set-up errors and after a numerical instability, so any script that checks the exit code alone will report broken runs as successes.</p></div></details>
-    <details class="q"><summary><span class="qt">Your burner surface has 7500 kW/m² on a 0.2 × 0.2 m top, and the <code>HRR</code> column sits at 102 kW during the first stage. Is that a problem?</span></summary><div class="qa"><p class="prose">No. The arithmetic gives 7500 × 0.04 = 300 kW at full output and 100 kW on the one-third stage, and the column varies as the flame moves. The reference run read 102 to 109 kW at the three times this guide samples, and swung between 84 kW and 124 kW across the whole stage. A column reading 4 kW or 1000 kW would be a problem.</p></div></details>
-    <details class="q"><summary><span class="qt">Your <code>.out</code> file lists a <code>Pressure Zone Information</code> block with a volume close to your room's volume. What has happened, and where else does it show?</span></summary><div class="qa"><p class="prose">The room has no path to an open boundary, so FDS treats it as a sealed space and tracks its background pressure. It also shows as an extra <code>ZONE_1</code> column in Pa at the end of <code>CHID_hrr.csv</code>, and as a doorway mass flow of zero. The usual cause is a door hole that does not reach past both faces of the wall.</p></div></details>
-    <details class="q"><summary><span class="qt">Your 20 cm and 10 cm runs give ceiling temperatures 40 °C apart. Which one is right?</span></summary><div class="qa"><p class="prose">Neither is proved right by the comparison. The 40 °C is the measurement: it says the answer still depends on the mesh, so the coarse run is not converged for that quantity, and you should expect the finer run to be closer. D*/δx tells you where you stand relative to what others have used; it is not a pass mark, and only refining until the answer stops moving settles it.</p></div></details>
-    <details class="q"><summary><span class="qt">MQH with the corner factor gives 242 °C for the 100 kW stage and your run gives 135 °C in the upper layer. Do you change the model?</span></summary><div class="qa"><p class="prose">Not to chase the number. You record the disagreement and its direction, then look for causes you can name: a coarse mesh that under-resolves the plume, and a thick lining still absorbing heat. You also note that MQH with the 6.85 coefficient is not valid for a corner fire and that the correction factor itself is uncertain. Changing inputs until a correlation is matched is fitting, not modelling.</p></div></details>
-  </div>
-
-  <div class="done-row"><input type="checkbox" id="done-day6" data-done="day6"><label for="done-day6">Day 6 done</label></div>
+<p class="prose">One trap before you change the number. Halving the cell size does not change only the cell size. Anything thinner than a cell has to be redrawn, and anything that does not land on a cell face gets snapped. The guide's own 20 cm variant of the reference case had to thicken the front wall from 0.1 m to 0.2 m and widen the door hole to match, and FDS snapped the burner top from 0.1 m up to 0.2 m, which the <code>.smv</code> file records as the burner occupying cells 0 to 1 in the vertical. The burner area, and therefore the heat release rate, stayed the same. The distance from the burner to the ceiling did not. When two runs disagree, be sure you know which differences are the mesh and which are the geometry.</p>
+<p class="prose">Check three is the outside world. Two references are available for this room without leaving your desk: a hand correlation, and somebody else's measurement. The hand correlation is MQH, published by McCaffrey, Quintiere and Harkleroad and reproduced in NUREG-1805, which estimates the upper-layer temperature rise in a naturally ventilated compartment:</p>
+<ul class="plain">
+<li><code>ΔT = 6.85 · [ Q² / ( (A_v √h_v) · (A_T · h_k) ) ]^(1/3)</code> — ΔT is the upper-layer rise above ambient in K, which is the same size as a rise in °C, and Q is the heat release rate in kW.</li>
+<li><code>A_v</code> is the area of the opening in m² and <code>h_v</code> its height in m, so <code>A_v √h_v</code> is the ventilation factor in m^2.5.</li>
+<li><code>A_T = [2(w·l) + 2(h·w) + 2(h·l)] − A_v</code> — the total area of the walls, floor and ceiling that bound the room, minus the opening, in m².</li>
+<li><code>h_k</code> is the effective heat transfer coefficient of the lining in kW/(m²·K). It has two branches, split by the thermal penetration time <code>t_p = (ρ · c / k) · (δ/2)²</code> in s.</li>
+<li>Before the heat has worked through the lining, for <code>t ≤ t_p</code>, use <code>h_k = √(k·ρ·c / t)</code>.</li>
+<li>Once it has, for <code>t &gt; t_p</code>, use <code>h_k = k/δ</code>.</li>
+<li>Units for that last group: k in kW/(m·K), ρ in kg/m³, c in kJ/(kg·K), δ the lining thickness in m, t the time since ignition in s.</li>
+</ul>
+<p class="prose">The two branches do not meet smoothly at <code>t = t_p</code>, so always say which one you used and at what time. For this room the numbers are fixed by the standard: the door is 0.8 × 2.0 m, so <code>A_v</code> = 1.60 m², <code>h_v</code> = 2.0 m and <code>A_v √h_v</code> = 2.263 m^2.5. The room is 3.6 × 2.4 × 2.4 m, so <code>A_T</code> = 46.08 − 1.60 = 44.48 m². The lining decides <code>h_k</code>, and the standard does not specify one, which is why the guide's case states its own: aerated concrete, k 0.26 W/m·K, ρ 500 kg/m³, c 0.96 kJ/kg·K, 0.1 m thick, from NUREG-1805 Table 2-3. With those values <code>t_p</code> is about 4600 s, so through the whole 1200 s programme the lining is still soaking up heat and the first branch applies.</p>
+<p class="prose">The same chapter of NUREG-1805 gives three estimates of the heat release rate needed for flashover in a compartment, and ISO 9705 gives a definition of its own.</p>
+<div class="scroll"><table>
+<thead><tr><th>Estimate</th><th>Expression</th><th class="num">For this room</th></tr></thead>
+<tbody>
+<tr><td><b>Babrauskas</b></td><td><code>750 · A_v √h_v</code></td><td class="num">1697 kW</td></tr>
+<tr><td><b>Thomas</b></td><td><code>7.8 · A_T + 378 · A_v √h_v</code></td><td class="num">1202 kW</td></tr>
+<tr><td><b>MQH</b></td><td><code>610 · √( h_k · A_T · A_v √h_v )</code></td><td class="num">618–735 kW</td></tr>
+<tr><td><b>ISO 9705-1:2016</b></td><td>Definition, not a correlation: source plus product reaches 1000 kW</td><td class="num">1000 kW</td></tr>
+<tr><td><b>Measured, 33 ISO room tests</b></td><td>Reported by Babrauskas, Peacock and Reneke</td><td class="num">median 1700 kW</td></tr>
+</tbody>
+</table></div>
+<p class="prose">The MQH entry is a range rather than a number because <code>h_k</code> falls as the lining heats through: with this room's own aerated concrete it gives 735 kW at the end of the 100 kW stage and 618 kW at the end of the 300 kW stage. The correlations are lower bounds in any case: the measured median across those 33 tests was 1700 kW, and only three of the 33 flashed over at or below 1000 kW. Alongside the 1000 kW definition, two working criteria from the experimental literature are worth carrying: an upper layer above 600 °C, or 20 kW/m² reaching the floor. The burner programme you are running tops out at 300 kW, so none of these should be approached, and the reference run ended at 297 °C in the upper layer and 3.7 kW/m² at the floor. That is the point of the check. You are confirming that a burner-only ISO 9705 room stays far from flashover, and if your run says otherwise, your run is wrong.</p>
+<p class="phase">Build</p>
+<ol class="steps">
+<li><div><p>Save a copy of your model under a new name, so the coarse and fine runs write to different folders and neither overwrites the other.</p></div></li>
+<li><div><p><span class="path">Model › Edit Meshes</span> — click the <span class="ui">Cell Size (m)</span> link to open <span class="ui">Set Cell Size</span> and enter <span class="val">0.1</span>. Read the cell counts the dialog reports before and after: for the room alone, 18 × 12 × 12 at 20 cm becomes 36 × 24 × 24 at 10 cm, which is 2592 cells becoming 20 736.</p></div></li>
+<li><div><p>Check every obstruction that is now thinner than a cell, and every surface that has to sit on a cell face. Redraw what needs redrawing, and note down what you changed so you can separate mesh effects from geometry effects afterwards.</p></div></li>
+<li><div><p><span class="path">Analysis › Simulation Parameters › Time</span> — set End Time to <span class="val">120</span> s for both runs. A short window is enough to see whether the answer moves, and it keeps the fine run to minutes rather than hours.</p></div></li>
+<li><div><p><span class="path">Analysis › Run FDS Parallel</span> — run both, then open the two <code>CHID_devc.csv</code> files and compare the same device over the same 120 s. The ceiling thermocouple in the corner tree, <code>TC_235</code> in the reference case, is the one to start with because it responds fastest.</p></div></li>
+<li><div><p>Do the MQH arithmetic for your own room on paper, at the end of the 100 kW stage. You need <code>A_v √h_v</code>, <code>A_T</code>, your lining's k, ρ, c and thickness, and a decision about which <code>h_k</code> branch applies. Write the answer down before you look at your run, so you cannot talk yourself into it afterwards.</p></div></li>
+</ol>
+<p class="phase">Check</p>
+<p class="prose">The guide ran that comparison on its own reference case, and the answer moved a long way. Over the first 90 s, from the moment the fire is properly alight, the corner thermocouple 5 cm below the ceiling reads 28 to 47 per cent hotter on 10 cm cells than on 20 cm cells — 105 °C against 74 °C at 20 s, 165 °C against 121 °C at 60 s — and the smoke layer sits about 0.4 m higher, averaging 1.33 m against 0.92 m over the last minute of that window. Neither run changed anything but the cell size.</p>
+<p class="prose">Two things follow. The 20 cm result was not converged, so any number taken from it is a method check and nothing more. And the direction of the error is the useful part: a coarse mesh smears the plume across cells that are too big to hold it, loses temperature to that smearing, and lets the hot layer sink further than it should. If your own refinement moves the answer like this, you have not found a bug — you have found the resolution your question actually needs.</p>
+<!--CHART:mesh-->
+<p class="prose">Now put the coarse run beside the hand calculation and beside a measurement, which is the third check. Dillon measured gas temperatures in a real ISO 9705 room with the standard corner burner and read about 305 °C at 2.35 m during the 100 kW stage and about 615 °C during the 300 kW stage. MQH predicts an upper-layer average, and the corner correction of 1.7 attributed to Mowrer and Williamson is applied because the burner sits in a corner rather than in the open.</p>
+<div class="scroll"><table>
+<thead><tr><th>End of stage</th><th class="num">20 cm run, upper layer</th><th class="num">20 cm run, ceiling</th><th class="num">MQH, centre</th><th class="num">MQH, corner ×1.7</th><th class="num">Dillon, 2.35 m</th></tr></thead>
+<tbody>
+<tr><td><b>100 kW, 590 s</b></td><td class="num">135 °C</td><td class="num">147 °C</td><td class="num">150 °C</td><td class="num">242 °C</td><td class="num">about 305 °C</td></tr>
+<tr><td><b>300 kW, 1195 s</b></td><td class="num">297 °C</td><td class="num">342 °C</td><td class="num">324 °C</td><td class="num">537 °C</td><td class="num">about 615 °C</td></tr>
+</tbody>
+</table></div>
+<p class="prose">Read the table carefully, because the columns are not the same quantity. The upper-layer column and both MQH columns are layer averages. The ceiling column and Dillon's column are single points near the ceiling, which in a corner-fire room run hotter than the layer average. The MQH figures were worked for this room with its own lining — aerated concrete, 100 mm — rather than for a generic one, and Dillon's values were read off a printed figure to about ±10 °C in a room that had steel plates and insulation board near the burner, with the burner top at 300 mm rather than 100 mm.</p>
+<!--INCLUDE:calc.html-->
+<p class="prose">With all that allowed for, the verdict still holds. The 20 cm run reads low. It sits below the centre-fire MQH value at both stages, well under the corner value that actually applies, and roughly half of what Dillon measured at 2.35 m. Two reasons account for most of it. The mesh is coarse — D*/δx is 1.9 at 100 kW and 3.0 at 300 kW, below the 3.8 to 14 that NIST used for this compartment, so barely two cells span the characteristic fire diameter and the plume is smeared over cells far larger than the flame. And the lining absorbs: 0.1 m of aerated concrete has a penetration time of about 4600 s, so for the whole 1200 s programme the walls are still drinking heat out of the gas. A finer mesh runs hotter. That is the direction to expect, and it is the direction your own 10 cm window should show.</p>
+<div class="watch"><h4>Watch out</h4><p class="prose">MQH was fitted to about 100 experimental fires with the fire away from the walls, and NUREG-1805 states that the correlation is not valid with the coefficient 6.85 if the fire is flush with a wall or in a corner. The 1.7 corner factor is a documented repair, but this guide has it second-hand through two papers rather than from the 1987 original, and Steckler's own corner data suggest something closer to 1.4. Treat the corner column as a bracket, not a target. A hand calculation that disagrees with your run is a reason to go looking, never a reason to adjust the run until it agrees.</p></div>
+<div class="check"><h4>Check your result</h4><p class="prose">You can now say three things about your own run, in one sentence each: the burner released what the arithmetic says it should; halving the cell size moved the ceiling temperature by an amount you have measured and written down; and the room temperature sits in a band you derived by hand, or it does not and you know which way and why. That sentence is what turns a finished run into a result.</p></div>
+<div class="quiz">
+<details class="q"><summary><span class="qt">FDS exited with code 0 and your batch script called the run a success. What actually proves the run finished?</span></summary><div class="qa"><p class="prose">Only the last line of the console or of <code>CHID.out</code> reading <code>STOP: FDS completed successfully</code>. FDS returns 0 after set-up errors and after a numerical instability, so any script that checks the exit code alone will report broken runs as successes.</p></div></details>
+<details class="q"><summary><span class="qt">Your burner surface has 7500 kW/m² on a 0.2 × 0.2 m top, and the <code>HRR</code> column sits at 102 kW during the first stage. Is that a problem?</span></summary><div class="qa"><p class="prose">No. The arithmetic gives 7500 × 0.04 = 300 kW at full output and 100 kW on the one-third stage, and the column varies as the flame moves. The reference run read 102 to 109 kW at the three times this guide samples, and swung between 84 kW and 124 kW across the whole stage. A column reading 4 kW or 1000 kW would be a problem.</p></div></details>
+<details class="q"><summary><span class="qt">Your <code>.out</code> file lists a <code>Pressure Zone Information</code> block with a volume close to your room's volume. What has happened, and where else does it show?</span></summary><div class="qa"><p class="prose">The room has no path to an open boundary, so FDS treats it as a sealed space and tracks its background pressure. It also shows as an extra <code>ZONE_1</code> column in Pa at the end of <code>CHID_hrr.csv</code>, and as a doorway mass flow of zero. The usual cause is a door hole that does not reach past both faces of the wall.</p></div></details>
+<details class="q"><summary><span class="qt">Your 20 cm and 10 cm runs give ceiling temperatures 40 °C apart. Which one is right?</span></summary><div class="qa"><p class="prose">Neither is proved right by the comparison. The 40 °C is the measurement: it says the answer still depends on the mesh, so the coarse run is not converged for that quantity, and you should expect the finer run to be closer. D*/δx tells you where you stand relative to what others have used; it is not a pass mark, and only refining until the answer stops moving settles it.</p></div></details>
+<details class="q"><summary><span class="qt">MQH with the corner factor gives 242 °C for the 100 kW stage and your run gives 135 °C in the upper layer. Do you change the model?</span></summary><div class="qa"><p class="prose">Not to chase the number. You record the disagreement and its direction, then look for causes you can name: a coarse mesh that under-resolves the plume, and a thick lining still absorbing heat. You also note that MQH with the 6.85 coefficient is not valid for a corner fire and that the correction factor itself is uncertain. Changing inputs until a correlation is matched is fitting, not modelling.</p></div></details>
+</div>
+<div class="done-row"><input data-done="day6" id="done-day6" type="checkbox"/><label for="done-day6">Day 6 done</label></div>
 </section>

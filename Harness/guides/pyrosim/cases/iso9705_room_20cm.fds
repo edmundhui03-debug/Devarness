@@ -60,9 +60,9 @@
 &RAMP ID='ISO 9705 PROGRAMME', T=1200.0, F=1.0 /
 &OBST ID='Burner', XB=0.0,0.2, 0.0,0.2, 0.0,0.1, SURF_IDS='BURNER','ROOM LINING','ROOM LINING' /
 
- DATASET SENSOR NODES. Each carries TEMPORAL_STATISTIC='INSTANT VALUE'. Without
+ EDUCATIONAL SENSOR POSITIONS. Each carries TEMPORAL_STATISTIC='INSTANT VALUE'. Without
  it FDS reports a device as a TIME AVERAGE over the output interval, and the
- DATASET contract takes its 5 s frames by decimation precisely so that nothing is
+ educational exporter takes its 5 s frames by decimation precisely so that nothing is
  averaged. FED is left alone: that quantity is a running time integral by
  definition. Check it in any run: search the .out file for TEMPORAL STATISTIC.
  S1 at the room centre, S2 near the door. Thermocouple,

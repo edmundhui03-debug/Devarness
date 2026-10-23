@@ -58,11 +58,11 @@ class TheList(unittest.TestCase):
                                          timeout=30).returncode
                 self.assertEqual(ignored, 0, name + " is listed but not in .gitignore")
 
-    def test_none_of_the_old_projects_is_listed_in_dev(self):
-        # DATASET_AI, the SAMPLE_FIRMWARE mirrors and Example App stayed in the old workspace (design spec, 2026-10-08).
+    def test_unrelated_example_projects_are_not_listed(self):
+        # Invented unrelated project names must not enter the public inventory.
         names = entries(LIST)
-        for kept_behind in ("Projects/DATASET_AI", "SAMPLE_FIRMWARE_upstream",
-                           "PCB Tools/AGENTS/Example_App", "PCB Tools/AGENTS/Example_App_MCP"):
+        for kept_behind in ("Projects/DEMO_SENSOR_LAB", "DEMO_FIRMWARE_upstream",
+                           "Sample Tools/AGENTS/Demo_Widget", "Sample Tools/AGENTS/Demo_Widget_MCP"):
             self.assertNotIn(kept_behind, names)
 
 

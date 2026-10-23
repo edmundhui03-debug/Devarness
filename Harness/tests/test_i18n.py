@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Tests for i18n: the language toggle it injects, and the selftest that guards its check.
 
-The toggle script is run as it ships, in node, against a page small enough to fake. Found on
-2026-09-17 on the sync sheet: on a Chinese-language browser, choosing English lasted until the
-next reload, because a saved "en" looked the same as the default "en".
+The toggle script runs in node against a small page fixture. On a Chinese-language
+browser, an explicit English choice must survive reload rather than being treated
+as an unset default.
 
 The selftest is run as it ships, and again from copies of the tool with one rule of check
 switched off. Each copy must exit 1 and name exactly the cases that rule guards, so no case is
@@ -308,11 +308,11 @@ class WorkspaceCheckTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("docling.partial", done.stdout)
 
-    def test_a_course_packs_vendor_page_is_not_checked_as_ours(self):
-        # The PCB Brother course packs are the vendor's files, kept byte for byte.
-        with tempfile.TemporaryDirectory(prefix="i18n-course-") as tmp:
+    def test_a_datasheet_vendor_page_is_not_checked_as_ours(self):
+        # A vendor's saved documentation is evidence, not an authored page.
+        with tempfile.TemporaryDirectory(prefix="i18n-vendor-") as tmp:
             subprocess.run(["git", "init", "-q", tmp], capture_output=True, check=True)
-            rel = "PCB Tools/AGENTS/PCB Brother/Materials/1 Foundations/lesson.html"
+            rel = "example-project/datasheets/vendor-manual.html"
             (Path(tmp) / rel).parent.mkdir(parents=True)
             (Path(tmp) / rel).write_text("<p>The vendor's page, with no toggle.</p>\n", encoding="utf-8")
             subprocess.run(["git", "-C", tmp, "add", rel], capture_output=True, check=True)
@@ -321,12 +321,40 @@ class WorkspaceCheckTests(unittest.TestCase):
         if done.returncode and "No module named 'bs4'" in done.stderr:
             self.skipTest(done.stderr.strip())
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertNotIn("lesson.html", done.stdout)
+        self.assertNotIn("vendor-manual.html", done.stdout)
+
+    def test_personal_exclusions_are_opt_in_and_namespaced(self):
+        with tempfile.TemporaryDirectory(prefix="i18n-config-") as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            home = Path(tmp) / "home"
+            page = root / "example-project" / "page.html"
+            page.parent.mkdir()
+            page.write_text("<p>A page with no toggle.</p>\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(root)], capture_output=True, check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], capture_output=True, check=True)
+            for namespace in ("dev", "devarness"):
+                config = home / ".config" / namespace
+                config.mkdir(parents=True)
+                (config / "personal-repos.txt").write_text("example-project\n", encoding="utf-8")
+            env = dict(I18N_ENV, HOME=str(home), USERPROFILE=str(home),
+                       DEVARNESS_ALLOW_PERSONAL_REPOS="0")
+            for enabled, expected in (("0", 1), ("1", 0)):
+                env["DEVARNESS_ALLOW_PERSONAL_REPOS"] = enabled
+                done = subprocess.run([BASH, str(TOOL), "check"], cwd=root,
+                                      capture_output=True, text=True, encoding="utf-8",
+                                      timeout=120, env=env)
+                self.assertEqual(done.returncode, expected, done.stdout + done.stderr)
+            (home / ".config" / "devarness" / "personal-repos.txt").unlink()
+            done = subprocess.run([BASH, str(TOOL), "check"], cwd=root,
+                                  capture_output=True, text=True, encoding="utf-8",
+                                  timeout=120, env=env)
+            self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
 
     def test_all_source_pages_require_a_toggle(self):
         with tempfile.TemporaryDirectory(prefix="i18n-pages-") as tmp:
             subprocess.run(["git", "init", "-q", tmp], capture_output=True, check=True)
-            for rel in ("Harness/dashboard/index.html", "Research/page.html"):
+            for rel in ("app/index.html", "example-project/page.html"):
                 path = Path(tmp) / rel
                 path.parent.mkdir(parents=True)
                 path.write_text("<p>A page with no toggle.</p>\n", encoding="utf-8")
@@ -356,13 +384,7 @@ class WorkspaceCheckTests(unittest.TestCase):
 
 
 class LegacyListTests(unittest.TestCase):
-    """Harness/i18n-legacy.txt names the pages imported on 2026-09-21 and nothing else.
-
-    A row switches the bilingual rule off for its page while the page is unchanged. The owner's
-    decision covered the pages Research, DATASET and SAMPLE_FIRMWARE brought into the old workspace, so a row for any other
-    page would be an exemption nobody approved. dev carries only the PyroSim guide's pages, which
-    moved unchanged from Research/08SEP-08OCT/PyroSim/ to Harness/guides/pyrosim/.
-    """
+    """Public pages must not inherit another workspace's bilingual exemptions."""
 
     def test_export_has_no_legacy_project_exemptions(self):
         listed = TOOL.parents[1] / "i18n-legacy.txt"

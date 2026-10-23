@@ -1,168 +1,107 @@
 <section id="day7">
-  <div class="day-head">
-    <div><p class="kicker">Day 7</p><h2>A dataset is a pipeline, not a folder of runs, so today you generate valid variants, run them as a batch you can trust, and convert one to the frames DATASET reads</h2></div>
-    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
-  </div>
-  <div class="goal"><span class="g-l">Goal</span><p>By the end of today you have six valid room-fire variants with a manifest that says what each one is, a batch you checked rather than assumed, and a CSV of 5-second DATASET frames converted from a finished run.</p></div>
-
-  <p class="phase">Learn</p>
-
-  <p class="prose">DATASET has already decided what a fire simulator must hand over. The wire contract in the project's own code names three channels per zone, fixes their units, and fixes how often a frame arrives. A run that does not meet it is work you will do twice, so read the contract before you generate anything.</p>
-
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Channel</th><th>Unit</th><th>Where it comes from</th></tr></thead>
-      <tbody>
-        <tr><td><b><code>temperature_c</code></b></td><td>°C</td><td>A <code>THERMOCOUPLE</code> device at the position the physical node would occupy</td></tr>
-        <tr><td><b><code>optical_density</code></b></td><td>per metre</td><td>An <code>OPTICAL DENSITY</code> device at the same point</td></tr>
-        <tr><td><b><code>co_ppm</code></b></td><td>ppm</td><td>A <code>VOLUME FRACTION</code> device with <code>SPEC_ID='CARBON MONOXIDE'</code> and <code>CONVERSION_FACTOR=1.0E6</code></td></tr>
-        <tr><td><b><code>occupancy</code></b></td><td>people</td><td>Not FDS. A crowd simulator owns this one, and a frame that carries a channel from the wrong owner is rejected</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">Four more clauses decide the shape of the file rather than its columns, and each of them changes what you do today.</p>
-
-  <ul class="plain">
-    <li><b>One frame every 5 s.</b> The contract's sample interval is 5.0 s, chosen so the detection baselines already written for DATASET run on the same tensor without resampling.</li>
-    <li><b>By decimation, never by averaging.</b> FDS writes device output every 1 s in this guide's cases, and the converter keeps every fifth row. The project's own rule says why: averaging into 5-second bins low-passes exactly the rate of rise the trend features exist to see.</li>
-    <li><b>t = 0 is ignition</b>, not the start of the simulation and not wall-clock time. An onset offset is applied when the scenario is generated, never by shifting a finished series afterwards.</li>
-    <li><b>One incident is one fire</b>, start to finish, on one floorplan, and the split between training and test data is by whole incident. Never split a rolling window, and hold out whole buildings for any claim about transferring to a new building.</li>
-  </ul>
-
-  <details class="deeper"><summary>Why decimation and not a 5-second average</summary><div class="d-in"><p class="prose">A mean over five seconds is a low-pass filter. It removes the fast part of the signal, and the fast part is the forecast: a network trained to see temperature climbing at so many degrees per second cannot see it in a series that has been smoothed first.</p><p class="prose">There is an FDS detail hiding behind this. The User's Guide says that by default the output quantity is time-averaged between printouts, and that <code>TIME_AVERAGED=F</code> on the device line prevents it. So writing device output directly at 5 s does not give you five-second samples; it gives you five-second averages, which is the thing the contract forbids. Writing at 1 s and keeping every fifth row narrows that averaging window to one second and leaves the 1 s series on disk if you ever need it; for strictly instantaneous values, add <code>TIME_AVERAGED=F</code> to the <code>&amp;DEVC</code> lines of the exported file, which is the step Day 4 left to today.</p></div></details>
-
-  <h3>Scenarios enumerate, and that is honest work for a handful of variants</h3>
-
-  <p class="prose">PyroSim has a feature for variations of one model, called Scenarios, and it is worth knowing exactly what it stores. Thunderhead's documentation is direct about the limit: scenarios only explicitly track the enabling and disabling of objects, and to modify an object parameter in a scenario, the object must be duplicated, the parameter in the duplicate must be modified, and the original object must be disabled in the scenario.</p>
-
-  <p class="prose">Their own worked example shows the cost. To run the same room with a burner at 1000 kW/m² and again at 2000 kW/m² on a 1.0 m² vent, you copy the vent, create a second surface from the fire template, set its heat release rate, assign it to the copy, then disable the original in one scenario and the copy in the other. That is four objects to keep consistent for one changed number. Change four numbers at once, as today's batch does, and the duplicates multiply.</p>
-
-  <p class="prose">What Scenarios do well is the running. <span class="ui">Export Scenarios</span> writes each scenario's <code>.fds</code> file into its own subfolder beside the saved model, and writes a BAT file that can be double-clicked in Windows Explorer to run them all in sequence. The documentation also warns why you should use it rather than running scenarios one at a time from <span class="ui">Run FDS</span>: running individually overwrites the same results file every time. For five or ten hand-made variants, this route is the right one, and it needs no scripting at all.</p>
-
-  <h3>For hundreds of runs, the file itself becomes the template</h3>
-
-  <p class="prose">The other route treats the exported <code>.fds</code> file as text. You export one file from the model you have spent six days building, replace the values that vary with placeholders, and let a script fill them in. PyroSim stays the authoring tool; the script only substitutes numbers into a file PyroSim wrote.</p>
-
-  <p class="prose">The risk is that a generated file can be wrong in ways FDS does not object to, and Day 4 and Day 6 have shown you several. An obstruction too small for the mesh is rejected, and the guide is explicit that if at least two of the three obstruction dimensions are less than half of the corresponding cell dimensions, the obstruction is ignored. A vent must be a plane on a solid. Anything reaching past the mesh is cut off at the boundary. A device outside every mesh loses its column from the CSV with a console warning and nothing else. So the generator validates each variant before it writes a file, and refuses the ones that break those rules.</p>
-
-  <p class="prose">This is the template the guide ships. Every value in double braces is filled by the script, and the sensors are identical to the reference case, so every run in a batch is measured in the same places.</p>
-
+<div class="day-head">
+<div><p class="kicker">Day 7</p><h2>Build a dataset from validated cases and raw sensor frames</h2></div>
+<div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+</div>
+<div class="goal"><span class="g-l">Goal</span><p>By the end of today you have six valid room-fire variants with a manifest that says what each one is, a batch you checked rather than assumed, and a CSV of 5-second sensor data frames converted from a finished run.</p></div>
+<p class="phase">Learn</p>
+<p class="prose">The exporter defines a small educational CSV format: raw channels with explicit units, one row per sensor position every 5 s. Choose a downstream data format separately for your own project.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Channel</th><th>Unit</th><th>Where it comes from</th></tr></thead>
+<tbody>
+<tr><td><b><code>temperature_c</code></b></td><td>°C</td><td>A <code>THERMOCOUPLE</code> device at the position the physical node would occupy</td></tr>
+<tr><td><b><code>optical_density</code></b></td><td>per metre</td><td>An <code>OPTICAL DENSITY</code> device at the same point</td></tr>
+<tr><td><b><code>co_ppm</code></b></td><td>ppm</td><td>A <code>VOLUME FRACTION</code> device with <code>SPEC_ID='CARBON MONOXIDE'</code> and <code>CONVERSION_FACTOR=1.0E6</code></td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose">Four more clauses decide the shape of the file rather than its columns, and each of them changes what you do today.</p>
+<ul class="plain">
+<li><b>One frame every 5 s.</b> The educational exporter selects the nearest raw reading at each five-second mark, starting at ignition.</li>
+<li><b>By decimation, never by averaging.</b> Keep the 1 s series and select every fifth sample so post-processing does not smooth the rate of rise.</li>
+<li><b>t = 0 is ignition</b>, not the start of the simulation and not wall-clock time. An onset offset is applied when the scenario is generated, never by shifting a finished series afterwards.</li>
+<li><b>One incident is one fire</b>, start to finish, on one floorplan, and the split between training and test data is by whole incident. Never split a rolling window, and hold out whole buildings for any claim about transferring to a new building.</li>
+</ul>
+<details class="deeper"><summary>Why decimation and not a 5-second average</summary><div class="d-in"><p class="prose">A mean over five seconds is a low-pass filter. It removes the fast part of the signal, and the fast part is the forecast: a network trained to see temperature climbing at so many degrees per second cannot see it in a series that has been smoothed first.</p><p class="prose">FDS time-averages device output between printouts by default. Use <code>TEMPORAL_STATISTIC='INSTANT VALUE'</code> on the sensor channels and check the <code>.out</code> file. Selecting every fifth row does not undo averaging already performed by the solver.</p></div></details>
+<h3>Scenarios enumerate, and that is honest work for a handful of variants</h3>
+<p class="prose">PyroSim has a feature for variations of one model, called Scenarios, and it is worth knowing exactly what it stores. Thunderhead's documentation is direct about the limit: scenarios only explicitly track the enabling and disabling of objects, and to modify an object parameter in a scenario, the object must be duplicated, the parameter in the duplicate must be modified, and the original object must be disabled in the scenario.</p>
+<p class="prose">Their own worked example shows the cost. To run the same room with a burner at 1000 kW/m² and again at 2000 kW/m² on a 1.0 m² vent, you copy the vent, create a second surface from the fire template, set its heat release rate, assign it to the copy, then disable the original in one scenario and the copy in the other. That is four objects to keep consistent for one changed number. Change four numbers at once, as today's batch does, and the duplicates multiply.</p>
+<p class="prose">What Scenarios do well is the running. <span class="ui">Export Scenarios</span> writes each scenario's <code>.fds</code> file into its own subfolder beside the saved model, and writes a BAT file that can be double-clicked in Windows Explorer to run them all in sequence. The documentation also warns why you should use it rather than running scenarios one at a time from <span class="ui">Run FDS</span>: running individually overwrites the same results file every time. For five or ten hand-made variants, this route is the right one, and it needs no scripting at all.</p>
+<h3>For hundreds of runs, the file itself becomes the template</h3>
+<p class="prose">The other route treats the exported <code>.fds</code> file as text. You export one file from the model you have spent six days building, replace the values that vary with placeholders, and let a script fill them in. PyroSim stays the authoring tool; the script only substitutes numbers into a file PyroSim wrote.</p>
+<p class="prose">The risk is that a generated file can be wrong in ways FDS does not object to, and Day 4 and Day 6 have shown you several. An obstruction too small for the mesh is rejected, and the guide is explicit that if at least two of the three obstruction dimensions are less than half of the corresponding cell dimensions, the obstruction is ignored. A vent must be a plane on a solid. Anything reaching past the mesh is cut off at the boundary. A device outside every mesh loses its column from the CSV with a console warning and nothing else. So the generator validates each variant before it writes a file, and refuses the ones that break those rules.</p>
+<p class="prose">This is the template the guide ships. Every value in double braces is filled by the script, and the sensors are identical to the reference case, so every run in a batch is measured in the same places.</p>
 <!--FDSBLOCK:iso9705_template-->
-
-  <p class="phase">Build</p>
-
-  <p class="prose">The first five steps are the Scenarios route, done in PyroSim on the office desktop. Do them once even if you plan to generate hundreds of runs later, because the BAT file that comes out tells you where FDS lives on that machine.</p>
-
-  <ol class="steps">
-    <li><div><p><span class="path">Toolbar › Edit Scenarios</span> — the <span class="ui">Scenarios</span> box on the main toolbar holds the active scenario drop-down and the <span class="ui">Edit Scenarios</span> button beside it. Click <span class="ui">New</span>, give the scenario a name in plain ASCII letters, and choose what it is <span class="ui">Based On</span>. Make two: one for the fire you already have, one for a second version of it.</p></div></li>
-    <li><div><p><span class="path">Navigation tree › right-click the burner vent › Copy/Move</span> — in the <span class="ui">Translate</span> dialog select <span class="ui">Copy</span> mode and click <span class="ui">OK</span> to duplicate it. Then create a second burner surface with a different heat release rate per area, using your existing surface as its template, and assign that surface to the copy. Nothing else in the model changes.</p></div></li>
-    <li><div><p><span class="path">Right-click a selected object › Disable Object(s)</span> — with the first scenario active, disable the copy. Switch scenarios with the toolbar drop-down and disable the original instead. A disabled object disappears from the 3D view and is struck through in the tree. <span class="ui">Enable/Disable Object(s) per Scenario</span> on the same context menu shows the whole picture at once.</p></div></li>
-    <li><div><p><span class="path">File › Export › Export Scenarios</span> — PyroSim writes one subfolder per scenario where the model file is saved, each holding that scenario's <code>.fds</code> file, plus a run file named <code>run_scenarios-&lt;model name&gt;.bat</code>. An Explorer window opens with it highlighted.</p></div></li>
-    <li><div><p><span class="path">Windows Explorer › the exported folder</span> — open the BAT file in a text editor before you run it. Its <code>SET PATH</code> lines name the FDS folder inside your PyroSim installation, and that path is the one to reuse in any batch you write yourself. The tutorials show older version numbers in it, so read yours rather than copying theirs. Then double-click the file to run the scenarios in sequence.</p></div></li>
-  </ol>
-
-  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The Edit Scenarios dialog open with two scenarios in the left-hand tree, the Scenario ID, Description and Disabled Objects fields filled on the right, and the toolbar active-scenario drop-down visible in the same frame.</p></div></div>
-
-  <p class="prose">The remaining steps are the template route. Copy the guide's <code>tools</code> and <code>cases</code> folders side by side into one local folder on the desktop, and run the commands from the folder that contains them both. The script finds the template by walking from its own location, so keeping those two folders together matters.</p>
-
-  <ol class="steps">
-    <li><div><p><span class="path">File › Export › FDS File</span> — enter a file name and click <span class="ui">Save</span>. PyroSim's note on this page is worth heeding: a string with non-ASCII characters is converted into a numeric hash in the FDS input file, which can make input files and CHIDs appear as numbers. Keep model and object names to plain letters, digits and underscores.</p></div></li>
-    <li><div><p><span class="path">Model view › Record View</span> — read the exported file against the template above. Model Records is a read-only exact copy of the file that will be input into the FDS simulator, so this is where you confirm which lines your own model writes for the burner, the door hole and the devices, and which values you would want a script to vary.</p></div></li>
-    <li><div><p><b>Generate the variants.</b> In a command prompt in that folder, run <code>python tools/make_scenarios.py --n 6 --seed 7 --cell 0.2 --t-end 1200 --out results/batch</code>. Use whatever command starts Python on that machine. It writes six <code>.fds</code> files and a <code>manifest.csv</code> into <code>results/batch</code>, and nothing else; the script uses the Python standard library only.</p></div></li>
-    <li><div><p><b>Read the manifest before you run anything.</b> Open <code>manifest.csv</code> and check one row by hand. The first variant of that seed is a 300 kW medium-growth fire with its burner corner at 2.4, 0.0 m and a 0.4 m door: a 0.6 × 0.6 m burner top is 0.36 m², and 300 kW ÷ 0.36 m² is the 833.3 kW/m² the manifest reports. Run the same command with the same seed again and you get byte-identical files, which is what makes a batch reproducible.</p></div></li>
-    <li><div><p><span class="path">File › Import FDS/CAD File</span> — take one generated file back into PyroSim and look at it in 3D. During import PyroSim checks the validity of each record and notifies you if errors are detected, so this is a second opinion on the geometry as well as a way to see where the burner landed. Import supports FDS versions 4, 5 and 6.</p></div></li>
-    <li><div><p><b>Run the batch.</b> Copy the pattern from your exported BAT: set the PATH to your PyroSim <code>fds</code> and <code>fds\mpi</code> folders, set <code>OMP_NUM_THREADS=1</code>, then run one FDS process per variant. The generator writes the six files flat into <code>results/batch</code> rather than one folder each, so either run them where they sit — the CHIDs differ, so no output collides — or move each into its own folder first, which is what the BAT's <code>PUSHD</code> lines do. Keep the files on a drive physically attached to the computer; the FDS guide warns that saving to a network share or a cloud-synced folder such as OneDrive can cause simulation failures.</p></div></li>
-    <li><div><p><b>Check every log before you believe the batch.</b> Search each run's log and <code>.out</code> file for the exact final line <code>STOP: FDS completed successfully</code>, and flag any line containing <code>ERROR(</code>, any <code>WARNING: DEVC</code>, and any unexpected <code>Pressure Zone Information</code>. The Watch out box below says why the exit status cannot do this job for you.</p></div></li>
-    <li><div><p><b>Convert one run to DATASET frames.</b> Run <code>python tools/fds_to_dataset.py results/batch/room_000_devc.csv -o results/batch/room_000_frames.csv</code>. On a machine that does not hold the DATASET research folder in its usual place, add <code>--no-risk</code>: without it the script stops with <code>FileNotFoundError</code> naming <code>dataset_fuzzy_fis.py</code>, because it loads the project's fuzzy index to score each frame. With <code>--no-risk</code> the contract channels still come out, and the scoring can be done later on the machine that has the research folder.</p></div></li>
-  </ol>
-
-  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The Explorer window that Export Scenarios opens: one subfolder per scenario and the run_scenarios BAT file, with the folder path and the file name readable.</p></div></div>
-
-  <h3>What the two scripts do, and what they refuse</h3>
-
-  <p class="prose"><code>make_scenarios.py</code> varies four things a real room fire varies: the peak heat release rate, chosen from 100, 200, 300, 500, 750 and 1000 kW; the growth class, one of the four standard t-squared curves, slow, medium, fast and ultra-fast, which reach about 1054 kW in 600, 300, 150 and 75 s; the burner's position anywhere on the floor grid; and the door width from 0.4 m to 1.2 m. A bigger fire is drawn as a wider burner rather than a hotter one, aiming at roughly 1000 kW/m², and the growth class plus the peak become a negative <code>TAU_Q</code> — for that first variant, −160.0 s.</p>
-
-  <p class="prose">It refuses more than it accepts, which is the point. A variant is rejected if the burner corner or either door edge is off the cell grid, if the burner reaches outside the room or through the front wall, if the peak falls outside 50 to 2000 kW, or if the burner would sit on top of the floor heat-flux gauge at 1.85, 1.25 m or the layer-height line at 3.25, 2.15 m. The last of those is the one a person would miss: the file would run to completion and quietly return a floor flux measured through the burner.</p>
-
-  <div class="check"><h4>What the conversion exposed</h4>
-    <p class="prose">Running the converter on the reference run turned up something worth carrying back to the project, and it is not a fault in either the simulation or the script. The fuzzy index reads smoke as percentage obscuration per metre on a 0 to 20 scale, and its top band, Dense, is fully reached at 13 %/m. That is a detector's scale: spot-type smoke detectors alarm somewhere between about 1.6 and 13 %/m. A real ceiling in a real room fire goes far past it. In the reference run the optical density at the ceiling node reaches 0.33 per metre within a minute, which is 53 %/m, and 0.56 per metre by the end, which is 72 %/m. The index saturates at an optical density of about 0.06 per metre.</p>
-    <p class="prose">Above that point the smoke channel carries no information: only temperature and CO can still move the score. That is why almost every frame of the reference run comes back as Emergency once the fire is properly alight. For detection, which is what the index was built for, saturating is the correct behaviour. For training a model to forecast how bad a fire is about to get, a channel that is pinned to its maximum for nineteen of twenty minutes is a channel the model cannot learn from. Train on <code>optical_density</code> itself, which is what the wire contract asks for, and treat the index as a label rather than an input.</p>
-  </div>
-
-  <p class="prose"><code>fds_to_dataset.py</code> reads the two header rows FDS writes, units then device names, keeps the row nearest each five-second mark, and emits one row per zone per frame: <code>time_s</code>, <code>zone</code>, the three contract channels, and visibility and FED alongside them as tenability labels. It converts optical density to percentage obscuration per metre for the fuzzy index only, because that index reads smoke in the other unit, and it scales a CO device that arrives as <code>mol/mol</code> into ppm rather than trusting the column name.</p>
-
-  <p class="phase">Check</p>
-
-  <div class="check"><h4>Check your result</h4><p class="prose">Open the converted file and check four things. The first row is at <code>0.0</code> seconds. The spacing between frames is exactly 5.0 s, with no gaps. There are two rows per frame, one for each sensor node. And for a 1200-second run there are 241 frames per zone, which is 1200 ÷ 5 plus the frame at zero; anything less means rows were dropped or the run ended early. Then look at the <code>co_ppm</code> column: it should read in tens or hundreds, not as a fraction like 0.00006, which would mean a volume fraction reached the file without being scaled.</p></div>
-
-  <p class="prose">Converting the guide's own reference run is the quickest way to see that the numbers survive the trip. Sensor node S1 in that 20 cm run gives these frames, and they are the same values the reference table quotes, arriving in the contract's units:</p>
-
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Frame</th><th class="num">co_ppm</th><th class="num">Visibility</th></tr></thead>
-      <tbody>
-        <tr><td><b>60 s</b></td><td class="num">22 ppm</td><td class="num">4.8 m</td></tr>
-        <tr><td><b>300 s</b></td><td class="num">25 ppm</td><td class="num">5.2 m</td></tr>
-        <tr><td><b>620 s</b></td><td class="num">53 ppm</td><td class="num">3.0 m</td></tr>
-        <tr><td><b>900 s</b></td><td class="num">58 ppm</td><td class="num">2.9 m</td></tr>
-        <tr><td><b>1195 s</b></td><td class="num">61 ppm</td><td class="num">3.1 m</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">Measured from the 20 cm reference run, which is coarser than the mesh Day 6 argues for. The converted file also carries FED, which is a dose that accumulates rather than a reading: it reaches 0.03 at 900 s and 0.04 at 1195 s in this run. Carry it as a label, not as a result this coarse run establishes.</p>
-
-  <div class="watch"><h4>Watch out</h4><p class="prose">FDS returns an exit status of 0 even when it has failed. On this project's Mac the binary returned 0 after every set-up error and after a run-time error, and PyroSim's own launcher logs a subprocess exit of 0 after a numerical instability. A batch script that tests the exit status will therefore report a clean sweep over runs that produced nothing. The only reliable test is the text: the final line <code>STOP: FDS completed successfully</code>. Add to it a search for <code>ERROR(</code> and for <code>WARNING: DEVC</code>, because a device outside the mesh costs you a channel in every run of the batch and says so only once, on the console.</p></div>
-
-  <p class="prose">One more failure is specific to batches: the name. The FDS guide states that it will over-write the output files of a given case if its assigned name is the same, and that the job name must contain no blank spaces. A period in the CHID is rejected outright with <code>ERROR(108)</code>, so a variant called <code>hrr_0.5MW</code> never starts. Give every variant its own CHID — the generator uses <code>room_000</code> upwards — or the second run quietly erases the first.</p>
-
-  <h3>What a batch costs, and what published work actually used</h3>
-
-  <p class="prose">Run one case before you queue fifty. The FDS guide's advice is to run your job for a short amount of time to estimate the time required for the full job, and setting <code>T_END</code> to zero performs only the set-up work so you can check the geometry in Smokeview for the price of a few seconds.</p>
-
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Job</th><th class="num">Cost</th><th>Measured or derived</th></tr></thead>
-      <tbody>
-        <tr><td><b>One 20 cm, 1200 s ISO 9705 case</b></td><td class="num">about 2.5 h</td><td>Measured on this project's MacBook Air: 8868 s of wall clock with 2 MPI processes</td></tr>
-        <tr><td><b>Today's six variants in sequence</b></td><td class="num">about 15 h</td><td>Arithmetic on the row above, on that same machine</td></tr>
-        <tr><td><b>The same room at 10 cm</b></td><td class="num">roughly 16×</td><td>Thunderhead: refining the mesh by a factor of two results in approximately a factor of 16 increase in run time</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">None of those numbers describe the office desktop. NIST's macOS build of FDS is compiled for x86-64 and runs under Rosetta on this Apple silicon machine, so these are upper bounds on unfamiliar hardware. Measure your own with a short pilot run before you plan a campaign. Where you do have cores to spare, Thunderhead's own advice for many small jobs is that you may get more total work finished faster by running several simultaneous small cases on the same cores than by running each one after the other, so run a few single-mesh variants side by side with <code>OMP_NUM_THREADS=1</code> rather than giving one case everything.</p>
-
-  <p class="prose">It helps to know what published work in this field ran, because two of the famous numbers are not FDS numbers at all.</p>
-
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Study</th><th class="num">Cases</th><th>Engine and cost</th></tr></thead>
-      <tbody>
-        <tr><td><b>P-Flash, Wang et al. 2021</b></td><td class="num">1 000</td><td>CFAST, a two-zone model, not CFD. The paper's own convergence check found flashover prediction stopped improving at about 1000 cases</td></tr>
-        <tr><td><b>FlashNet, Tam et al. 2022</b></td><td class="num">78 000</td><td>CFAST again, on about 250 cluster nodes over roughly two weeks</td></tr>
-        <tr><td><b>Su et al. 2021</b></td><td class="num">280</td><td>FDS. 15 to 48 h per atrium case on about 32 cores</td></tr>
-        <tr><td><b>Fang et al. 2025</b></td><td class="num">480</td><td>FDS, sampled by Latin hypercube across 24 rooms of origin</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">The pattern is the one to carry into any plan you write: the tens of thousands of cases belong to zone models, which solve two well-mixed layers per room in seconds, and the CFD campaigns are in the hundreds. Whatever you promise a supervisor, promise it in hundreds of FDS cases and a sampler, not in tens of thousands.</p>
-
-  <h3>The honest limit of what you built today</h3>
-
-  <p class="prose">This is a pipeline rehearsal, and it is worth saying so in writing before anyone mistakes it for a corpus. One ISO 9705 room is one compartment. The two nodes in it, S1 and S2, are two positions in the same volume, not two zones connected by a door, so nothing here exercises the adjacency graph the forecaster consumes, and nothing here can support a claim about transferring between buildings — that needs whole buildings held out of training. The occupancy channel is absent by design, because a crowd simulator owns it. What you have proved is that the contract can be met end to end: geometry that validates, runs whose success was tested rather than assumed, and frames in the right channels, units and spacing, with a manifest saying which parameters produced each one.</p>
-
-  <p class="prose">The next step is not more runs of this room. It is a second compartment and a doorway between them, so that a zone graph exists at all, and a design-fire source for the peak heat release rates rather than a range borrowed from residential studies. Both are decisions for the project, not for the simulator.</p>
-
-  <div class="quiz">
-    <details class="q"><summary><span class="qt">FDS can write device output every 5 s directly. Why does this guide write it every 1 s and keep every fifth row?</span></summary><div class="qa"><p class="prose">Two reasons. FDS time-averages device output between printouts by default, so output written at 5 s gives five-second averages, and DATASET forbids averaging because it low-passes exactly the rate of rise the forecaster exists to see. Decimating a 1 s series narrows that averaging window to one second and leaves the 1 s data on disk. Narrowing is not removing, though, so every case in this guide goes further: each training channel carries <code>TEMPORAL_STATISTIC='INSTANT VALUE'</code>, which turns the averaging off outright. Check it in any batch run's <code>.out</code> file by searching for <code>TEMPORAL STATISTIC</code>.</p></div></details>
-    <details class="q"><summary><span class="qt">You want 24 variants that differ in peak heat release rate, growth rate, burner position and door width. Why are PyroSim Scenarios the wrong tool, and what do you use instead?</span></summary><div class="qa"><p class="prose">A scenario only enables and disables objects. Changing a parameter means duplicating the object, editing the duplicate and disabling the original in that scenario, so every changed number adds objects to keep consistent across all 24. Export one FDS file instead, turn it into a template, and let a script fill and validate the values. Scenarios remain the right tool for five or ten hand-made variants, and their Export Scenarios BAT is still a good model for the batch runner.</p></div></details>
-    <details class="q"><summary><span class="qt">Your batch of 40 runs finished overnight and every process returned exit status 0. Why is that not evidence of anything, and what do you check instead?</span></summary><div class="qa"><p class="prose">FDS returns 0 after set-up errors and after run-time errors alike, so the status says only that the program ended. Search each log for the final line STOP: FDS completed successfully, and flag any ERROR(, any WARNING: DEVC line, and any unexpected Pressure Zone Information, which is how a sealed room announces itself.</p></div></details>
-    <details class="q"><summary><span class="qt">Two variants in a batch were written with the same CHID. What do you find afterwards?</span></summary><div class="qa"><p class="prose">One set of results. FDS over-writes the output files of a case whose assigned name is the same, so the second run erases the first and both entries in your manifest point at the survivor. Give every variant its own CHID, with no spaces and no periods — a period stops the run with ERROR(108).</p></div></details>
-    <details class="q"><summary><span class="qt">Name two claims this one-room dataset cannot support, however many variants you generate.</span></summary><div class="qa"><p class="prose">Anything about the zone graph, because one compartment has no adjacency and the two nodes are positions in the same volume; and anything about transferring to an unseen building, which needs whole buildings held out of training. It also carries no occupancy channel, since a crowd simulator owns that one.</p></div></details>
-  </div>
-
-  <div class="done-row"><input type="checkbox" id="done-day7" data-done="day7"><label for="done-day7">Day 7 done</label></div>
+<p class="phase">Build</p>
+<p class="prose">The first five steps are the Scenarios route, done in PyroSim on the Windows computer. Do them once even if you plan to generate hundreds of runs later, because the BAT file that comes out tells you where FDS lives on that machine.</p>
+<ol class="steps">
+<li><div><p><span class="path">Toolbar › Edit Scenarios</span> — the <span class="ui">Scenarios</span> box on the main toolbar holds the active scenario drop-down and the <span class="ui">Edit Scenarios</span> button beside it. Click <span class="ui">New</span>, give the scenario a name in plain ASCII letters, and choose what it is <span class="ui">Based On</span>. Make two: one for the fire you already have, one for a second version of it.</p></div></li>
+<li><div><p><span class="path">Navigation tree › right-click the burner vent › Copy/Move</span> — in the <span class="ui">Translate</span> dialog select <span class="ui">Copy</span> mode and click <span class="ui">OK</span> to duplicate it. Then create a second burner surface with a different heat release rate per area, using your existing surface as its template, and assign that surface to the copy. Nothing else in the model changes.</p></div></li>
+<li><div><p><span class="path">Right-click a selected object › Disable Object(s)</span> — with the first scenario active, disable the copy. Switch scenarios with the toolbar drop-down and disable the original instead. A disabled object disappears from the 3D view and is struck through in the tree. <span class="ui">Enable/Disable Object(s) per Scenario</span> on the same context menu shows the whole picture at once.</p></div></li>
+<li><div><p><span class="path">File › Export › Export Scenarios</span> — PyroSim writes one subfolder per scenario where the model file is saved, each holding that scenario's <code>.fds</code> file, plus a run file named <code>run_scenarios-&lt;model name&gt;.bat</code>. An Explorer window opens with it highlighted.</p></div></li>
+<li><div><p><span class="path">Windows Explorer › the exported folder</span> — open the BAT file in a text editor before you run it. Its <code>SET PATH</code> lines name the FDS folder inside your PyroSim installation, and that path is the one to reuse in any batch you write yourself. The tutorials show older version numbers in it, so read yours rather than copying theirs. Then double-click the file to run the scenarios in sequence.</p></div></li>
+</ol>
+<div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The Edit Scenarios dialog open with two scenarios in the left-hand tree, the Scenario ID, Description and Disabled Objects fields filled on the right, and the toolbar active-scenario drop-down visible in the same frame.</p></div></div>
+<p class="prose">The remaining steps are the template route. Copy the guide's <code>tools</code> and <code>cases</code> folders side by side into one local folder on the desktop, and run the commands from the folder that contains them both. The script finds the template by walking from its own location, so keeping those two folders together matters.</p>
+<ol class="steps">
+<li><div><p><span class="path">File › Export › FDS File</span> — enter a file name and click <span class="ui">Save</span>. PyroSim's note on this page is worth heeding: a string with non-ASCII characters is converted into a numeric hash in the FDS input file, which can make input files and CHIDs appear as numbers. Keep model and object names to plain letters, digits and underscores.</p></div></li>
+<li><div><p><span class="path">Model view › Record View</span> — read the exported file against the template above. Model Records is a read-only exact copy of the file that will be input into the FDS simulator, so this is where you confirm which lines your own model writes for the burner, the door hole and the devices, and which values you would want a script to vary.</p></div></li>
+<li><div><p><b>Generate the variants.</b> In a command prompt in that folder, run <code>python tools/make_scenarios.py --n 6 --seed 7 --cell 0.2 --t-end 1200 --out results/batch</code>. Use whatever command starts Python on that machine. It writes six <code>.fds</code> files and a <code>manifest.csv</code> into <code>results/batch</code>, and nothing else; the script uses the Python standard library only.</p></div></li>
+<li><div><p><b>Read the manifest before you run anything.</b> Open <code>manifest.csv</code> and check one row by hand. The first variant of that seed is a 300 kW medium-growth fire with its burner corner at 2.4, 0.0 m and a 0.4 m door: a 0.6 × 0.6 m burner top is 0.36 m², and 300 kW ÷ 0.36 m² is the 833.3 kW/m² the manifest reports. Run the same command with the same seed again and you get byte-identical files, which is what makes a batch reproducible.</p></div></li>
+<li><div><p><span class="path">File › Import FDS/CAD File</span> — take one generated file back into PyroSim and look at it in 3D. During import PyroSim checks the validity of each record and notifies you if errors are detected, so this is a second opinion on the geometry as well as a way to see where the burner landed. Import supports FDS versions 4, 5 and 6.</p></div></li>
+<li><div><p><b>Run the batch.</b> Copy the pattern from your exported BAT: set the PATH to your PyroSim <code>fds</code> and <code>fds\mpi</code> folders, set <code>OMP_NUM_THREADS=1</code>, then run one FDS process per variant. The generator writes the six files flat into <code>results/batch</code> rather than one folder each, so either run them where they sit — the CHIDs differ, so no output collides — or move each into its own folder first, which is what the BAT's <code>PUSHD</code> lines do. Keep the files on a drive physically attached to the computer; the FDS guide warns that saving to a network share or a cloud-synced folder such as OneDrive can cause simulation failures.</p></div></li>
+<li><div><p><b>Check every log before you believe the batch.</b> Search each run's log and <code>.out</code> file for the exact final line <code>STOP: FDS completed successfully</code>, and flag any line containing <code>ERROR(</code>, any <code>WARNING: DEVC</code>, and any unexpected <code>Pressure Zone Information</code>. The Watch out box below says why the exit status cannot do this job for you.</p></div></li>
+<li><div><p><b>Convert one run to sensor frames.</b> Run <code>python tools/fds_to_dataset.py results/batch/room_000_devc.csv -o results/batch/room_000_frames.csv</code>. The standard-library exporter writes raw readings and validates sampling and CO units; it assigns no risk or safety labels.</p></div></li>
+</ol>
+<div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The Explorer window that Export Scenarios opens: one subfolder per scenario and the run_scenarios BAT file, with the folder path and the file name readable.</p></div></div>
+<h3>What the two scripts do, and what they refuse</h3>
+<p class="prose"><code>make_scenarios.py</code> varies four things a real room fire varies: the peak heat release rate, chosen from 100, 200, 300, 500, 750 and 1000 kW; the growth class, one of the four standard t-squared curves, slow, medium, fast and ultra-fast, which reach about 1054 kW in 600, 300, 150 and 75 s; the burner's position anywhere on the floor grid; and the door width from 0.4 m to 1.2 m. A bigger fire is drawn as a wider burner rather than a hotter one, aiming at roughly 1000 kW/m², and the growth class plus the peak become a negative <code>TAU_Q</code> — for that first variant, −160.0 s.</p>
+<p class="prose">It refuses more than it accepts, which is the point. A variant is rejected if the burner corner or either door edge is off the cell grid, if the burner reaches outside the room or through the front wall, if the peak falls outside 50 to 2000 kW, or if the burner would sit on top of the floor heat-flux gauge at 1.85, 1.25 m or the layer-height line at 3.25, 2.15 m. The last of those is the one a person would miss: the file would run to completion and quietly return a floor flux measured through the burner.</p>
+<p class="prose"><code>fds_to_dataset.py</code> reads units and device names from the two FDS header rows. It keeps the reading nearest each five-second mark and emits <code>time_s</code>, <code>zone</code>, <code>temperature_c</code>, <code>optical_density</code>, <code>co_ppm</code>, <code>visibility_m</code> and <code>fed</code>. CO is converted from ppm, mol/mol or %; unknown units, gaps and non-finite values are rejected.</p>
+<p class="phase">Check</p>
+<div class="check"><h4>Check your result</h4><p class="prose">Open the converted file and check four things. The first row is at <code>0.0</code> seconds. The spacing between frames is exactly 5.0 s, with no gaps. There are two rows per frame, one for each sensor node. And for a 1200-second run there are 241 frames per zone, which is 1200 ÷ 5 plus the frame at zero; anything less means rows were dropped or the run ended early. Then look at the <code>co_ppm</code> column: it should read in tens or hundreds, not as a fraction like 0.00006, which would mean a volume fraction reached the file without being scaled.</p></div>
+<p class="prose">Converting the guide's own reference run is the quickest way to see that the numbers survive the trip. Sensor node S1 in that 20 cm run gives these frames, and they are the same values the reference table quotes, arriving in the contract's units:</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Frame</th><th class="num">co_ppm</th><th class="num">Visibility</th></tr></thead>
+<tbody>
+<tr><td><b>60 s</b></td><td class="num">22 ppm</td><td class="num">4.8 m</td></tr>
+<tr><td><b>300 s</b></td><td class="num">25 ppm</td><td class="num">5.2 m</td></tr>
+<tr><td><b>620 s</b></td><td class="num">53 ppm</td><td class="num">3.0 m</td></tr>
+<tr><td><b>900 s</b></td><td class="num">58 ppm</td><td class="num">2.9 m</td></tr>
+<tr><td><b>1195 s</b></td><td class="num">61 ppm</td><td class="num">3.1 m</td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose">Measured from the 20 cm reference run, which is coarser than the mesh Day 6 argues for. The converted file also carries FED, which is a dose that accumulates rather than a reading: it reaches 0.03 at 900 s and 0.04 at 1195 s in this run. Carry it as a label, not as a result this coarse run establishes.</p>
+<div class="watch"><h4>Watch out</h4><p class="prose">FDS returns an exit status of 0 even when it has failed. On the historical reference environment the binary returned 0 after every set-up error and after a run-time error, and PyroSim's own launcher logs a subprocess exit of 0 after a numerical instability. A batch script that tests the exit status will therefore report a clean sweep over runs that produced nothing. The only reliable test is the text: the final line <code>STOP: FDS completed successfully</code>. Add to it a search for <code>ERROR(</code> and for <code>WARNING: DEVC</code>, because a device outside the mesh costs you a channel in every run of the batch and says so only once, on the console.</p></div>
+<p class="prose">One more failure is specific to batches: the name. The FDS guide states that it will over-write the output files of a given case if its assigned name is the same, and that the job name must contain no blank spaces. A period in the CHID is rejected outright with <code>ERROR(108)</code>, so a variant called <code>hrr_0.5MW</code> never starts. Give every variant its own CHID — the generator uses <code>room_000</code> upwards — or the second run quietly erases the first.</p>
+<h3>What a batch costs, and what published work actually used</h3>
+<p class="prose">Run one case before you queue fifty. The FDS guide's advice is to run your job for a short amount of time to estimate the time required for the full job, and setting <code>T_END</code> to zero performs only the set-up work so you can check the geometry in Smokeview for the price of a few seconds.</p>
+<p class="prose">Historical timings are illustrative and do not predict your computer. Measure a short pilot run before planning a batch. Several small cases may use available cores more effectively than assigning every core to one case; compare both options locally.</p>
+<p class="prose">It helps to know what published work in this field ran, because two of the famous numbers are not FDS numbers at all.</p>
+<div class="scroll">
+<table>
+<thead><tr><th>Study</th><th class="num">Cases</th><th>Engine and cost</th></tr></thead>
+<tbody>
+<tr><td><b>P-Flash, Wang et al. 2021</b></td><td class="num">1 000</td><td>CFAST, a two-zone model, not CFD. The paper's own convergence check found flashover prediction stopped improving at about 1000 cases</td></tr>
+<tr><td><b>FlashNet, Tam et al. 2022</b></td><td class="num">78 000</td><td>CFAST again, on about 250 cluster nodes over roughly two weeks</td></tr>
+<tr><td><b>Su et al. 2021</b></td><td class="num">280</td><td>FDS. 15 to 48 h per atrium case on about 32 cores</td></tr>
+<tr><td><b>Fang et al. 2025</b></td><td class="num">480</td><td>FDS, sampled by Latin hypercube across 24 rooms of origin</td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose">The pattern is the one to carry into any plan you write: the tens of thousands of cases belong to zone models, which solve two well-mixed layers per room in seconds, and the CFD campaigns are in the hundreds. Whatever you promise a supervisor, promise it in hundreds of FDS cases and a sampler, not in tens of thousands.</p>
+<h3>The honest limit of what you built today</h3>
+<p class="prose">This is an educational pipeline rehearsal. S1 and S2 are two sensor positions in one room, not connected compartments. These cases establish neither transfer to unseen buildings nor an evacuation or safety assessment. Validate any scientific application independently.</p>
+<p class="prose">The next step is not more runs of this room. It is a second compartment and a doorway between them, so that a zone graph exists at all, and a design-fire source for the peak heat release rates rather than a range borrowed from residential studies. Both are decisions for the project, not for the simulator.</p>
+<div class="quiz">
+<details class="q"><summary><span class="qt">FDS can write device output every 5 s directly. Why does this guide write it every 1 s and keep every fifth row?</span></summary><div class="qa"><p class="prose">FDS time-averages device output by default. Select every fifth 1 s row to keep a five-second sequence without additional smoothing, and set <code>TEMPORAL_STATISTIC='INSTANT VALUE'</code> on sensor channels to prevent solver averaging. Confirm the setting in the <code>.out</code> file.</p></div></details>
+<details class="q"><summary><span class="qt">You want 24 variants that differ in peak heat release rate, growth rate, burner position and door width. Why are PyroSim Scenarios the wrong tool, and what do you use instead?</span></summary><div class="qa"><p class="prose">A scenario only enables and disables objects. Changing a parameter means duplicating the object, editing the duplicate and disabling the original in that scenario, so every changed number adds objects to keep consistent across all 24. Export one FDS file instead, turn it into a template, and let a script fill and validate the values. Scenarios remain the right tool for five or ten hand-made variants, and their Export Scenarios BAT is still a good model for the batch runner.</p></div></details>
+<details class="q"><summary><span class="qt">Your batch of 40 runs finished overnight and every process returned exit status 0. Why is that not evidence of anything, and what do you check instead?</span></summary><div class="qa"><p class="prose">FDS returns 0 after set-up errors and after run-time errors alike, so the status says only that the program ended. Search each log for the final line STOP: FDS completed successfully, and flag any ERROR(, any WARNING: DEVC line, and any unexpected Pressure Zone Information, which is how a sealed room announces itself.</p></div></details>
+<details class="q"><summary><span class="qt">Two variants in a batch were written with the same CHID. What do you find afterwards?</span></summary><div class="qa"><p class="prose">One set of results. FDS over-writes the output files of a case whose assigned name is the same, so the second run erases the first and both entries in your manifest point at the survivor. Give every variant its own CHID, with no spaces and no periods — a period stops the run with ERROR(108).</p></div></details>
+<details class="q"><summary><span class="qt">Name two claims this one-room dataset cannot support, however many variants you generate.</span></summary><div class="qa"><p class="prose">Anything about the zone graph, because one compartment has no adjacency and the two nodes are positions in the same volume; and anything about transferring to an unseen building, which needs whole buildings held out of training. It also carries no occupancy channel, since a crowd simulator owns that one.</p></div></details>
+</div>
+<div class="done-row"><input data-done="day7" id="done-day7" type="checkbox"/><label for="done-day7">Day 7 done</label></div>
 </section>

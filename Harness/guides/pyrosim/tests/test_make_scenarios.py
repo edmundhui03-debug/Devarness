@@ -69,7 +69,7 @@ def test_a_rendered_scenario_measures_exactly_where_the_reference_does():
 
 def test_every_training_channel_samples_instantaneously():
     # FDS reports a device as a TIME AVERAGE over the output interval unless
-    # told otherwise. DATASET decimates precisely so that nothing is averaged,
+    # told otherwise. The exporter decimates precisely so that nothing is averaged,
     # so an averaged channel would be averaged twice.
     training = [f"{z}_{q}" for z in ("S1", "S2") for q in ("T", "CO", "OD", "VIS", "O2", "CO2")]
     for text, where in ((ms.render(TEMPLATE, scenario()), "template"), (REFERENCE, "reference")):
@@ -122,7 +122,7 @@ def test_cli_writes_cases_and_a_manifest(tmp_path):
     assert "T_END=300.0" in (tmp_path / "room_000.fds").read_text()
 
 
-# --- Regression from Aster's review, 2026-09-13 ------------------------------
+# --- Unsupported geometry regression --------------------------------------
 
 def test_an_unsupported_cell_size_is_refused_by_the_api_not_just_the_cli():
     # At 0.05 m the one-decimal coordinates silently move the burner and the

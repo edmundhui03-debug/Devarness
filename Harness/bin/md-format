@@ -80,8 +80,8 @@ def separate_projects() -> tuple[str, ...]:
 
     Nested projects with their own remotes and their own conventions. The house
     format binds dev; it does not reach across into the owner's separate work.
-    The list lived here until 2026-09-17 and still said Self Learning two days
-    after the rename to Research, so check reported 1,223 of Research's problems.
+    Read the shared list rather than duplicating it, so renamed or newly
+    separated projects do not inherit another workspace's formatting rules.
     """
     record = ROOT / 'Harness/separate-projects.txt'
     try:

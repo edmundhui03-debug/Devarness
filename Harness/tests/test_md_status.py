@@ -3,10 +3,9 @@
 
 Run: python3 Harness/tests/test_md_status.py
 
-The prompt hook asks for this index on every prompt. On 2026-09-22, the day after
-Research, DATASET and SAMPLE_FIRMWARE tripled the documents, parsing 1,134 of them took 1.7
-seconds each time and the hook had gone from 0.52 s a prompt to 4.1 s. The memo
-keeps one file's marked sections until that file changes. It is opt-in: a plain
+The prompt hook asks for this index on every prompt. Repeatedly parsing unchanged
+documents adds avoidable work. The memo keeps one file's marked sections until
+that file changes. It is opt-in: a plain
 `md-format status` writes nothing, which is what "read-only" has always meant here.
 """
 import json
@@ -106,10 +105,8 @@ class MemoTests(unittest.TestCase):
                 self.assertEqual(self.status("--memo", str(self.memo)), plain)
 
     def test_a_tracked_file_that_is_absent_on_this_device_is_counted_not_fatal(self):
-        # Ten tracked .md files are symlinks into the Understand-Anything runtime,
-        # which a fresh clone has not built. On 2026-09-22 the first of them stopped
-        # `md-format status` with a traceback in a worktree — and would on a new device
-        # until its bootstrap finished. The index says how many it could not read.
+        # A tracked Markdown symlink may target an optional runtime that a fresh
+        # clone has not built. The index must count absent targets without failing.
         (self.docs / "gone.md").symlink_to(self.docs / "runtime-not-built" / "gone.md")
         data = self.status()
         self.assertEqual(self.headings(data), ["The first thing waits", "The second thing waits"])

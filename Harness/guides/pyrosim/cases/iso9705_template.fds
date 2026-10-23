@@ -2,9 +2,9 @@
 
  PyroSim 7-day guide - Day 7 template. Every training channel carries
  TEMPORAL_STATISTIC='INSTANT VALUE'. FDS otherwise averages a device over each
- output interval, and the DATASET contract takes its 5 s frames by decimation
+ output interval, and the educational exporter takes its 5 s frames by decimation
  precisely so that nothing is averaged: averaging twice low-passes the rate of
- rise the forecaster exists to see. FED keeps its running time integral, which
+ rise in raw sensor readings. FED keeps its running time integral, which
  is what that quantity means.
 
  make_scenarios.py fills every

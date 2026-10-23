@@ -1,8 +1,8 @@
 """Assemble PyroSim_7Day_Guide.html from the site partials, the case files and the charts.
 
-The FDS listings are copied from cases/*.fds at build time and the charts from
-results/charts/*.html, so the page can never show a case or a number that has
-drifted from the files that were actually run. After building, run i18n
+The FDS listings are copied from cases/*.fds at build time. Historical chart
+inputs are not distributed; the public build marks those missing plots rather
+than reading private run folders. After building, run i18n
 extract / inject / check on the output; its keys are content hashes, so a
 rebuild keeps every translation whose English did not change.
 
@@ -30,7 +30,7 @@ CASE_NOTE = {
 
 def fds_source(name: str) -> str:
     """The case text, carried once in a non-executing block the page reads."""
-    text = (ROOT / "cases" / f"{name}.fds").read_text()
+    text = (ROOT / "cases" / f"{name}.fds").read_text(encoding="utf-8")
     if "</script" in text.lower():
         raise ValueError(f"{name}.fds contains '</script', which would end the block early")
     return f'<script type="text/plain" id="src-{name}">\n{text}</script>'
@@ -40,7 +40,7 @@ def fds_listing(name: str) -> str:
     """The visible listing: a bar with copy and save, and the highlighted text."""
     if name not in CASE_NOTE:
         raise ValueError(f"unknown case {name}")
-    lines = (ROOT / "cases" / f"{name}.fds").read_text().count("\n")
+    lines = (ROOT / "cases" / f"{name}.fds").read_text(encoding="utf-8").count("\n")
     return (f'<div class="listing">\n'
             f'  <div class="listing-bar">\n'
             f'    <span class="listing-name">{name}.fds</span>\n'
@@ -58,16 +58,15 @@ def render(text: str, depth: int = 0) -> str:
         raise RecursionError("includes nested too deeply")
 
     def include(m):
-        return render((SITE / "parts" / m.group(1)).read_text(), depth + 1)
+        return render((SITE / "parts" / m.group(1)).read_text(encoding="utf-8"), depth + 1)
 
     def inline(m):
-        return (SITE / m.group(1)).read_text()
+        return (SITE / m.group(1)).read_text(encoding="utf-8")
 
     def chart(m):
-        path = ROOT / "results" / "charts" / f"{m.group(1)}.html"
-        if not path.exists():
-            raise FileNotFoundError(f"chart {path.name} has not been generated; run results/make_charts.py")
-        return path.read_text()
+        return ('<p class="note">Historical chart not included in this source checkout. '
+                'Rerun the public case files to plot your own results; the reference '
+                'tables retain illustrative measurements, not a current validation.</p>')
 
     text = re.sub(r"<!--INCLUDE:([\w.-]+)-->", include, text)
     text = re.sub(r"/\*INLINE:([\w.-]+)\*/", inline, text)
@@ -78,12 +77,12 @@ def render(text: str, depth: int = 0) -> str:
 
 
 def main() -> int:
-    page = render((SITE / "page.html").read_text())
+    page = render((SITE / "page.html").read_text(encoding="utf-8"))
     leftovers = re.findall(r"<!--(?:INCLUDE|CHART|FDS|FDSBLOCK):[^>]*-->|/\*INLINE:[^*]*\*/", page)
     if leftovers:
         print("unresolved markers:", leftovers, file=sys.stderr)
         return 1
-    OUT.write_text(page)
+    OUT.write_text(page, encoding="utf-8")
     print(f"wrote {OUT.name}: {len(page):,} bytes")
     return 0
 

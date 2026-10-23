@@ -6,9 +6,9 @@
   rea doctor --provider ghidra --json
   rea inspect <file> --provider ghidra --format json
 
-It builds the environment from dev-work/reverse/RECIPE.md section 4 (GHIDRA_INSTALL_DIR, JAVA_HOME,
+It builds the child environment with GHIDRA_INSTALL_DIR, JAVA_HOME,
 REA_ANALYSIS_PROVIDER=ghidra, PATH with the local Node, the JDK bin and Ghidra support prepended for
-the child only, npm cache inside Harness/.runtime) and runs
+the child only, and npm cache inside Harness/.runtime. It runs
 `node Harness/.runtime/rea/node_modules/rea-agents/scripts/rea.mjs <args>` with inherited stdio,
 returning the child's exit code. It prints NOTHING to its own stdout (MCP speaks over stdout). If the
 runtime is not installed it prints one line to stderr naming the installer and exits 3.

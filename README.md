@@ -91,16 +91,20 @@ Budget each run explicitly, including a composed rerun: four runs capped at
 USD 1 each give a USD 4 planned maximum. Check reported spend after every run.
 `delivered` records CLI completion; inspect the artifact for task acceptance.
 
-Use this as a GitHub template or clone it beside your projects. Local
-project folders, book collections, task records, review boxes, runtime
-state and credential files are ignored. `tools/release_check.py` checks
-tracked files and Git history before publication. Do not rely only on
-ignore rules or a scanner to identify private content.
+Use this as a GitHub template or clone it beside your projects. Local project
+folders, book collections, task records, review boxes, runtime state and
+credential files are ignored. `tools/release_check.py` checks current index
+blobs and modified working files for credentials, personal home paths and email
+addresses, and checks reachable history for credentials. It also rejects local
+recall caches and updater locks/logs, even if force-staged. It reads no personal
+configuration. Review project examples and provenance before publication too;
+generic patterns cannot recognize every private fact.
 
 See docs/ARCHITECTURE.md for integration boundaries, docs/TOOLS.md for
 the tool catalogue, docs/ADAPTATION.md for scope and verification, and
-THIRD_PARTY.md for attribution. Legacy device-completeness tests require
-a full optional installation and are separate from the portable core.
+THIRD_PARTY.md for attribution. The legacy new-device checker still expects
+the earlier full-install shell bootstrap; use the portable core checks above.
+Its compatibility work is tracked in docs/PLAN.md.
 
 The public harness's current work and verification are tracked in
 [docs/PLAN.md](docs/PLAN.md). Personal dashboards and their local state

@@ -20,9 +20,9 @@
 
 ## The 18 core rules come from these books and fold in these rules
 
-The skill states each rule in full. The IDs are the study's, and `docs/ADAPTATION.md` holds each with its cite, its page
-and its relation to Ponytail. A page number is the PDF's page index, not the
-printed folio.
+The skill states each core rule in full. The IDs retain the study's grouping;
+book titles and page references supply bibliographic attribution. A page
+number is the PDF's page index, not the printed folio.
 
 | # | Primary | Folded in | Checks |
 | --- | --- | --- | --- |
@@ -117,12 +117,11 @@ as support.
 
 ## Ten pairs of book rules conflict, and each has one resolution
 
-- A-14 vs D-17: A-14's check flags every pass-only handler (27 in dev's own
-  Python tools); D-17 exempts a broad handler whose lines record why it
-  swallows. Resolution: one check, D-17's. Flag a pass or ... handler with no
+- A-14 vs D-17: A-14's check flags every pass-only handler; D-17 exempts a
+  broad handler whose lines record why it swallows. Resolution: one check,
+  D-17's. Flag a pass or ... handler with no
   comment, broad ones first; a comment stating why is a decision
-  (ponytail-review/SKILL.md:63). In dev that leaves one hit:
-  .claude/hooks/preflight_report.py:24.
+  (Harness/ponytail/skills/ponytail-review/SKILL.md:63).
 - A-23 vs B-13 vs C-08: three duplicate-block checks with thresholds of 4, 5 and
   6 lines and different scopes. Resolution: keep B-13's scope (the diff plus the
   same file's unchanged lines) with C-08's 6-line threshold, ignoring lines that
@@ -133,32 +132,25 @@ as support.
   if/for/while/try inside one function, not counting with.
 - A-09 vs B-12 (and the A-05/B-01 resolutions): A-09 keeps a fixed 3-parameter
   ceiling, while B-12 says a size measure is a prompt, never a finding, which is
-  why A-05's 20-line ceiling was rejected. 38 of dev's 585 Python functions take
-  more than three parameters (e.g. Harness/bin/dev-check:228). Resolution: drop
-  the ceiling from the rule; a fourth parameter only prompts a look for an
-  option nobody asked for or a mixed job.
-- D-22 vs house lesson LESSONS.md:86-88 (not a pair of accepted ids): D-22's
+  why A-05's 20-line ceiling was rejected. Resolution: drop the ceiling from
+  the rule; a fourth parameter only prompts a look for an option nobody
+  asked for or a mixed job.
+- D-22 vs Python 3.9 compatibility (not a pair of accepted ids): D-22's
   check flags write_text() without newline=, which steers agents to
-  Path.write_text(newline=). That keyword needs Python 3.10, and this exact call
-  broke the Mac's 3.9 (practice-of-programming.md:185-190). D-22 also omits the
-  encoding LESSONS.md:227 requires. Resolution: fold it into D-20 using the
-  house idiom open(path, 'w', encoding='utf-8', newline='\n')
-  (Harness/bin/i18n:387) or write_bytes.
+  Path.write_text(newline=). That keyword needs Python 3.10, beyond the
+  supported minimum. D-22 also omits explicit encoding. Resolution: fold it
+  into D-20 using open(path, 'w', encoding='utf-8', newline='\n')
+  or write_bytes.
 - B-M3 vs D-01: D-01 carries checked errors in status enums, while B-M3's
-  resolution demands a default branch for any value from another module. In
-  SAMPLE_FIRMWARE, the detector firmware's sys_app.c:983 switches with no default on the
-  ConfigApplyAction_e that ConfigStore_Apply returns, built with -Wall
-  (detector/cmake/gcc-arm-none-eabi.cmake:29). Adding a default would silence
-  the compiler's missing-enumerator warning (-Wswitch); GCC behaviour from
-  documentation, not tested here. Resolution: a C switch over an enum lists
-  every enumerator and omits default; raw integers from flash, radio or config
+  resolution demands a default branch for any value from another module.
+  Resolution: a C switch over an enum lists every enumerator and omits default;
+  raw integers from flash, radio or config
   are converted to the enum and rejected at the boundary; B-M3's default applies
   to switches on raw integers, strings and Python match.
-- B-M6 vs B-21: B-21 adds a defaulted parameter as the test seam, and SAMPLE_FIRMWARE's
-  pure modules take explicit parameters so they can be tested on the host
-  (the-c-programming-language.md:105-111; alarm_status.h:14 per
-  head-first-design-patterns.md:204-206). B-M6 says not to pass what the routine
-  could fetch for itself, and it repeats B-16's Preserve Whole Object resolution
+- B-M6 vs B-21: B-21 adds a defaulted parameter as the test seam. Explicit
+  parameters can make a pure module testable without its production runtime.
+  B-M6 says not to pass what the routine could fetch for itself, and it repeats
+  B-16's Preserve Whole Object resolution
   (both cite Refactoring p.104). Resolution: cut B-M6.
 - A-07 vs B-21: B-21's rule text recommends 'an overridable forwarding method',
   which A-07 bans. B-21's resolution already forbids a new forwarding layer but
@@ -190,10 +182,9 @@ states one of these rules, it carries this wording.
   (Harness/ponytail/skills/ponytail-review/SKILL.md:85-92). A shrink never goes
   below Ponytail SKILL.md:44 and is always marked shortcut:.
 - B-M3 (together with karpathy-guidelines/SKILL.md:30, 'no error handling for
-  impossible scenarios'): in firmware, a value read from flash, a LoRa downlink
-  or a config key is outside input even when it is typed as an enum. Validate it
-  at the boundary; Sys_ApplyConfig's own comment says a downlink must not
-  silence a sounding siren (the detector firmware's sys_app.c:975-980).
+  impossible scenarios'): a value read from storage, a network message or
+  configuration is outside input even when it is typed as an enum. Validate
+  it at the boundary and preserve the system's safety invariants.
 - C-20: the Rule of Silence could be read as permission to drop warnings,
   degraded-state notices or error output. The router says an empty preflight is
   START FAILED, never silence, and a fallback that weakens security reports
@@ -210,13 +201,12 @@ states one of these rules, it carries this wording.
   independently measured hardware calibration values into derived formulas
   (Ponytail SKILL.md:44, the calibration real hardware needs).
 - A-07 and its check: a one-line forwarding method can be the only path to
-  safety machinery, as with Example App's StudioService @tool methods, which hold
-  the job and revision checks (head-first-design-patterns.md:172-193). Exempt
-  decorated entry points; never remove a facade method as a pass-through.
+  validation enforced by an entry-point decorator. Exempt decorated entry
+  points; never remove a facade method as a pass-through.
 - D-19: 'print a plain message instead of a raw traceback' must still exit
-  non-zero and keep the underlying cause (Rule of Repair,
-  Books/notes/linux/art-of-unix-programming.md:98-109). It must never become a
-  broad catch that hides programming errors.
+  non-zero and keep the underlying cause (The Art of Unix Programming,
+  Rule of Repair). It must never become a broad catch that hides programming
+  errors.
 - B-07 (folded into A-11): 'substitute a safe value' can hide bad input at a
   trust boundary. At a boundary, reject and report; substitute only where the
   domain defines a safe value, and log the substitution.
@@ -234,7 +224,7 @@ states one of these rules, it carries this wording.
 | B-02 | Extract any block that needs a comment into a function named for its purpose, even a single line, even when the call is longer than the body. | Keep Ponytail (no wrapper nobody asked for; ponytail-review/SKILL.md:54 split by job): extract only a block that is a separate job or repeats; for a single line, rename what it uses instead of adding a one-line function. |
 | B-17 | Replace a bare value that carries meaning, such as money with its currency, a range, a phone number or a ZIP code, with a small object of its own. | Keep Ponytail: values stay in the form the platform gives; add a small type only when it deletes checks or conversions on that value already repeated in the code the change touches. |
 | B-22 | Prefer a seam in the code's own interface, a parameter or an overridable method, over build, link or preprocessor substitution; save those for pervasive dependencies with no better option. | Follow B-21's resolution: use a seam the code already has, an interface one before a build, link or PATH one; add only a defaulted parameter, and only when no existing seam lets the required test run; make any link-type swap obvious (B-23). |
-| B-26 | Before changing untested code, pin what it does now: assert a value you expect to be wrong, run it, set the expectation to the actual output, and repeat. | TDD outranks TieItUp: do not adopt this loop. Expected values stay derived without the code under test (writing-good-tests.md:76) and a failing test is fixed in the code (TDD:181); use only the narrow characterization test writing-good-tests.md:58-60 allows, and ask the owner before using the loop more widely on legacy code. |
+| B-26 | Before changing untested code, pin what it does now: assert a value you expect to be wrong, run it, set the expectation to the actual output, and repeat. | TDD outranks TieItUp: do not adopt this loop. Derive expected values independently of the code under test and fix a failing test in the code. A characterization test must document observed behavior explicitly; ask the owner before using that approach more widely on legacy code. |
 | B-M2 | Never put a call with side effects inside an assert: run it first, keep its result in a variable, then assert on that variable. |  |
 | B-M6 | Don't pass a routine a value it can get by asking an object it already has, either a field of its own or another parameter. |  |
 | C-08 | Remove the duplication a change creates before calling it done: no two added blocks that must change together. |  |
@@ -247,10 +237,10 @@ only on the owner's word.
 
 - 3. D-M6 (checker-proposed): a def default that is a list/dict/set literal, a
   comprehension, or a list()/dict()/set() call. FP: a default that is only ever
-  read; dev tools have 0.
+  read.
 - 4. D-15: in one try, a handler whose builtin class subclasses an earlier
   handler's builtin class. FP: none when restricted to builtins; rare hits.
-- 5. B-24 (report under writing-good-tests.md:124-127): PYTEST_CURRENT_TEST,
+- 5. B-24 (test/production parity): PYTEST_CURRENT_TEST,
   'pytest' in sys.modules, JEST_WORKER_ID or BATS_TEST_ in a non-test file. FP:
   conftest.py and helpers under tests/ not named test_*; treat both as test
   files.
@@ -260,8 +250,7 @@ only on the owner's word.
   braces, or typedef after another type word. FP: function-pointer typedefs,
   which the parenthesis rule exempts.
 - 9. D-M5 (checker-proposed): name = getchar() where the diff declares name as a
-  char type. FP: none known; probably never fires, since the firmware reads its
-  UART through the HAL (not checked).
+  char type. FP: none known; applicability depends on the input API.
 - 10. D-03: a comparison of the form <= expr - 1. FP: a deliberately inclusive
   arithmetic bound that is not a range.
 - 11. A-M1 (checker-proposed): an IfExp inside an IfExp, or a ? inside an
@@ -282,13 +271,12 @@ only on the owner's word.
 - 18. B-10: a one-letter name bound at module level, or a one-letter def or
   class (exempt _, TypeVar names and loop variables). FP: maths or physics
   constants in a simulation script.
-- 19. C-24 (report under writing-good-tests.md:27-39): an assert whose two sides
+- 19. C-24 (independent expected values): an assert whose two sides
   call the same function, or whose expected side was assigned from that call.
   FP: idempotence or determinism tests that compare two runs.
 - 20. C-02 (report under TDD SKILL.md:132): an added function that only returns
   a constant equal to an added assertion's expected value. FP: a genuinely
-  constant function, though its test is then a change detector
-  (writing-good-tests.md:41-45).
+  constant function, though its test is then a change detector.
 - 21. B-14: two if/elif chains or match/switch blocks, at least one added,
   testing the same name against the same three or more literals. FP: an encoder
   and decoder that must mirror each other.
@@ -309,8 +297,7 @@ only on the owner's word.
   call in a long function.
 - 34. A-07 (report under Ponytail SKILL.md:35): a def whose body passes its
   parameters unchanged to one call. FP: decorated entry points that are the only
-  path to safety checks (StudioService @tool methods,
-  head-first-design-patterns.md:172-193), interface implementations and
+  path to safety checks, interface implementations and
   compatibility aliases. Exempt decorated functions and overrides.
 - 35. B-16: the same run of three or more parameter names, in order, in two
   signatures, one of them added. FP: a family of checkers that each take (path,
@@ -322,13 +309,11 @@ only on the owner's word.
   None that deliberately means 'absent or not computed', which is different from
   empty.
 - 39. A-09: more than three parameters in Python (not counting self, cls, *args,
-  **kwargs), four or more in JS or C. FP: 38 of dev's 585 functions (e.g.
-  Harness/bin/dev-check:228 run with 4, daily_task_xml with 7). Report only as a
-  prompt under B-12, never as a finding.
+  **kwargs), four or more in JS or C. FP: a coherent interface whose parameters
+  each serve the same job. Report only as a prompt under B-12, never as a
+  finding.
 - 40. B-M3 (checker-proposed): a match with no wildcard case, a switch with no
   default, or a Bash case with no *) arm. FP: C enum switches under -Wall, where
-  a default disables -Wswitch (Core/Src/sys_app.c:983;
-  detector/cmake/gcc-arm-none-eabi.cmake:29), and closed Python match sets.
+  a default disables -Wswitch, and closed Python match sets.
 - 41. A-M2 (checker-proposed; cut): Yoda-order comparisons. FP: ST-generated
-  firmware (Core/Src/sysmem.c:63, usart_if.c:241) and plain style taste; do not
-  ship.
+  firmware and plain style taste; do not ship.

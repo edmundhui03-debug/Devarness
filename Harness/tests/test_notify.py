@@ -3,11 +3,9 @@
 
 Run: python3 Harness/tests/test_notify.py
 
-The owner, 2026-10-02: alert "whenever any agents ... finish any running
-tasks", in the shape 'Aster/Peter has done the running of "Example_App" on the
-Windows device, please review ...'. These tests send nothing: `send` is
-replaced, and they cover the threshold, the explicit-report suppression, and
-reading each client's turn start from its transcript.
+These tests use invented task names and send nothing: `send` is replaced. They
+cover the message format, duration threshold, explicit-report suppression, and
+reading each client's turn start from its synthetic transcript.
 """
 import importlib.machinery
 import importlib.util
@@ -53,9 +51,9 @@ class NotifyTests(unittest.TestCase):
         finally:
             sys.stdin = sys.__stdin__
 
-    def test_the_done_message_is_the_owners_shape(self):
-        self.assertEqual(self.mod.task_message("done", "Aster", "Example_App", "the routing report"),
-                         'Aster has done the running of "Example_App" on the {} device, '
+    def test_the_done_message_includes_agent_task_and_device(self):
+        self.assertEqual(self.mod.task_message("done", "Aster", "Demo_Widget", "the routing report"),
+                         'Aster has done the running of "Demo_Widget" on the {} device, '
                          'please review the routing report'.format(self.mod.DEVICE))
 
     def test_a_long_claude_turn_alerts_as_peter(self):
@@ -106,8 +104,7 @@ class NotifyTests(unittest.TestCase):
         self.assertEqual(self.sent, [])
 
     def test_one_agents_report_does_not_silence_another(self):
-        # Aster's review, 2026-10-03: a device-wide timestamp let Peter's `done`
-        # suppress Aster's long-turn alert.
+        # Report timestamps must be scoped to each agent, not the whole device.
         t = self.write("rollout.jsonl", [{"timestamp": stamp(900), "type": "event_msg",
                                           "payload": {"type": "task_started"}}])
         self.mod.reported("Peter")
@@ -115,7 +112,7 @@ class NotifyTests(unittest.TestCase):
         self.assertEqual([a for _, a, _ in self.sent], ["Aster"])
 
     def test_a_prompt_sent_as_content_blocks_starts_a_turn(self):
-        # Aster's review: a prompt with an image arrives as blocks, not a string.
+        # A prompt with an image may arrive as content blocks, not a string.
         t = self.write("claude.jsonl", [
             {"type": "user", "timestamp": stamp(1800), "message": {"content": "old prompt"}},
             {"type": "user", "timestamp": stamp(720), "message": {"content": [

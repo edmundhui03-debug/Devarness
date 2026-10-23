@@ -44,9 +44,7 @@ COMMON = {"the", "and", "for", "with", "that", "this", "from", "into", "not", "i
           "was", "are", "has", "have", "md", "claude", "peter", "aster", "setup",
           "doc", "docs", "file", "files", "task", "tasks", "work", "run", "new", "one",
           "two", "all", "any", "out", "off", "own", "use", "used", "get", "got",
-          # Asking words and words this workspace says everywhere. "fix" put a PCB
-          # Studio handover at the top of "can you fix the typo": every closed
-          # section in dev is marked fixed.
+          # Asking words and common status words do not identify a subject.
           "can", "you", "your", "our", "her", "his", "they", "them", "their", "fix",
           "fixed", "open", "add", "make", "made", "need", "needs", "want", "please",
           "help", "check", "checks", "write", "read", "look", "tell", "show", "now",
@@ -244,9 +242,8 @@ def said_together(text: str) -> set:
 def names_of(relative: str, title: str, sections) -> list:
     """Every name a subject answers to, each on its own: a folder, the file, the title, a heading.
 
-    Kept apart on purpose. One record with 32 marked sections has 128 heading
-    words, and a long prompt found five of them — one per heading, which is what
-    chance looks like. A name is where the words stand together.
+    Keep names apart so a long prompt cannot accumulate matches across
+    unrelated headings. A name is where the words stand together.
     """
     return ([(3, words(part)) for part in relative.split("/")] + [(2, words(title))]
             + [(1, words(s.heading)) for s in sections])
@@ -261,15 +258,11 @@ def uses(word: str, lower: str) -> bool:
 def named(query, root: Path, status: dict, memory: Path = None):
     """The one subject these words NAME, or None. The prompt hook's gate.
 
-    find() ranks by shared words: right for a question typed at task-recall, wrong for
-    a sentence typed at an agent. On 2026-09-22, the day after Research, DATASET and
-    SAMPLE_FIRMWARE tripled the documents, 19 of 28 ordinary prompts shared a word with some
-    path — "test" with UNIT_TEST_COVERAGE.md, "rest" with a REST plan, "bugs" with
-    a web-bugs plan — and one shared word was enough to speak. No count of shared
-    words can tell a name from a sentence; how rare the word is cannot either,
-    because "umbrella" and "album" are rarer here than "pcb". What tells them apart
-    is that a project is named by words that stand together, in the prompt and in
-    the name: "pcb studio", "emergency button", "device sync sheet".
+    find() ranks by shared words: useful for an explicit task-recall query, but
+    too broad for ordinary prompts. A common word or a high relevance score
+    does not establish that the user named a subject. Require words that stand
+    together in both the prompt and one subject name, such as "sample project"
+    or "release checklist".
 
     A single-word name — "pyrosim" — is therefore not recognised. That is the
     price, it is deliberate, and `task-recall pyrosim` is one command away.

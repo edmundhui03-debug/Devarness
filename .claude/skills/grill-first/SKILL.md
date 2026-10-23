@@ -46,9 +46,6 @@ approval. Grilling sharpens the questions; superpowers still owns the gate.
 
 ## Why
 
-The owner is a hardware engineer driving several agents from a prompt. One
-question at a time costs a round trip each; the whole frontier at once, with the
-recommended answer visible, costs one. And the failures that hurt most in this
-workspace — the Altium that was never scriptable, the sync that ate staged work,
-the tool that was installed and never usable — were all things nobody asked
-about early. Grilling is how they get asked.
+One question at a time costs a round trip each; asking the whole settled
+frontier together makes decisions easier to review. Resolve capability,
+data-preservation and readiness questions before the work depends on them.

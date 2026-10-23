@@ -85,21 +85,19 @@ class InventoryClaimsTests(unittest.TestCase):
         self.assertIn("daemon health not verified", line)
 
     def test_removed_tools_are_not_reported(self):
-        # n8n and herdr were removed on 2026-10-07; a row for either would be a
-        # claim about a tool dev no longer has.
+        # Removed optional tools must not appear as available capabilities.
         rows = [line.split()[0] for line in self.output["systemMessage"].splitlines() if line.strip()]
         self.assertNotIn("n8n", rows)
         self.assertNotIn("herdr", rows)
         self.assertNotIn("localhost:5678", self.output["additionalContext"])
 
     def test_tools_that_stayed_behind_are_not_reported(self):
-        # dev leaves Hindsight, the device sheet, the Example App layer and its
-        # Konnect runtime in the old workspace (design spec, 2026-10-08).
+        # Omitted integrations and invented project markers must not be reported.
         message = self.output["systemMessage"]
         rows = [line.split()[0] for line in message.splitlines() if line.strip()]
         for gone in ("hindsight", "device", "sync", "konnect", "Studio"):
             self.assertNotIn(gone, rows)
-        for text in ("hindsight", "Device_SyncSheet", "Example_App", "PCB Tools"):
+        for text in ("hindsight", "Device_SyncSheet", "Demo_Widget", "PCB Tools"):
             self.assertNotIn(text, message)
         self.assertNotIn("Konnect", message + self.output["additionalContext"])
 

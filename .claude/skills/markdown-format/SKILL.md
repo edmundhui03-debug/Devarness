@@ -32,9 +32,8 @@ covering every rule, fired and not fired. Run it after changing
 failure means one has come back.
 
 `md-format rewrap FILE` reflows plain prose paragraphs to 80 columns. It leaves
-fenced code, tables, links and front matter alone. An ad-hoc rewrap that did
-not destroyed two skills on 2026-09-11 by reflowing a YAML `description:`;
-use this one.
+fenced code, tables, links and front matter alone. Use this command to avoid
+rewrapping YAML fields or code whose whitespace carries meaning.
 
 `md-format dupes` reports a normative sentence stated in more than one document,
 which the router forbids: "the copy outside this file is the one that drifts".
@@ -109,9 +108,8 @@ title is expected after it, not before.
 ## Rules that matter
 
 **Markdown here is not bilingual.** The English/Cantonese house rule is for HTML
-deliverables — `bilingual-page` owns that. These documents are working evidence
-between the owner and two agents, and translating 185 of them would cost more
-than it returns.
+deliverables — `bilingual-page` owns that. Markdown carries working evidence
+for the project; translation is a separate project choice.
 
 **Use portable Markdown links.** Ordinary relative links work in terminals,
 GitHub and the owner's navigation apps. Obsidian wikilinks are not portable
@@ -123,5 +121,5 @@ editing. `md-format check` reports the backlog on everything else so the owner
 can choose; rewriting a finished record to satisfy a format risks changing
 evidence, which is worse than an unformatted document.
 
-**Aster follows the same rule.** It is recorded in `AGENTS.md` and the root
-`CLAUDE.md`, not only here, because half of the workspace's documents are hers.
+**Every client follows the same rule.** `AGENTS.md` and the root `CLAUDE.md`
+share this requirement so it applies across the supported clients.

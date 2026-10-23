@@ -176,8 +176,8 @@ class ReaderTests(unittest.TestCase):
     def test_a_failure_line_loses_its_terminal_colours(self):
         # scholar-sync.sh colours its [fail]; the escapes reached the hold
         # reason and every table that prints it.
-        self.assertEqual(self.mod.last_line("ok\n\x1b[1;31m[fail]\x1b[0m Self Learning directory not found\n"),
-                         "[fail] Self Learning directory not found")
+        self.assertEqual(self.mod.last_line("ok\n\x1b[1;31m[fail]\x1b[0m Sample Lessons directory not found\n"),
+                         "[fail] Sample Lessons directory not found")
 
     def test_an_unknown_policy_is_refused_with_its_line(self):
         self.fx.policy("Harness/a\tmaybe\t-\t-\n")
@@ -238,19 +238,18 @@ class RealTableTests(unittest.TestCase):
         self.mod = load()
 
     def test_every_per_device_file_is_ignored(self):
-        # The lock rode a sync to every device on 2026-09-24 and read as busy there.
+        # Per-device lock and runtime state must never be versioned.
         for rel in (self.mod.STATE, self.mod.LOCK, self.mod.LOGS + "/x.log",
                     "Harness/docling.partial/HEAD", "Harness/pcb/Konnect.partial/HEAD"):
             self.assertEqual(subprocess.run(["git", "check-ignore", "-q", rel], cwd=ROOT).returncode, 0, rel)
 
     def test_the_daily_task_is_the_long_run_the_banner_asks_for_before_dev_check(self):
-        # Installers and the plugin step only run in a long run; nothing ran
-        # one until this task (review I8, 2026-09-24).
+        # Installers and the plugin step require the scheduled long run.
         import xml.etree.ElementTree as ET
         ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
         options = dict(self.mod.DAILY_TASK)
         options.pop("task")
-        xml = self.mod.load_dev_check().daily_task_xml("pythonw.exe", "C:/dev/Harness/bin/update-tools", "PC\\owner", **options)
+        xml = self.mod.load_dev_check().daily_task_xml("pythonw.exe", "C:/fixture-workspace/Harness/bin/update-tools", "FIXTURE-PC\\example", **options)
         root = ET.fromstring(xml.split("\n", 1)[1])
         arguments = root.find("t:Actions/t:Exec/t:Arguments", ns).text
         self.assertEqual("update-tools " + arguments.split('" ', 1)[1], self.mod.LONG_RUN)
@@ -292,9 +291,8 @@ class DailyRunTests(unittest.TestCase):
         return 0
 
     def test_on_macos_install_daily_goes_through_dev_check_s_scheduler(self):
-        # Since 2026-09-27 dev-check's schedule() writes the Mac's daily jobs, DEVARNESS_update_daily
-        # and DEVARNESS_check_daily, verified on the MacBook Air (925471a); update-tools keeps no second
-        # writer, whose own label left `launch` and new-device looking for the wrong job.
+        # The shared scheduler owns both daily jobs. A second writer could leave
+        # launch and new-device callers looking for different job labels.
         calls = []
         scheduler = types.SimpleNamespace(schedule=lambda install, **task: calls.append((install, task)) or 0)
         with mock.patch.object(self.mod.platform, "system", return_value="Darwin"), \
@@ -368,7 +366,7 @@ class LaunchTests(unittest.TestCase):
         lock.write_text("pid %d since now\n" % os.getpid(), encoding="utf-8")
         line = self.launch(self.state(("Harness/docling", "absent")), "Windows")
         self.assertEqual((line, self.calls, self.spawned), ("", [], []))
-        # Its banner half (Peter's ruling, Task 6): the start says a run is going.
+        # The start banner reports a run that is currently in progress.
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             self.mod.main(["--root", str(self.fx.dev), "banner"])
@@ -390,7 +388,7 @@ class LaunchTests(unittest.TestCase):
         self.assertEqual((rc, out.getvalue()), (0, ""))
 
     def test_a_clone_left_to_its_own_command_launches_nothing(self):
-        # Peter's ruling (Task 4): every run skips a clone that ran out of a
+        # Every run skips a clone that ran out of a
         # whole run until `update-tools apply --only` names it or its pin moves,
         # so a launch for it would only spend a run.
         state = self.state(("Harness/docling", "absent"), ("Harness/laya", "absent"))
@@ -401,9 +399,8 @@ class LaunchTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "CREATE_NO_WINDOW is Windows'")
     def test_a_windowless_run_opens_no_console_for_its_git_calls(self):
-        # Peter's ruling (Task 4): the task's pythonw and a detached start have
-        # no console, and a console child of theirs opens a window on the
-        # owner's screen; laya-service fixed the same in a16e1a3, books in 35b31c1.
+        # Detached children of windowless processes must also suppress console
+        # windows so a scheduled background run does not open visible terminals.
         flags = []
 
         def popen(argv, **options):
@@ -415,7 +412,7 @@ class LaunchTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "CREATE_NO_WINDOW is Windows'")
     def test_ending_a_timed_out_tree_opens_no_console_either(self):
-        # Peter's ruling (Task 4, C3): kill_tree's taskkill runs at each timeout
+        # kill_tree's taskkill runs at each timeout
         # and would open a window in a windowless run, as run_bounded's calls did.
         calls = []
 
@@ -444,7 +441,7 @@ class LaunchTests(unittest.TestCase):
         return state
 
     def test_the_same_queue_is_not_launched_again_within_six_hours(self):
-        # Peter's ruling (Task 4, C2): work a long run cannot finish, a folder
+        # Work a long run cannot finish, a folder
         # in a clone's way say, would otherwise launch a run at every start.
         for system in ("Windows", "Darwin"):          # the task's run, or a detached spawn
             with self.subTest(system=system):
@@ -914,7 +911,7 @@ class AdvanceTests(unittest.TestCase):
 
     def test_an_installer_that_never_finishes_leaves_the_tool_stuck(self):
         # A run killed mid-installer left a half-built runtime at the new pin
-        # and nothing said so (review, 2026-09-24): the tool is marked stuck
+        # silently without an explicit marker: the tool is marked stuck
         # on disk before its installer starts, and cleared when it passes.
         url = self.fx.upstream("a")
         old = self.fx.head("a")
@@ -931,7 +928,7 @@ class AdvanceTests(unittest.TestCase):
 
     def test_a_failed_fetch_is_tried_again_at_the_next_run(self):
         # A network blip is not a broken upstream: holding the tool until
-        # upstream moves again would strand it (review, 2026-09-24).
+        # upstream moves again would strand it.
         url = self.fx.upstream("a")
         old = self.fx.head("a")
         clone = self.fx.clone("Harness/a", "a", old)
@@ -973,9 +970,8 @@ class AdvanceTests(unittest.TestCase):
         self.assertEqual(moves[0][2], newer)
 
     def test_a_held_tool_with_an_installer_reads_held_at_a_start_and_queues_no_launch(self):
-        # Peter's ruling (Task 4, C1): the hold was read after the installer's
-        # time, so a start called a held tool pending and launched a long run
-        # that only said it was held.
+        # Read the hold before estimating installer time so a held tool does
+        # not launch a redundant long run.
         url = self.fx.upstream("a")
         old = self.fx.head("a")
         self.fx.clone("Harness/a", "a", old)
@@ -1196,8 +1192,7 @@ class ApplyTests(unittest.TestCase):
         self.assertIn("pushed", out)
 
     def test_every_start_scans_and_moves_a_light_clone(self):
-        # The owner, 2026-09-25: every open brings each clone to its newest.
-        # The 24 h start floor is gone (Q1): a second start the same hour moves too.
+        # Every start checks for new pins, including a second start in the same hour.
         url, old, new = self.a_behind_upstream()
         rc, out = self.run_tool("apply", "--budget", "60")
         self.assertIn("advanced", out, out)
@@ -1261,8 +1256,8 @@ class ApplyTests(unittest.TestCase):
     def test_a_session_start_budget_still_scans_after_phase_one(self):
         # session_start hands the tool at most 60 s; phase 1 spends some of
         # it, and what is left must still be enough to scan and move a light
-        # tool, or a normal start never advances anything (seen 2026-09-24:
-        # "59 s left of the start" with the minimum at 60).
+        # tool; requiring the full original budget would prevent normal starts
+        # from advancing anything after phase one consumes time.
         url, old, new = self.a_behind_upstream()
         rc, out = self.run_tool("apply", "--force", "--budget", "45")
         self.assertIn("advanced", out)
@@ -1460,7 +1455,7 @@ class ApplyTests(unittest.TestCase):
         self.assertEqual(state["held_rows"], ["Harness/report", "Harness/held"])
 
     def test_a_launch_in_the_same_second_as_its_run_is_shown(self):
-        # Peter's ruling (Task 6): both are one-second now_iso stamps, and a
+        # Both are one-second now_iso stamps, and a
         # start launches within the second its run ended, so > would hide it.
         state = {"last_run": {"at": "2026-09-26T09:00:00Z", "seconds": 9.0, "results": []},
                  "launched": {"at": "2026-09-26T09:00:00Z", "how": "DEVARNESS_update_daily", "for": ["docling", "laya"]}}
@@ -1545,8 +1540,8 @@ class ApplyTests(unittest.TestCase):
         self.assertLess(budget, self.mod.LOCK_STALE_HOURS * 3600)
 
     def test_the_banner_names_the_rows_it_reports_absent_or_cloned(self):
-        # Peter's ruling (Task 6, from Task 2's review): "2 absent" named no row,
-        # and one missing clone can be absent twice in a run, once in each phase.
+        # An aggregate count does not identify missing clones. One clone can
+        # also be absent twice in a run, once in each phase.
         results = [("Harness/laya", "absent", "no clone; the background run clones it: update-tools apply --budget 1800"),
                    ("Harness/docling", "absent", "no clone; the background run clones it: update-tools apply --budget 1800"),
                    ("Harness/docling", "absent", "no clone yet; the long run clones it at its pin"),
@@ -1583,7 +1578,7 @@ class ApplyTests(unittest.TestCase):
                 "unpushed": {"count": 1, "why": why}}
 
     def test_a_pin_commit_that_needs_a_person_degrades_the_start(self):
-        # Peter's ruling (Task 6 fix, C1): a half-moved shared index read READY.
+        # A partially moved shared index requires attention rather than READY.
         state = self.unpushed_state("NEEDS A PERSON: the branch moved while rebasing, and the index and files "
                                     "could not be put back (x): they are at a, the branch at b; put them back "
                                     "with: git -C \"C:/dev\" read-tree -m -u abc HEAD")
@@ -1686,8 +1681,7 @@ class ApplyTests(unittest.TestCase):
         self.assertIn("another agent's commit", git("log", "-2", "--format=%s", cwd=self.fx.dev).stdout)
 
     def test_another_agents_commit_is_never_pushed_with_the_pin(self):
-        # 2026-10-01: origin had not moved, so the first plain push went through
-        # and published seven commits the owner had not released (Claude/REMINDERS.md).
+        # An unchanged origin does not authorize publishing unrelated local commits.
         self.two_adjacent_rows()
         origin = self.with_origin()
         released = git("rev-parse", "main", cwd=origin).stdout
@@ -2060,8 +2054,8 @@ class PluginTests(unittest.TestCase):
         self.assertEqual(state["last_plugins"]["failed"], {"codex copies": "n8n skills differ: n8n-code-python"})
 
     def test_the_failure_of_a_plugin_no_longer_installed_goes(self):
-        # Peter's ruling (Task 6 fix, C2): a plugin that left the registry is
-        # never reached again, so its kept failure stayed in every banner.
+        # A plugin removed from the registry is no longer retried; discard its
+        # stale failure instead of keeping it in every banner.
         self.fake_claude("print('ok')")
         state = {"last_plugins": {"at": "2026-09-24T04:00:00Z", "changed": [],
                                   "failed": {"gone@nowhere": "boom", "codex copies": "n8n skills differ"}}}

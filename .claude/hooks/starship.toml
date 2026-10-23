@@ -12,8 +12,7 @@
 # Regenerate with:  starship preset catppuccin-powerline -o <this file> --force
 # and then restore the two keys below `$schema`, which the preset does not carry.
 # Glyphs need a Nerd Font. Ghostty supplies one by default; if you switch
-# terminals and see boxes, set the font to JetBrainsMono Nerd Font Mono
-# (already installed in ~/Harness/Fonts).
+# terminals and see boxes, install and select a compatible Nerd Font locally.
 
 "$schema" = 'https://starship.rs/config-schema.json'
 

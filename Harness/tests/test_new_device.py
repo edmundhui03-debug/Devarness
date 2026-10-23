@@ -12,8 +12,8 @@ result, and the tool runs as a subprocess, the way a new device runs it.
 DEVARNESS_NEWDEVICE_TOOL points the suite at a mutated copy of the tool, which is how
 each test was shown to fail without the behaviour it guards.
 
-dev drops three layers of the old workspace: Example App's satellite (a project
-imported later), device registration (one device, no sync sheet) and Hindsight.
+The portable bootstrap excludes unrelated project integrations and device
+registration state. These disposable fixtures exercise the supported layers.
 dev may have no remote: an absent origin is a note. Every pinned clone counts,
 the tracked ones and the owner's personal-repos.txt in the given home.
 """
@@ -574,17 +574,17 @@ class OptionalLayerTests(Case):
         device = self.make().complete()
         # This fixture tests presence reporting, not the live project inventory.
         write(device.dev / "Harness" / "separate-projects.txt",
-              "SAMPLE_FIRMWARE\nDATASET\nSelf Learning\nResearch\nProjects/DATASET_AI\n")
-        (device.dev / "SAMPLE_FIRMWARE").mkdir()
-        (device.dev / "Projects" / "DATASET_AI").mkdir(parents=True)
+              "DEMO_FIRMWARE\nDEMO_DATA\nSample Lessons\nSample Studies\nProjects/DEMO_SENSOR_LAB\n")
+        (device.dev / "DEMO_FIRMWARE").mkdir()
+        (device.dev / "Projects" / "DEMO_SENSOR_LAB").mkdir(parents=True)
         done = device.check()
         row = report(done)["rows"]["separate-projects"]
         self.assertEqual(done.returncode, 0)
         self.assertEqual((row["status"], row["detail"], row["fix"]),
-                         ("note", "present: SAMPLE_FIRMWARE, Projects/DATASET_AI; absent: DATASET, Self Learning, Research", ""))
-        (device.dev / "DATASET").mkdir()
-        (device.dev / "Self Learning").mkdir()
-        (device.dev / "Research").mkdir()
+                         ("note", "present: DEMO_FIRMWARE, Projects/DEMO_SENSOR_LAB; absent: DEMO_DATA, Sample Lessons, Sample Studies", ""))
+        (device.dev / "DEMO_DATA").mkdir()
+        (device.dev / "Sample Lessons").mkdir()
+        (device.dev / "Sample Studies").mkdir()
         row = report(device.check())["rows"]["separate-projects"]
         self.assertEqual(row["status"], "ok")
 
@@ -647,7 +647,7 @@ class OptionalLayerTests(Case):
         self.assertEqual((row["required"], row["status"], row["fix"]),
                          (False, "note", "Harness/bin/update-tools install-daily"))
         self.assertIn("last long run never", row["detail"])
-        # dev-check's scheduler writes it, under the task's name, since 2026-09-27 (925471a).
+        # The shared scheduler writes the plist under the task's expected name.
         write(device.home / "Harness" / "LaunchAgents" / "DEVARNESS_update_daily.plist", "<plist/>\n")
         write(device.dev / ".claude" / "hooks" / "update-tools.state",
               json.dumps({"last_long_run": time.time() - 3 * 3600}))

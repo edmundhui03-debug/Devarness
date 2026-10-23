@@ -196,7 +196,7 @@ class TableTests(unittest.TestCase):
 
 
 class DailyTests(unittest.TestCase):
-    """The 05:00 run on the Windows PC: owner decision 2026-09-24, from the grill's nine answers.
+    """The scheduled 05:00 run uses a disposable Windows task fixture.
 
     A windowless start has no stdout, so the verdict must reach files; and a
     run that leaves none must read as an error, never as yesterday's pass.
@@ -260,8 +260,8 @@ class DailyTests(unittest.TestCase):
     def test_the_task_runs_daily_at_five_windowless_and_never_wakes_the_pc(self):
         import xml.etree.ElementTree as ET
         ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
-        root = ET.fromstring(self.tool.daily_task_xml("C:/Python314/pythonw.exe", "C:/dev/Harness/bin/dev-check",
-                                                      "PC\\owner").split("\n", 1)[1])
+        root = ET.fromstring(self.tool.daily_task_xml("C:/FixturePython/pythonw.exe", "C:/fixture-workspace/Harness/bin/dev-check",
+                                                      "FIXTURE-PC\\example").split("\n", 1)[1])
         text = lambda path: root.find(path, ns).text
         self.assertTrue(text("t:Triggers/t:CalendarTrigger/t:StartBoundary").endswith("T05:00:00"))
         self.assertEqual(text("t:Triggers/t:CalendarTrigger/t:ScheduleByDay/t:DaysInterval"), "1")
@@ -271,8 +271,8 @@ class DailyTests(unittest.TestCase):
             self.assertEqual(text("t:Settings/t:" + setting), value, setting)
         self.assertEqual(text("t:Principals/t:Principal/t:LogonType"), "InteractiveToken")
         self.assertEqual(text("t:Principals/t:Principal/t:RunLevel"), "LeastPrivilege")
-        self.assertEqual(text("t:Actions/t:Exec/t:Command"), "C:/Python314/pythonw.exe")
-        self.assertEqual(text("t:Actions/t:Exec/t:Arguments"), '"C:/dev/Harness/bin/dev-check" --daily')
+        self.assertEqual(text("t:Actions/t:Exec/t:Command"), "C:/FixturePython/pythonw.exe")
+        self.assertEqual(text("t:Actions/t:Exec/t:Arguments"), '"C:/fixture-workspace/Harness/bin/dev-check" --daily')
 
     def test_the_mac_job_runs_daily_at_the_hour_with_a_path_that_outlives_the_session(self):
         import plistlib
@@ -305,9 +305,8 @@ class DailyTests(unittest.TestCase):
             self.assertEqual(calls[-1][:2], ["launchctl", "bootout"])
 
     def test_the_mac_update_job_is_written_and_loaded_on_either_device(self):
-        # The same launchd path with the platform, uid, home and launchctl faked, so the
-        # repositories rubric's criterion 7 ("no plist written") is caught on the Windows PC
-        # too, now that update-tools installs its Mac job through this scheduler (2026-09-27).
+        # Fake the platform, uid, home and launchctl so missing launchd plist
+        # writes are detected even when these scheduler tests run on Windows.
         import plistlib
         calls = []
         fake = lambda argv, **kw: calls.append(argv) or subprocess.CompletedProcess(argv, 0, "", "")
@@ -372,9 +371,8 @@ class RealPlanTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "the Windows search order")
     def test_windows_runs_a_bash_launcher_under_git_bash_never_the_wsl_launcher(self):
-        # A bare "bash" is found in System32 first, WSL's launcher; its bash
-        # stripped the backslashes from the launcher's path, and three rows
-        # failed with "No such file" for a launcher path stripped of them (2026-09-19).
+        # A bare "bash" can resolve to the WSL launcher in System32, which may
+        # strip backslashes from a Windows launcher path. Select Git Bash explicitly.
         tool = load()
         bash = Path(tool.command_for({c.name: c for c in tool.PLAN}["i18n-check"], ROOT)[0])
         self.assertTrue(bash.is_file(), bash)

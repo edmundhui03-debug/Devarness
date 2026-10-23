@@ -1,67 +1,42 @@
 <section id="sources">
-  <p class="kicker">Sources and review</p>
-  <h2>What was checked, what was run, and what is still unverified</h2>
+<p class="kicker">Sources and review</p>
+<h2>What was checked, what was run, and what is still unverified</h2>
+<p class="prose">The guide cites Thunderhead documentation, NIST FDS guidance and published fire studies. Historical reference values are illustrative; raw run evidence is not distributed with this source checkout. Reproduce measurements from the public cases before relying on them.</p>
+<h3>Primary sources</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>Source</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td><b>PyroSim 2026.1 documentation</b> — <a href="https://www.thunderheadeng.com/docs/2026-1/pyrosim/">thunderheadeng.com/docs/2026-1/pyrosim</a></td><td>Every menu path, dialog field, default value and troubleshooting page. The 2026.2 pages were diffed against it; both releases carry the same FDS 6.10.1.</td></tr>
+<tr><td><b>FDS 6.10.1 User's Guide</b> (NIST SP 1019) — <a href="https://github.com/firemodels/fds/releases/tag/FDS-6.10.1">github.com/firemodels/fds</a></td><td>Mesh and resolution, the characteristic fire diameter, the reaction and its yields, HRRPUA and ramps, vents and holes, every device quantity, the output files and the instability guidance.</td></tr>
+<tr><td><b>FDS Validation Guide 6.10.1</b></td><td>The propane soot and CO yields, NIST's own ISO 9705 modelling, and the accuracy statistics for layer temperature, layer depth and velocity.</td></tr>
+<tr><td><b>ISO 9705-1:2016</b> and ISO 9705:1993</td><td>The room, the doorway, the burner and its 100 kW / 300 kW programme, and the 1000 kW definition of flashover.</td></tr>
+<tr><td><b>NUREG-1805</b>, Fire Dynamics Tools (NRC, 2004)</td><td>The MQH correlation and its limits, the three flashover heat release estimates, and the lining thermal properties used in the reference case.</td></tr>
+<tr><td><b>Dillon, NIST GCR 98-756</b> (1998)</td><td>Measured gas temperatures in a real ISO 9705 room with a corner burner at 100 kW and 300 kW.</td></tr>
+<tr><td><b>Steckler, NBSIR 82-2520</b> (1982); <b>Bryant</b> doorway measurements</td><td>Layer temperatures, interface heights and doorway flows for compartments of this size.</td></tr>
+</tbody>
+</table>
+</div>
+<h3>What was actually run</h3>
+<div class="scroll">
+<table>
+<thead><tr><th>Run</th><th>Result</th></tr></thead>
+<tbody>
 
-  <p class="prose">Nothing in this guide was written from memory. Menu paths and defaults come from Thunderhead's own 2026.1 documentation and from the strings inside the shipped software; physics and keywords come from NIST's FDS 6.10.1 User's Guide by page; the room and its burner come from ISO 9705; the numbers come from simulations that were actually run on this machine.</p>
-
-  <h3>Primary sources</h3>
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Source</th><th>Used for</th></tr></thead>
-      <tbody>
-        <tr><td><b>PyroSim 2026.1 documentation</b> — <a href="https://www.thunderheadeng.com/docs/2026-1/pyrosim/">thunderheadeng.com/docs/2026-1/pyrosim</a></td><td>Every menu path, dialog field, default value and troubleshooting page. The 2026.2 pages were diffed against it; both releases carry the same FDS 6.10.1.</td></tr>
-        <tr><td><b>FDS 6.10.1 User's Guide</b> (NIST SP 1019) — <a href="https://github.com/firemodels/fds/releases/tag/FDS-6.10.1">github.com/firemodels/fds</a></td><td>Mesh and resolution, the characteristic fire diameter, the reaction and its yields, HRRPUA and ramps, vents and holes, every device quantity, the output files and the instability guidance.</td></tr>
-        <tr><td><b>FDS Validation Guide 6.10.1</b></td><td>The propane soot and CO yields, NIST's own ISO 9705 modelling, and the accuracy statistics for layer temperature, layer depth and velocity.</td></tr>
-        <tr><td><b>ISO 9705-1:2016</b> and ISO 9705:1993</td><td>The room, the doorway, the burner and its 100 kW / 300 kW programme, and the 1000 kW definition of flashover.</td></tr>
-        <tr><td><b>NUREG-1805</b>, Fire Dynamics Tools (NRC, 2004)</td><td>The MQH correlation and its limits, the three flashover heat release estimates, and the lining thermal properties used in the reference case.</td></tr>
-        <tr><td><b>Dillon, NIST GCR 98-756</b> (1998)</td><td>Measured gas temperatures in a real ISO 9705 room with a corner burner at 100 kW and 300 kW.</td></tr>
-        <tr><td><b>Steckler, NBSIR 82-2520</b> (1982); <b>Bryant</b> doorway measurements</td><td>Layer temperatures, interface heights and doorway flows for compartments of this size.</td></tr>
-        <tr><td><b>DATASET project files</b> — <code>dataset/forecast/schema.py</code>, <code>dataset_fuzzy_fis.py</code>, the CData sampling note</td><td>The three channels, the 5 s frame interval taken by decimation, and the fuzzy hazard index Day 7's converter scores each frame with.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <h3>What was actually run</h3>
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Run</th><th>Result</th></tr></thead>
-      <tbody>
-        <tr><td><b>FDS 6.10.1 installed on macOS</b> from NIST's own release, SHA-256 verified against the digest GitHub publishes</td><td><span class="chip ok">verified</span> Proven by a two-second propane fire that reaches <code>STOP: FDS completed successfully</code>.</td></tr>
-        <tr><td><b>The reference case, 20 cm cells, full 1200 s programme</b></td><td><span class="chip ok">complete</span> 8868 s of wall clock, two MPI processes. Every number in this guide's tables and charts.</td></tr>
-        <tr><td><b>The same case, 10 cm cells</b></td><td><span class="chip warn">partial</span> The first attempt died of an MPI timeout while the machine was loaded. The second reached 234 s of the programme and was then stopped deliberately; it supplied the mesh-study comparison, which is drawn over the first 90 s. A full 1200 s run at 10 cm is roughly a day and a half on this hardware.</td></tr>
-        <tr><td><b>Five deliberately broken variants</b></td><td><span class="chip ok">verified</span> The sealed-room pressure zone, the hole that misses the wall, the sensor placed above the ceiling, HRRPUA typed as kilowatts and a misspelt keyword. Every message in the error finder marked as seen came from these runs.</td></tr>
-        <tr><td><b>The Day 7 scripts</b></td><td><span class="chip ok">tested</span> 32 tests covering grid snapping, the growth-rate arithmetic, scenario validity, the DATASET decimation rule, the unit conversions, and every issue Aster raised.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <h3>What this guide could not establish</h3>
-  <ul class="plain">
-    <li>No screenshot in this guide was taken from PyroSim. PyroSim runs only on Windows and this guide was written on a Mac, so every screenshot slot is marked for you to fill from the office desktop.</li>
-    <li>The guide targets PyroSim 2026.1. If your copy is 2026.2, the solver is identical but a few menu labels differ; where that is known, the text says so.</li>
-    <li>A handful of interface details could not be confirmed without the software on screen: which ramp-up options the burner dialog actually lists, whether auto-save before running is ticked on a fresh install, and the exact install path on your machine.</li>
-    <li>ISO 9705-1:2016 Annex B, which fixes where the standard's own instruments go, is not public. The sensor positions in the reference case are this guide's choices, made to match what DATASET needs.</li>
-    <li>The reference run is coarse and reads cooler than measurements of a real ISO room. It is a check on your method, not a statement about fire.</li>
-  </ul>
-
-  <h3>Review log</h3>
-  <div class="scroll">
-    <table>
-      <thead><tr><th>Check</th><th>Outcome</th></tr></thead>
-      <tbody>
-        <tr><td>Research, six streams against primary sources</td><td><span class="chip ok">done</span> PyroSim interface, FDS technical, ISO 9705, how beginners are taught, the DATASET contract, and data generation. Each wrote a notes file with page-level citations.</td></tr>
-        <tr><td>Independent verification pass on the research notes</td><td><span class="chip warn">not completed</span> The adversarial checkers failed twice, on a session limit and then on authentication. Claims were instead checked directly: every number in this guide comes from a run performed here or from a source quoted with its page.</td></tr>
-        <tr><td>Outside review of the case files, scripts and arithmetic</td><td><span class="chip ok">done</span> Aster, the Codex agent that reviews this workspace's work and did not write it, found no blocking FDS syntax defect and confirmed the mesh alignment, the door holes, the OPEN vents, the doorway flow integrals, the layer device, the Day 6 faults and every hand calculation. It raised seven issues; all seven were reproduced here and fixed.</td></tr>
-        <tr><td>Case files</td><td><span class="chip ok">run</span> All four parse and run under FDS 6.10.1; the reference case was checked in set-up-only mode and then run in full at 20 cm.</td></tr>
-        <tr><td>Corrections made during writing</td><td><span class="chip ok">fixed</span> The doorway flow devices were rewritten to the documented <code>MASS FLUX X</code> form, because <code>MASS FLOW</code> was removed from the FDS documentation in 6.7.8 and survives only for backward compatibility. The room's lining was changed to aerated concrete with properties cited from NUREG-1805, replacing values that had no source. The Day 6 exercise's third fault stopped being a fault when the model gained its second mesh, and was moved above the ceiling and re-run.</td></tr>
-        <tr><td>The biggest thing Aster caught</td><td><span class="chip ok">fixed</span> FDS averages device output over each output interval unless told not to, so the Day 7 pipeline was decimating values that had already been averaged — which is exactly what the DATASET contract decimates in order to avoid. The template now sets <code>TEMPORAL_STATISTIC='INSTANT VALUE'</code> on every training channel, verified in a re-run's <code>.out</code> file. The reference numbers in this guide predate that change and are one-second means.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <footer>
-    <b>Built</b> · 13 September 2026, for the DATASET research role<br>
-    <b>Cases and scripts</b> · <code>Self Learning/08SEP-08OCT/PyroSim/</code><br>
-    <b>Standing</b> · the guide is current for PyroSim 2026.1 with FDS 6.10.1; the reference numbers are from a 20 cm run on macOS and are not a substitute for your own
-  </footer>
+<tr><td><b>The reference case, 20 cm cells, full 1200 s programme</b></td><td>Historical complete 1200 s programme. Original logs are not distributed; rerun the public case for current evidence.</td></tr>
+<tr><td><b>The same case, 10 cm cells</b></td><td>Historical partial run: 234 s of a 1200 s programme. No complete 10 cm result is distributed; rerun the case for a mesh-convergence study.</td></tr>
+<tr><td><b>Five deliberately broken variants</b></td><td><span class="chip ok">verified</span> The sealed-room pressure zone, the hole that misses the wall, the sensor placed above the ceiling, HRRPUA typed as kilowatts and a misspelt keyword. Every message in the error finder marked as seen came from these runs.</td></tr>
+<tr><td><b>The Day 7 scripts</b></td><td>The public test suite checks geometry, sampling, unit conversion, invalid readings and a clean-source page build. Run it locally; this page is not a live test receipt.</td></tr>
+</tbody>
+</table>
+</div>
+<h3>What this guide could not establish</h3>
+<ul class="plain">
+<li>Screenshots are placeholders, not captures of a current installation. Confirm menu paths and settings in your own licensed PyroSim installation.</li>
+<li>The guide targets PyroSim 2026.1. If your copy is 2026.2, the solver is identical but a few menu labels differ; where that is known, the text says so.</li>
+<li>A handful of interface details could not be confirmed without the software on screen: which ramp-up options the burner dialog actually lists, whether auto-save before running is ticked on a fresh install, and the exact install path on your machine.</li>
+<li>ISO 9705-1:2016 Annex B, which fixes where the standard's own instruments go, is not public. The sensor positions in the reference case are this guide's choices, made to match the educational measurements.</li>
+<li>The reference run is coarse and reads cooler than measurements of a real ISO room. It is a check on your method, not a statement about fire.</li>
+</ul>
+<footer><b>Public source</b> · <code>Harness/guides/pyrosim/</code><br/><b>Scope</b> · introductory education; rerun cases for current evidence</footer>
 </section>

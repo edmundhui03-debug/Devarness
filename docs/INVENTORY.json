@@ -932,11 +932,6 @@
       "mode": "100644"
     },
     {
-      "path": "Harness/guides/pyrosim/tests/benchmark_chart_load.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
       "path": "Harness/guides/pyrosim/tests/benchmark_read_devc.py",
       "origin": "adapted harness source",
       "mode": "100644"
@@ -947,12 +942,12 @@
       "mode": "100644"
     },
     {
-      "path": "Harness/guides/pyrosim/tests/test_fds_to_dataset.py",
-      "origin": "adapted harness source",
+      "path": "Harness/guides/pyrosim/tests/test_build.py",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Harness/guides/pyrosim/tests/test_make_charts.py",
+      "path": "Harness/guides/pyrosim/tests/test_fds_to_dataset.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
@@ -1258,11 +1253,6 @@
     },
     {
       "path": "Harness/tests/fixtures/library-queries.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Harness/tests/prds-reader.browser.js",
       "origin": "adapted harness source",
       "mode": "100644"
     },

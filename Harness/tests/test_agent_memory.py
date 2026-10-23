@@ -3,9 +3,10 @@
 Run: python3 Harness/tests/test_agent_memory.py
  or: python3 -m unittest discover -s Harness/tests -p 'test_agent_memory.py'
 
+Fixture identities, preferences and incidents are invented.
 Every fixture is written into a temporary folder; no real memory folder is read.
-The slug expectations were produced by running Claude Code 2.1.274's own
-JavaScript slug functions under node, not by this tool.
+The slug cases cover path punctuation, case and length in the supported
+client format; they do not check a locally installed client.
 """
 from __future__ import annotations
 
@@ -42,7 +43,7 @@ PROSE = ("Kept by Peter, one bullet per memory. This paragraph is prose rather t
          "its length nor [a link to a file that is not there](missing-notes.md) is an index finding."
          + " It goes on about how the index is kept." * 6)
 TOOL_NOTES_LINE = "- [Tool notes](reference-tool-notes.md) — where ngspice lives and how it runs headless"
-USER_DESCRIPTION = 'description: "The owner reviews \\"every\\" board before fabrication and reads Markdown in vim"'
+USER_DESCRIPTION = 'description: "The owner reviews \\"every\\" draft before release and reads Markdown in an editor"'
 TOOL_DESCRIPTION = "description: >-\n  Where the spice simulator lives and\n  which flags make it run headless"
 
 
@@ -65,7 +66,7 @@ def clean_memory():
             "",
             PROSE,
             "",
-            "- [Owner role](user-owner-role.md) — reviews every board before fabrication; reads Markdown in "
+            "- [Owner role](user-owner-role.md) — reviews every draft before release; reads Markdown in "
             "[vim](https://www.vim.org)",
             "- [Small commits](feedback-small-commits.md) — commit by path, never sweep another session's staged files",
             "- [Bridge build](project-bridge-build.md) — checkpoint 4 accepted, sign-off pending; "
@@ -80,11 +81,11 @@ def clean_memory():
             "metadata: ",
             "  node_type: memory",
             "  type: user",
-            "  originSessionId: 7b0196ae-bbad-4cea-ad2a-eca98afa6a5c",
+            "  originSessionId: 00000000-0000-4000-8000-000000000000",
             "  modified: 2026-09-01T08:00:00.000Z",
             "---",
             "",
-            "The owner is an electronics engineer; see [[feedback-small-commits]].",
+            "The owner is a sample reviewer; see [[feedback-small-commits]].",
             "",
         ]),
         "feedback-small-commits.md": "\n".join([
@@ -97,7 +98,7 @@ def clean_memory():
             "",
             "Commit with `git commit --only <paths>`; `[[in-code-span]]` is not a link.",
             "",
-            "**Why:** a plain commit swept another session's staged work on 2026-09-10.",
+            "**Why:** a broad commit could include unrelated staged work.",
             "",
             "**How to apply:** name every path in the commit command.",
             "",
@@ -207,7 +208,7 @@ def drop_why(files):
 
 def copy_a_description(files):
     edit(files, "reference-tool-notes.md", TOOL_DESCRIPTION,
-         "description: The owner reviews every board before fabrication and reads Markdown daily")
+         "description: The owner reviews every draft before release and reads Markdown daily")
 
 
 def link_an_unwritten_memory(files):
@@ -262,7 +263,7 @@ class Scratch(unittest.TestCase):
 class ClaudeCodeSlug(Scratch):
     def test_every_character_but_an_ascii_letter_or_digit_becomes_one_dash(self):
         for path, expected in (("/opt/work/dev", "-opt-work-dev"),
-                               ("/srv/PCB Tools/AGENTS/Example_App", "-srv-PCB-Tools-AGENTS-PCB-Studio"),
+                               ("/srv/Example Tools/AGENTS/Sample_App", "-srv-Example-Tools-AGENTS-Sample-App"),
                                ("/tmp/claude-501/-srv-dev/scratchpad", "-tmp-claude-501--srv-dev-scratchpad")):
             with self.subTest(path=path):
                 self.assertEqual(MEMORY.slug(path), expected)

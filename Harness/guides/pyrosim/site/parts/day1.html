@@ -3,13 +3,13 @@
     <div><p class="kicker">Day 1</p><h2>PyroSim draws the room, FDS does the physics, and one text file passes between them</h2></div>
     <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
   </div>
-  <div class="goal"><span class="g-l">Goal</span><p>A licensed PyroSim you can drive on the office desktop, a 60-second test fire that has run from start to finish, and the one line in its output file that proves FDS got to the end.</p></div>
+  <div class="goal"><span class="g-l">Goal</span><p>A licensed PyroSim you can drive on the Windows computer, a 60-second test fire that has run from start to finish, and the one line in its output file that proves FDS got to the end.</p></div>
 
   <p class="phase">Learn</p>
 
   <p class="prose">You are learning two programs today, not one. PyroSim is an editor made by Thunderhead Engineering: you draw the room in it, fill in dialogs, and it writes a text file. Fire Dynamics Simulator, FDS, is written by NIST: it reads that text file, solves the flow and heat transfer, and writes the results to disk. PyroSim never works out a temperature. It prepares the question and it draws the answer.</p>
 
-  <p class="prose">The two are shipped together. PyroSim 2026.1 is, in Thunderhead's words, "designed for FDS version 6.10.1", and it installs that exact build of FDS alongside itself, plus Smokeview 6.10.1 for viewing results. So the version of PyroSim on the office desktop fixes the version of the solver your numbers come from.</p>
+  <p class="prose">The two are shipped together. PyroSim 2026.1 is, in Thunderhead's words, "designed for FDS version 6.10.1", and it installs that exact build of FDS alongside itself, plus Smokeview 6.10.1 for viewing results. So the version of PyroSim on the Windows computer fixes the version of the solver your numbers come from.</p>
 
   <p class="prose">The whole pipeline is five steps, and every day of this guide sits somewhere on it.</p>
 
@@ -25,7 +25,7 @@
 
   <details class="deeper"><summary>Why the FDS version matters more than the PyroSim version</summary><div class="d-in">
     <p class="prose">PyroSim 2026.1 and 2026.2 ship the same solver. The bundled <code>fds.exe</code>, <code>fds_openmp.exe</code> and <code>smokeview.exe</code> are byte-for-byte identical in the two release packages; only PyroSim's own launcher differs. Both carry the revision string <code>FDS-6.10.1-0-g12efa16</code>, which is the revision on the title page of the FDS 6.10.1 User's Guide.</p>
-    <p class="prose">That matters for DATASET. A result is reproducible if someone else runs the same input file with the same solver version, so record the FDS version next to every number you keep, not the PyroSim version. FDS 6.11.0 changed flux limiters, a corner boundary condition, the 3D smoke file format and thermocouple defaults, so a newer solver reading the same input file can return different numbers, and that is not a mistake by either side.</p>
+    <p class="prose">That matters for sensor data. A result is reproducible if someone else runs the same input file with the same solver version, so record the FDS version next to every number you keep, not the PyroSim version. FDS 6.11.0 changed flux limiters, a corner boundary condition, the 3D smoke file format and thermocouple defaults, so a newer solver reading the same input file can return different numbers, and that is not a mistake by either side.</p>
   </div></details>
 
   <p class="prose">Now the window. PyroSim opens on one window with the model in the middle, and the same five regions every time.</p>
@@ -40,7 +40,7 @@
 
   <p class="prose">At the bottom of the model view are three tabs: <span class="ui">3D View</span>, <span class="ui">2D View</span> and <span class="ui">Record View</span>. Add, remove or select an object in one and the others follow at once. The third tab is the one that matters most in this guide. Record View shows the FDS input file PyroSim is writing, kept up to date as you work, so you can watch a dialog turn into a line of <code>&amp;OBST</code> or <code>&amp;SURF</code>. It has two sections: <b>Model Records</b>, which is read-only because PyroSim generates it, and <b>Additional Records</b>, where you can type lines that are injected at the top of the file. PyroSim performs no validation on what you type there, and its own objects cannot refer to it, so leave it empty until Day 5.</p>
 
-  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The whole PyroSim window on the office desktop with a model open: menubar, File toolbar (SI and EN buttons and the green Run FDS triangle visible), the Navigation panel tree expanded, and the three view tabs at the bottom of the model view.</p></div></div>
+  <div class="shot"><div class="shot-frame"><p class="sf-l">Screenshot slot</p><p class="sf-t">The whole PyroSim window on the Windows computer with a model open: menubar, File toolbar (SI and EN buttons and the green Run FDS triangle visible), the Navigation panel tree expanded, and the three view tabs at the bottom of the model view.</p></div></div>
 
   <p class="prose">Units next, because a wrong unit is the cheapest mistake to make and one of the hardest to spot. PyroSim can display and accept either metric or English units: click <span class="ui">SI</span> or <span class="ui">EN</span> on the File toolbar, or use the <span class="ui">Units</span> item on the <span class="ui">View</span> menu. Switching converts the values you have already entered rather than reinterpreting them. Record View is the exception that keeps you honest: it always displays values in the units FDS uses, whatever the buttons say. Work in SI, which is what FDS reads and what this guide quotes throughout: metres, seconds, kilograms, degrees Celsius, and kilowatts for heat release rate.</p>
 

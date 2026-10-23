@@ -25,6 +25,16 @@ def devc(tmp_path):
     return path
 
 
+def test_default_export_is_self_contained_raw_sensor_data(devc):
+    units, rows = fc.read_devc(devc)
+    frames = fc.to_dataset(rows, units=units)
+    assert set(frames[0]) == {
+        "time_s", "zone", "temperature_c", "optical_density", "co_ppm",
+        "visibility_m", "fed",
+    }
+    assert [frame["time_s"] for frame in frames if frame["zone"] == "S1"] == [0, 5, 10]
+
+
 def test_read_devc_uses_both_header_rows(devc):
     units, rows = fc.read_devc(devc)
     assert units["S1_CO"] == "ppm"
@@ -76,35 +86,17 @@ def test_read_devc_still_rejects_invalid_numbers_in_late_rows(tmp_path):
 
 
 def test_frames_are_every_fifth_second_by_decimation_not_averaging(devc):
-    frames = fc.to_dataset(fc.read_devc(devc)[1], with_risk=False)
+    frames = fc.to_dataset(fc.read_devc(devc)[1])
     s1 = [f for f in frames if f["zone"] == "S1"]
     assert [f["time_s"] for f in s1] == [0.0, 5.0, 10.0]
     assert [f["temperature_c"] for f in s1] == [20.0, 70.0, 120.0]   # raw samples, not bin means
 
 
 def test_one_frame_per_zone_per_time(devc):
-    frames = fc.to_dataset(fc.read_devc(devc)[1], with_risk=False)
+    frames = fc.to_dataset(fc.read_devc(devc)[1])
     assert [(f["time_s"], f["zone"]) for f in frames][:4] == [
         (0.0, "S1"), (0.0, "S2"), (5.0, "S1"), (5.0, "S2")]
     assert set(frames[0]) >= {"temperature_c", "optical_density", "co_ppm", "visibility_m", "fed"}
-
-
-def test_smoke_obscuration_from_optical_density():
-    assert fc.obscuration_pct_per_m(0.0) == pytest.approx(0.0)
-    assert fc.obscuration_pct_per_m(1.0) == pytest.approx(90.0)
-    assert fc.obscuration_pct_per_m(0.0757) == pytest.approx(16.0, abs=0.05)
-
-
-def test_fuzzy_index_matches_the_manual_examples(tmp_path):
-    # dataset_fuzzy_fis.py "quiet room" (20 C, 0.5 %obs/m, 2 ppm) and
-    # "flaming fire" (85 C, 16 %obs/m, 140 ppm)
-    quiet_od, fire_od = 0.00218, 0.0757
-    path = tmp_path / "fis_devc.csv"
-    path.write_text(devc_text([[0.0, 20.0, 2.0, quiet_od, 30.0, 0.0, 20.0, 2.0, quiet_od, 30.0, 0.0],
-                               [5.0, 85.0, 140.0, fire_od, 2.0, 0.1, 85.0, 140.0, fire_od, 2.0, 0.1]]))
-    frames = fc.to_dataset(fc.read_devc(path)[1])
-    assert frames[0]["fis_level"] == "Safe"
-    assert frames[2]["fis_level"] == "Emergency"
 
 
 def test_co_written_as_mol_per_mol_is_converted_to_ppm(tmp_path):
@@ -113,7 +105,7 @@ def test_co_written_as_mol_per_mol_is_converted_to_ppm(tmp_path):
     path.write_text(HEADER.replace("s,C,ppm,1/m,m,,C,ppm", "s,C,mol/mol,1/m,m,,C,mol/mol")
                     + "0.0,20.0,1.4E-4,0.0,30.0,0.0,20.0,7.0E-5,0.0,30.0,0.0\n")
     units, rows = fc.read_devc(path)
-    frames = fc.to_dataset(rows, with_risk=False, units=units)
+    frames = fc.to_dataset(rows, units=units)
     assert frames[0]["co_ppm"] == pytest.approx(140.0)
     assert frames[1]["co_ppm"] == pytest.approx(70.0)
 
@@ -122,7 +114,7 @@ def test_missing_device_names_the_id(tmp_path):
     path = tmp_path / "bad_devc.csv"
     path.write_text(HEADER.replace("S2_CO", "S2_CARBON") + "0.0,20,0,0,30,0,20,0,0,30,0\n")
     with pytest.raises(KeyError, match="S2_CO"):
-        fc.to_dataset(fc.read_devc(path)[1], with_risk=False)
+        fc.to_dataset(fc.read_devc(path)[1])
 
 
 def test_cli_writes_a_csv(devc, tmp_path):
@@ -131,14 +123,13 @@ def test_cli_writes_a_csv(devc, tmp_path):
     with open(out, newline="") as stream:
         rows = list(csv.DictReader(stream))
     assert len(rows) == 6
-    assert rows[0]["zone"] == "S1" and "fis_level" in rows[0]
+    assert rows[0]["zone"] == "S1" and "temperature_c" in rows[0]
+    assert set(rows[0]) == set(fc.to_dataset(fc.read_devc(devc)[1])[0])
 
 
-# --- Regressions from Aster's review, 2026-09-13 -----------------------------
+# --- Invalid readings and sampling regressions ----------------------------
 
-def test_non_finite_readings_are_refused_not_labelled_safe(tmp_path):
-    # A NaN once scored 0.0 and came back "Safe": an invalid reading must never
-    # acquire a normal risk label.
+def test_non_finite_readings_are_refused(tmp_path):
     path = tmp_path / "nan_devc.csv"
     path.write_text(HEADER + "0.0,nan,0.0,0.0,30.0,0.0,20.0,0.0,0.0,30.0,0.0\n")
     with pytest.raises(ValueError, match="S1_T"):
@@ -149,7 +140,7 @@ def test_non_finite_time_is_refused(tmp_path):
     path = tmp_path / "nantime_devc.csv"
     path.write_text(HEADER + "nan,20.0,0.0,0.0,30.0,0.0,20.0,0.0,0.0,30.0,0.0\n")
     with pytest.raises(ValueError, match="Time"):
-        fc.to_dataset(fc.read_devc(path)[1], with_risk=False)
+        fc.to_dataset(fc.read_devc(path)[1])
 
 
 @pytest.mark.parametrize("unit,value,expected", [
@@ -160,7 +151,7 @@ def test_non_finite_time_is_refused(tmp_path):
 def test_every_supported_co_unit_reaches_ppm(unit, value, expected):
     rows = [{"Time": 0.0, "S1_T": 20.0, "S1_CO": value, "S1_OD": 0.0, "S1_VIS": 30.0, "S1_FED": 0.0,
              "S2_T": 20.0, "S2_CO": value, "S2_OD": 0.0, "S2_VIS": 30.0, "S2_FED": 0.0}]
-    f = fc.to_dataset(rows, with_risk=False, units={"S1_CO": unit, "S2_CO": unit})[0]
+    f = fc.to_dataset(rows, units={"S1_CO": unit, "S2_CO": unit})[0]
     assert f["co_ppm"] == pytest.approx(expected)
 
 
@@ -169,7 +160,7 @@ def test_an_unknown_co_unit_is_refused_rather_than_assumed_to_be_ppm():
     rows = [{"Time": 0.0, "S1_T": 20.0, "S1_CO": 0.014, "S1_OD": 0.0, "S1_VIS": 30.0, "S1_FED": 0.0,
              "S2_T": 20.0, "S2_CO": 0.0, "S2_OD": 0.0, "S2_VIS": 30.0, "S2_FED": 0.0}]
     with pytest.raises(ValueError, match="kg/kg"):
-        fc.to_dataset(rows, with_risk=False, units={"S1_CO": "kg/kg"})
+        fc.to_dataset(rows, units={"S1_CO": "kg/kg"})
 
 
 def test_a_missing_frame_is_reported_not_silently_dropped():
@@ -177,7 +168,7 @@ def test_a_missing_frame_is_reported_not_silently_dropped():
                                             "S2_T", "S2_CO", "S2_OD", "S2_VIS", "S2_FED")}}
             for t in (0.0, 4.49, 5.51, 10.0)]
     with pytest.raises(ValueError, match="missing from the series: 5 s"):
-        fc.to_dataset(rows, with_risk=False)
+        fc.to_dataset(rows)
 
 
 def test_a_series_that_does_not_start_at_ignition_is_refused():
@@ -185,4 +176,4 @@ def test_a_series_that_does_not_start_at_ignition_is_refused():
                                             "S2_T", "S2_CO", "S2_OD", "S2_VIS", "S2_FED")}}
             for t in (5.0, 10.0, 15.0)]
     with pytest.raises(ValueError, match="t = 0"):
-        fc.to_dataset(rows, with_risk=False)
+        fc.to_dataset(rows)

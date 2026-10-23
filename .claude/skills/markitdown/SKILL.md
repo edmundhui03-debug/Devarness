@@ -5,15 +5,14 @@ description: Convert a PDF, Office file, spreadsheet, EPub or ZIP into Markdown 
 
 # markitdown
 
-Two commands, both on `PATH`, both free until called. Neither is an MCP server.
+Two optional commands, available after local setup. Neither is an MCP server.
 
 | Command | Gives you | Reach for it when |
 | --- | --- | --- |
 | `markitdown` | one flat Markdown stream, best table fidelity | you want the content and page numbers do not matter |
 | `md-pages` | `=====PAGE N=====` markers, plus tables | a finding will cite a page — datasheets, papers, anything reviewed |
 
-Measured on this workspace: a 5-page datasheet takes 1.8 s, a 31-page TI
-datasheet 3.6 s, a research paper 5.2 s, a spreadsheet 2.2 s.
+Verify the selected command and its dependencies in the current checkout.
 
 ## Choosing between them
 
@@ -21,10 +20,9 @@ datasheet 3.6 s, a research paper 5.2 s, a spreadsheet 2.2 s.
 datasheet claim nobody can locate is not evidence, and the review convention in
 this workspace is already `=====PAGE N=====`.
 
-Use plain `markitdown` when you want every table and do not need pages. On the
-same 31-page datasheet it recovered 299 table rows against `md-pages`'s 170,
-because it runs a different extractor. If a table matters and looks mangled, try
-the other command before concluding the table is unreadable.
+Use plain `markitdown` when you want tables and do not need pages. The
+extractors can recover different content; compare them on the actual input
+when an important table looks incomplete or mangled.
 
 ## Use
 
@@ -60,26 +58,26 @@ them as content.
 
 ## The datasheet workflow
 
-This is the main use here. The Emergency Button review keeps datasheets in
-`datasheets/` and their text in `datasheets/text/`:
+A project can keep datasheets in `datasheets/` and their extracted text in
+`datasheets/text/`, outside the public reusable harness:
 
 ```bash
 md-pages datasheets/*.pdf --outdir datasheets/text/
 ```
 
-Verified to reproduce the existing convention exactly — same page count, same
-markers, on the same files the earlier pipeline handled. It replaces
-`pdftotext`, which several kicad-happy scripts want but which was never
-installed here.
+Check page counts, markers and important tables against the source document.
+An extracted file does not establish that another tool's PDF dependency is
+installed or interchangeable.
 
-## Options this workspace does not have
+## Optional backends need their own setup
 
-Azure Document Intelligence, LLM image descriptions, and the `markitdown-ocr`
-plugin all need credentials that are not configured. Do not offer them as if
-they were available.
+Azure Document Intelligence, LLM image descriptions and OCR plugins have
+their own dependencies and may require credentials. Check their configuration
+and permissions before offering them; source presence is not readiness.
 
 ## Source and upgrades
 
-Pristine clone at `Harness/markitdown/`, never edited. The command is an
-isolated uv tool: `uv tool upgrade markitdown`. `md-pages` is ours, at
-`Harness/bin/md-pages`, symlinked into `~/.local/bin`.
+The optional upstream clone belongs at `Harness/markitdown/`; keep it
+unmodified. If installed as an isolated uv tool, upgrade it with
+`uv tool upgrade markitdown`. The local page-marked adapter is
+`Harness/bin/md-pages`; no pre-existing home-folder launcher is required.

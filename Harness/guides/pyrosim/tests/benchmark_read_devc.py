@@ -2,7 +2,7 @@
 
 Run with any Python 3.9+: python tests/benchmark_read_devc.py
 Times are untraced medians; peaks are tracemalloc Python allocations, not RSS.
-The reference reader is frozen from the old workspace's commit 969bb22 for reproducibility.
+The reference reader below preserves the original full-buffer algorithm.
 """
 
 import csv
@@ -32,7 +32,7 @@ def reference_read_devc(path):
 
 def pipeline(reader, path):
     units, rows = reader(path)
-    return units, rows, fc.to_dataset(rows, with_risk=False, units=units)
+    return units, rows, fc.to_dataset(rows, units=units)
 
 
 def main():
@@ -78,7 +78,7 @@ def main():
         print(json.dumps({
             "python": platform.python_version(), "platform": platform.platform(),
             "input_rows": count, "output_frames": frames, "timing_repeats": repeats,
-            "risk_scoring": False, "parsed_data_and_frames_equal": True,
+            "parsed_data_and_frames_equal": True,
             **metrics,
             "peak_memory_reduction_pct": 100 * (1 - optimized["peak_python_bytes"]
                                                    / baseline["peak_python_bytes"]),

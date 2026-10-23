@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """UserPromptSubmit hook: when a prompt names something dev is tracking, put its state in front.
 
-The owner asked for a tool that remembers as soon as a project is mentioned,
-rather than one that has to be invoked. A router rule would depend on whichever
-agent is reading it; this does not — the harness runs it on the prompt itself
+The hook recalls tracked state when a project is mentioned, without a separate
+command. A router rule would depend on whichever agent is reading it;
+the harness instead runs this hook on the prompt itself
 and hands the answer back as additionalContext, before the model reads a thing.
 
-It adds, it never blocks. A UserPromptSubmit hook *can* refuse a turn, and this
-one must not: the workspace already refused one always-on gate on the grounds that it would
-argue on every turn (CLAUDE.md, the claude-scholar boundary). The rule here is
-narrower — say something only when the prompt names what dev tracks, say it in at
+It adds, it never blocks. A UserPromptSubmit hook *can* refuse a turn, but this
+one must not interrupt ordinary prompting. Its rule is narrower: say something
+only when the prompt names what dev tracks, say it in at
 most a dozen lines, and say nothing at all otherwise.
 
 Anything it cannot read or decide exits 0 with no output: a hook that breaks
@@ -25,17 +24,15 @@ ROOT = Path(__file__).resolve().parents[2]
 TASK = ROOT / "Harness" / "bin" / "task-recall"
 # The gate is task-recall's, asked for with --named: it answers only when the prompt
 # NAMES a subject — two words said together and found together in one name. No
-# total and no count decides it here. A total let "can you fix the typo" reach 4.9
-# on a Example App handover; a count of shared words, which replaced it, let "test",
-# "rest" and "bugs" each speak the day the documents tripled (2026-09-22).
+# total and no count decides it here: ordinary prompts can share isolated words
+# with unrelated records, so the gate requires a name rather than a word count.
 OPEN_SHOWN = 4
 BOUND = 20
 # A prompt that is already about the tool, or is answering it, needs no recall.
 SKIP = ("task-recall", "/clear", "/compact")
 # The harness hands this hook a finished background task as if it were a prompt.
-# Nobody typed it, and a page of machine-written text shares a word with
-# everything: on 2026-09-22 one put a Example App record into a turn the owner
-# never wrote.
+# Nobody typed it; machine-written notification text must not trigger recall
+# as if the owner had named a tracked subject.
 NOT_THE_OWNER = ("<task-notification>", "[SYSTEM NOTIFICATION")
 
 

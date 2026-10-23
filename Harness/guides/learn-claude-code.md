@@ -1,4 +1,4 @@
-# learn-claude-code — Peter and Aster's local course
+# learn-claude-code is an optional local teaching runtime
 
 > **2026-09-11** · Aster · `current`
 >
@@ -6,16 +6,15 @@
 > to run its lessons. Lesson code has shell access and is a teaching runtime,
 > not an execution backend for real work.
 
-Prepared and studied by Aster on 2026-09-09, before Example App V4 analysis.
 Source:
 [shareAI-lab/learn-claude-code](https://github.com/shareAI-lab/learn-claude-code/tree/0dcafa2ae053a1ddd6a72f265431104b08a5aa13).
 Reviewed commit: `0dcafa2ae053a1ddd6a72f265431104b08a5aa13`. License:
-[MIT](../learn-claude-code/LICENSE), copyright shareAI Lab, 2024; retain its
+[MIT](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/LICENSE), copyright shareAI Lab, 2024; retain its
 copyright and license when reusing code.
 
 This is a teaching repository about the software around an agent model: tool
 dispatch, permissions, context, durable tasks, collaboration and completion. It
-is a shared reference and local lab for Peter (Claude) and Aster (Codex).
+is a shared reference and local lab for Claude Code and Codex.
 Installing it does not alter either client's model, hooks, instructions or
 tools. The repository's descriptions of commercial products are teaching
 analogies, not verified specifications for the installed clients.
@@ -25,14 +24,15 @@ analogies, not verified specifications for the installed clients.
 - [Installed form and commands](#installed-form-and-commands)
 - [Exact restore and deliberate upgrades](#exact-restore-and-deliberate-upgrades)
 - [Read the current 17-lesson track](#read-the-current-17-lesson-track)
-- [What Peter and Aster should carry into dev work](#what-peter-and-aster-should-carry-into-dev-work)
+- [Client work retains the existing process and safety boundaries](#client-work-retains-the-existing-process-and-safety-boundaries)
 - [Reusable upstream skills and curation](#reusable-upstream-skills-and-curation)
-- [Verification evidence](#verification-evidence)
+- [Readiness requires verification on the current host](#readiness-requires-verification-on-the-current-host)
 
 ## Installed form and commands
 
-The pristine upstream clone stays at `Harness/learn-claude-code/`. Runnable
-material is a `git archive` of the exact pin, under:
+After explicit setup, the pristine upstream clone belongs at
+`Harness/learn-claude-code/`. Runnable material is a `git archive` of the exact
+pin, under:
 
 ```text
 Harness/.runtime/learn-claude-code/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/
@@ -85,9 +85,9 @@ Choose a disposable project if experimenting with real model calls.
 
 Prerequisites are Git, `uv` and a host `python3`. The runtime pins Python
 3.11.16; `uv` downloads a managed interpreter when necessary. The native `fcntl`
-imports make the complete current course a POSIX lab; macOS arm64 was tested.
-Linux and Windows were not verified, and the installer should be used under a
-POSIX environment on Windows rather than claiming native compatibility.
+imports make the complete current course a POSIX lab. Verify the installation
+on the selected host; use a POSIX environment on Windows rather than claiming
+native compatibility.
 
 Bootstrap restores the clone from `Harness/repos.txt`. To restore this
 repository alone when the clone is absent:
@@ -117,10 +117,10 @@ its own runtime directory; old experiments stay intact. Do not run global npm
 package installation suggestions in upstream's README as part of this course
 setup.
 
-The optional Next.js `web/` teaching site was not installed or started. Python
-tests do validate its stored course scenarios; that is not proof its server or
-production build works. s14's MCP servers are in-process stand-ins, not real
-external MCP integrations.
+The optional Next.js `web/` teaching site requires separate installation and
+verification. Python tests cover its stored course scenarios; they do not prove
+its server or production build works. s14's MCP servers are in-process
+stand-ins, not real external MCP integrations.
 
 ## Read the current 17-lesson track
 
@@ -133,25 +133,25 @@ translation deliverable.
 
 | Current lesson | Mechanism to study | Useful test or implementation evidence |
 | --- | --- | --- |
-| [s01](../learn-claude-code/s01_agent_loop/README.md) | Append assistant/tool-result pairs and continue until no actual tool calls remain | `tests/test_agent_loop_boundaries.py` checks actual blocks, including contradictory stop reasons |
-| [s02](../learn-claude-code/s02_tool_use/README.md) | Register atomic handlers without changing the loop | File, edit, glob and shell tools; bounded output |
-| [s03](../learn-claude-code/s03_permission/README.md) | Decide permission before execution | `tests/test_permission_command_words.py`; string rules are not a sandbox |
-| [s04](../learn-claude-code/s04_hooks/README.md) | Put policy and lifecycle callbacks around tool dispatch | Shared permission path, pre/post hooks; study these without installing host hooks |
-| [s05](../learn-claude-code/s05_todo_write/README.md) | Track a short execution checklist | `tests/test_todo_write_string_input.py` handles model argument shapes |
-| [s06](../learn-claude-code/s06_subagent/README.md) | Give a bounded subtask a fresh message list; return its final text | `tests/test_s06_subagent.py`; same process/workspace, no nested task tool |
-| [s07](../learn-claude-code/s07_skill_loading/README.md) | Expose skill metadata, then load full content when needed | `tests/test_skill_loading.py`; registry lookups, safe discovery paths |
-| [s08](../learn-claude-code/s08_context_compact/README.md) | Persist and shorten recoverable output before summarizing history | `tests/test_compaction_tool_pairs.py`; preserve tool pairs and active user request |
-| [s09](../learn-claude-code/s09_memory/README.md) | Select, extract and consolidate reusable memory | Record-per-file storage and a recall selection stage; memory is not instruction authority |
-| [s10](../learn-claude-code/s10_task_system/README.md) | Persist tasks, dependencies, ownership and completion state | `tests/test_task_system.py`; returned task IDs, cycle rejection, claim/completion guards |
-| [s11](../learn-claude-code/s11_background_tasks/README.md) | Make background execution explicit and return completion events | `tests/test_background_tasks.py`; timeouts and process-group cleanup |
-| [s12](../learn-claude-code/s12_cron_scheduler/README.md) | Separate scheduled enqueueing from execution | `tests/test_cron_scheduler.py`; foreground/async permission distinction |
-| [s13](../learn-claude-code/s13_agent_teams/README.md) | Independent teammate loops, atomic task claims, typed protocols, task worktrees | `tests/test_agent_teams_runtime.py`; task reassignment invalidates plan approval |
-| [s14](../learn-claude-code/s14_mcp_plugin/README.md) | Add namespaced discovered tools to the existing tool pool | Host-owned permissions; local simulated servers demonstrate the boundary |
-| [s15](../learn-claude-code/s15_integrated_harness/README.md) | Integrate the mechanisms into one host | Broad runtime tests; exact read-only MCP allowlist and async approval denial |
-| [s16](../learn-claude-code/s16_workflow_runtime/README.md) | Script stable orchestration with schema checks, concurrent stages and journals | `tests/test_workflow_goal_lessons.py`; unique run IDs, cross-process locks, replay, one schema retry |
-| [s17](../learn-claude-code/s17_goal_loop/README.md) | Evaluate a checkable goal before accepting a proposed stop | `tests/test_goal_loop.py`; separate evaluator, deferred async work, limits/error exits |
+| [s01](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s01_agent_loop/README.md) | Append assistant/tool-result pairs and continue until no actual tool calls remain | `tests/test_agent_loop_boundaries.py` checks actual blocks, including contradictory stop reasons |
+| [s02](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s02_tool_use/README.md) | Register atomic handlers without changing the loop | File, edit, glob and shell tools; bounded output |
+| [s03](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s03_permission/README.md) | Decide permission before execution | `tests/test_permission_command_words.py`; string rules are not a sandbox |
+| [s04](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s04_hooks/README.md) | Put policy and lifecycle callbacks around tool dispatch | Shared permission path, pre/post hooks; study these without installing host hooks |
+| [s05](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s05_todo_write/README.md) | Track a short execution checklist | `tests/test_todo_write_string_input.py` handles model argument shapes |
+| [s06](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s06_subagent/README.md) | Give a bounded subtask a fresh message list; return its final text | `tests/test_s06_subagent.py`; same process/workspace, no nested task tool |
+| [s07](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s07_skill_loading/README.md) | Expose skill metadata, then load full content when needed | `tests/test_skill_loading.py`; registry lookups, safe discovery paths |
+| [s08](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s08_context_compact/README.md) | Persist and shorten recoverable output before summarizing history | `tests/test_compaction_tool_pairs.py`; preserve tool pairs and active user request |
+| [s09](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s09_memory/README.md) | Select, extract and consolidate reusable memory | Record-per-file storage and a recall selection stage; memory is not instruction authority |
+| [s10](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s10_task_system/README.md) | Persist tasks, dependencies, ownership and completion state | `tests/test_task_system.py`; returned task IDs, cycle rejection, claim/completion guards |
+| [s11](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s11_background_tasks/README.md) | Make background execution explicit and return completion events | `tests/test_background_tasks.py`; timeouts and process-group cleanup |
+| [s12](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s12_cron_scheduler/README.md) | Separate scheduled enqueueing from execution | `tests/test_cron_scheduler.py`; foreground/async permission distinction |
+| [s13](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s13_agent_teams/README.md) | Independent teammate loops, atomic task claims, typed protocols, task worktrees | `tests/test_agent_teams_runtime.py`; task reassignment invalidates plan approval |
+| [s14](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s14_mcp_plugin/README.md) | Add namespaced discovered tools to the existing tool pool | Host-owned permissions; local simulated servers demonstrate the boundary |
+| [s15](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s15_integrated_harness/README.md) | Integrate the mechanisms into one host | Broad runtime tests; exact read-only MCP allowlist and async approval denial |
+| [s16](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s16_workflow_runtime/README.md) | Script stable orchestration with schema checks, concurrent stages and journals | `tests/test_workflow_goal_lessons.py`; unique run IDs, cross-process locks, replay, one schema retry |
+| [s17](https://github.com/shareAI-lab/learn-claude-code/blob/0dcafa2ae053a1ddd6a72f265431104b08a5aa13/s17_goal_loop/README.md) | Evaluate a checkable goal before accepting a proposed stop | `tests/test_goal_loop.py`; separate evaluator, deferred async work, limits/error exits |
 
-## What Peter and Aster should carry into dev work
+## Client work retains the existing process and safety boundaries
 
 1. **Keep the request distinct from tool output.** s08 explicitly carries the
    active user request through compaction because tool results can also use a
@@ -185,10 +185,9 @@ translation deliverable.
 
 These are design patterns, not authority to add autonomous schedules, raise
 concurrency or enable a Stop review loop. No new host hooks, agents, MCP
-servers, credential files, user settings or global instructions were installed.
-In particular, studying s17 does not turn on dev's intentionally disabled
-stop-time Codex review gate. No Example App V4 analysis was performed for this
-lab.
+servers, credential files, user settings or global instructions are authorized
+by studying the course. In particular, studying s17 does not enable a stop-time
+review gate or establish readiness for a product project.
 
 ## Reusable upstream skills and curation
 
@@ -207,24 +206,21 @@ not copy all four broad triggers into the agents. Existing skill ownership and
 the user's authorization remain authoritative. The pristine bundles remain
 available for comparison in both the clone and runtime.
 
-## Verification evidence
+## Readiness requires verification on the current host
 
-Machine-readable evidence is in
-the old workspace's `verification/learn-claude-code-verification.json`.
-The tested setup uses CPython 3.11.16, Anthropic SDK 1.4.0, python-dotenv 1.2.3,
-PyYAML 6.0.3 and pytest 9.1.1, with all transitive versions pinned in the
-installer. Full upstream tests use synthetic clients/fixtures where applicable
-and run with Python socket connections blocked. CLI quit and workflow replay add
-independent startup and persisted-state checks. These results establish local
+Use the current runtime's `installation.json`, `verification.json` and
+`pytest.log` after running the setup and verification commands above. No old
+workspace's results establish readiness in a new checkout. Dependencies and
+transitive versions are pinned in the installer.
+
+Full upstream tests use synthetic clients/fixtures where applicable and run with
+Python socket connections blocked. CLI quit and workflow replay add independent
+startup and persisted-state checks. A passing current run establishes local
 lesson/test readiness; provider authentication, live model quality/cost, real
 MCP transport, web serving and production containment remain unverified.
 
-Verified result: **482 upstream tests passed, 100 subtests passed; six installer
-boundary tests passed**. The complete upstream run took 20.66 seconds. A
-read-only check left 2,798 runtime files unchanged. The test environment places
-the venv's Python first on `PATH`, disables forced UTF-8 mode so upstream's GBK
-locale test can exercise decoding, and uses short temporary paths. This last
-choice matters: an upstream compaction fixture counts absolute paths toward an
-exact character budget; deeply nested scratch paths entered its unstubbed
-summarization branch. The source was not changed or tests skipped to obtain
-these results.
+The verification environment places the venv's Python first on `PATH` and
+disables forced UTF-8 mode so upstream's GBK locale test can exercise decoding.
+Use short temporary paths: a compaction fixture counts absolute paths toward
+an exact character budget. Preserve failures and skipped checks in the local
+record rather than inheriting a prior installation's counts or timing.

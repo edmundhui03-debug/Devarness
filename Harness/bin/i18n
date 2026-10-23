@@ -30,27 +30,18 @@ def usage(code=0):
           " | i18n {check|selftest}")
     sys.exit(code)
 
-# Exempt, each for a reason the router states. The template is the
-# pre-translation starting point and is meant to carry no toggle; _review/
-# holds evidence and screenshot fixtures rather than pages; the Emergency
-# Button v0.1 review predates the rule and rewriting a delivered record to
-# satisfy a format risks changing what was delivered. A project's evidence/
-# folder under PRDs and Specs/ holds generated receipts and diagrams, not
-# pages (owner, 2026-10-16).
+# The template starts before translation. Review fixtures and generated
+# evidence receipts are not authored deliverable pages.
 EXEMPT = (
     "Harness/templates/bilingual-page.html",
     "/_review/",
     "/evidence/",
-    "LoRaWAN_Emergency_Button_Review.html",
 )
 # Never pages of ours, wherever they sit: build output, runtimes, a vendor's
-# page saved into a datasheets/ folder as evidence, and the PCB Brother course
-# packs, which are the vendor's files kept byte for byte.
-GENERATED = ("node_modules/", "/.runtime/", "/datasheets/", "/PCB Brother/Materials/")
-# Pages that failed the rule when Research, DATASET and SAMPLE_FIRMWARE were imported into
-# the old workspace on 2026-09-21, each with the sha256 of its content then (CRLF read as LF).
-# The owner chose to keep them as history while unchanged: an edited page is
-# checked like any other, and a new page was never on the list.
+# page saved into a datasheets/ folder as evidence.
+GENERATED = ("node_modules/", "/.runtime/", "/datasheets/")
+# Optional local legacy exemptions carry a content hash (CRLF read as LF).
+# The public source ships an empty list; edited pages get checked normally.
 LEGACY = "Harness/i18n-legacy.txt"
 
 
@@ -70,11 +61,7 @@ def content_hash(path):
 
 
 def record_paths(root, record):
-    """The paths a dev list names, one per line: Harness/repos.txt holds the vendored
-    clones and Harness/separate-projects.txt the owner's separate projects. Both were
-    copied into this file until 2026-09-17, when the copies had missed the rename
-    of Self Learning to Research and the cwc-workshops clone, and check reported
-    29 pages that were not the workspace's."""
+    """Read the first-column paths from a shared clone or project manifest."""
     try:
         with open(os.path.join(root, record), encoding="utf-8") as fh:
             return [line.split("\t")[0].strip() for line in fh
@@ -98,12 +85,13 @@ def deliverable_pages():
         return None, 0, 0
     listed = subprocess.run(["git", "-C", root, "ls-files", "*.html"],
                             capture_output=True, text=True).stdout.split("\n")
-    # A nested repo is invisible to the root listing, and an imported project
-    # holds pages too. md-format had this same blind spot until 2026-09-12; a
-    # workspace-wide check that cannot see a project is not one.
-    theirs = (record_paths(root, "Harness/repos.txt") + record_paths(root, "Harness/separate-projects.txt")
-              # the owner's personal clones (the book PDFs), listed per device, never in git
-              + record_paths(os.path.join(os.path.expanduser("~"), ".config", "dev"), "personal-repos.txt"))
+    # Root listings omit nested repositories; shared manifests identify
+    # upstream pages before authored pages in nested projects are checked.
+    theirs = (record_paths(root, "Harness/repos.txt")
+              + record_paths(root, "Harness/separate-projects.txt"))
+    if os.environ.get("DEVARNESS_ALLOW_PERSONAL_REPOS") == "1":
+        theirs += record_paths(os.path.join(os.path.expanduser("~"), ".config", "devarness"),
+                               "personal-repos.txt")
     for marker in list(Path(root).glob("*/.git")) + list(Path(root).glob("*/*/.git")):
         if not marker.is_dir():
             continue                      # a worktree; reported under its checkout
@@ -141,7 +129,7 @@ def deliverable_pages():
 def translated(zh):
     """The keys whose Cantonese is a non-blank string. A key mapped to "" is still
     English on the page, and a dictionary that is only a list of keys translates
-    nothing; until 2026-09-17 check counted both as full coverage."""
+    nothing."""
     if not isinstance(zh, dict):
         return set()
     return {k for k, v in zh.items() if isinstance(v, str) and v.strip()}
@@ -536,10 +524,8 @@ def selftest():
                 ok, why = False, "%s: %s" % (type(exc).__name__, exc)
             results.append((label, ok, why))
 
-        # A page imported with Research, DATASET or SAMPLE_FIRMWARE is listed in
-        # Harness/i18n-legacy.txt with the hash of its content at the import. It is
-        # history while unchanged, whatever its line endings, and checked once
-        # anyone edits it.
+        # A legacy fixture is exempt only while its recorded content hash
+        # matches, with line endings normalized. Edited pages are checked.
         def legacy_check(repo_name, page, recorded):
             repo = at(repo_name)
             git("init", "-q", repo)

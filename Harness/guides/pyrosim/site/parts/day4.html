@@ -1,206 +1,164 @@
 <section id="day4">
-  <div class="day-head">
-    <div>
-      <p class="kicker">Day 4</p>
-      <h2>Today you decide what the run writes down, where it is measured, and how often</h2>
-    </div>
-    <div class="day-meta"><b>2–3 h</b><span>time today</span></div>
-  </div>
-
-  <div class="goal">
-    <span class="g-l">Goal</span>
-    <p>A model that records two sensor nodes at two heights, a smoke-layer line, a floor heat flux and four slice planes, writing one row every second — the three channels DATASET consumes plus everything you need to check them.</p>
-  </div>
-
-  <p class="phase">Learn</p>
-
-  <p class="prose">PyroSim has no object called a sensor. It has <b>devices</b>, and each one is a single FDS <code>&amp;DEVC</code> line that names a quantity and a place. FDS samples the device as the run steps and writes it as one column of <code>CHID_devc.csv</code>, one row per output interval. Nothing else in the run changes: a device measures, it does not affect the fire.</p>
-
-  <p class="prose">Every device you place today comes from the <span class="ui">Devices</span> menu. These are its entries, in the order the menu lists them:</p>
-
-  <ul class="plain">
-    <li>New Gas-phase Device, New Solid-phase Device, New Thermocouple, New FED Device</li>
-    <li>New Statistics Device, New Time Device, New Beam Detector Device, New Layer Zoning Device</li>
-    <li>New Heat Release Rate Device, New Flow Measuring Device, New Aspirator</li>
-    <li>New Smoke Detector, New Heat Detector, New Sprinkler, New Nozzle</li>
-    <li>New HVAC Duct Device, New HVAC Node Device</li>
-  </ul>
-
-  <p class="prose">Today's build uses five of them: gas-phase, solid-phase, thermocouple, FED and layer zoning. The rest wait for a day when you model detection or ventilation.</p>
-
-  <div class="shot">
-    <div class="shot-frame">
-      <p class="sf-l">Screenshot slot</p>
-      <p class="sf-t">On the office desktop, pull down the <span class="ui">Devices</span> menu and capture it at full height, so every entry label is readable. You will compare those labels against this list.</p>
-    </div>
-  </div>
-
-  <p class="prose">The first division to understand is gas-phase against solid-phase. A gas-phase device measures a property of the air in a cell, and PyroSim's own documentation is blunt about what that means: the value is taken <b>at the cell centre, regardless of where in the cell you place the device</b>. A solid-phase device measures a property of a surface, and is taken at a cell face; it needs a <span class="ui">Normal of Solid</span> so FDS knows which way the surface points.</p>
-
-  <details class="deeper">
-    <summary>Why the position inside a cell does not matter</summary>
-    <div class="d-in">
-      <p class="prose">The FDS User's Guide states it directly: FDS uses the device coordinates only to decide which cell the device is in, then reads that cell's centred or face-centred value, and no interpolation is done. So on 10 cm cells a ceiling device typed at 2.35 m and one typed at 2.31 m return identical numbers, because both sit in the cell spanning 2.30 to 2.40 m. Change to 20 cm cells and the same device reads the centre of the 2.20 to 2.40 m cell instead — 2.30 m. The device did not move; the cell did.</p>
-      <p class="prose">A device sitting exactly on a cell boundary is assigned to the cell with the greater coordinate. Thunderhead's tutorial adds a practical warning for solid-phase devices: put the horizontal position inside one cell rather than on a corner, because at a corner FDS will in effect pick one of the four adjoining cells.</p>
-    </div>
-  </details>
-
-  <p class="prose">The second division is <code>TEMPERATURE</code> against <code>THERMOCOUPLE</code>, and it catches almost everyone. <code>TEMPERATURE</code> is the gas temperature in the cell. <code>THERMOCOUPLE</code> is the temperature of a modelled metal bead sitting in that cell, which absorbs and re-radiates heat and takes time to warm up. The guide's own words are that the thermocouple temperature lags the true gas temperature by an amount set mainly by its bead size. In a short verification run on this project's Mac, a 20 kW burner in a 1 m box gave <span class="val">172.6 °C</span> for <code>TEMPERATURE</code> and <span class="val">84.8 °C</span> for <code>THERMOCOUPLE</code> at the same point at the same instant. Neither is wrong. They are different instruments.</p>
-
-  <details class="deeper">
-    <summary>What the bead model actually solves, and its defaults</summary>
-    <div class="d-in">
-      <p class="prose">FDS writes an energy balance on a small sphere: convection from the gas, plus absorbed radiation, minus what the bead re-radiates, divided by the bead's mass and specific heat. In FDS 6.10.1 — the version PyroSim 2026.1 bundles — the defaults are a bead diameter of 0.001 m, an emissivity of 0.85, and the density and specific heat of nickel, 8908 kg/m³ and 0.44 kJ/(kg·K). PyroSim exposes all four as <span class="ui">Bead Diameter</span>, <span class="ui">Emissivity</span>, <span class="ui">Bead Density</span> and <span class="ui">Bead Specific Heat</span>.</p>
-      <p class="prose">FDS 6.11.1 changed those last two to Type-K values, 8700 kg/m³ with a specific heat that ramps from 0.4515 kJ/(kg·K) at 20 °C to 0.6010 kJ/(kg·K) at 1200 °C. You are not running 6.11.1, so you get nickel. If you later compare against a paper that used a newer FDS, that is one place the two can differ.</p>
-      <p class="prose">The rule of thumb that follows: if you are emulating a real thermocouple or a real detector, use <code>THERMOCOUPLE</code>. If you want the gas temperature a zone model or a hand correlation would predict, use <code>TEMPERATURE</code>. Do not mix the two inside one channel, and whenever you quote a temperature, say which of the two it came from.</p>
-    </div>
-  </details>
-
-  <p class="prose">Gases are not separate quantities in FDS 6. Carbon monoxide, carbon dioxide and oxygen are all read with the quantity <code>VOLUME FRACTION</code> plus a <code>SPEC_ID</code> naming the species: <code>'CARBON MONOXIDE'</code>, <code>'CARBON DIOXIDE'</code>, <code>'OXYGEN'</code>. There is no <code>OXYGEN VOLUME FRACTION</code> quantity in FDS 6, so a menu entry that reads like one is showing you a label, not a keyword. Volume fraction comes out in mol/mol, so a reading of 0.000061 is 61 ppm: ppm is mol/mol multiplied by 1,000,000.</p>
-
-  <details class="deeper">
-    <summary>Getting ppm out of PyroSim rather than out of a spreadsheet</summary>
-    <div class="d-in">
-      <p class="prose">FDS can do the multiplication for you. The <code>&amp;DEVC</code> keywords are <code>CONVERSION_FACTOR=1.0E6</code> with <code>UNITS='ppm'</code>, and that is exactly what the reference case uses, so its CO columns are already in ppm with <code>ppm</code> in the units row of the CSV. The research notes for this guide do not record a PyroSim dialog field that writes those two keywords, so on the office desktop assume you will either multiply mol/mol by 1,000,000 when you read the CSV, or add the keywords to the exported <code>.fds</code> file on Day 7. Whichever you choose, write the choice down: a CO channel that is silently in mol/mol and one that is in ppm differ by six orders of magnitude and both look plausible in a plot.</p>
-      <p class="prose">One more prerequisite, from Day 3: CO and soot only exist in the run if you set <code>CO_YIELD</code> and <code>SOOT_YIELD</code> on the reaction. Both default to zero. With them at zero a CO device does not error: the 1 m test box on this project's Mac, run once with the yields left out, returned CO exactly 0, optical density 0 and visibility pinned at its 30 m maximum for the whole run.</p>
-    </div>
-  </details>
-
-  <p class="prose">Smoke is measured three ways and they are related by constants you can look up. FDS tracks an extinction coefficient K, computed as the mass extinction coefficient times the soot mass per unit volume. <code>OPTICAL DENSITY</code> is K divided by 2.3, in units of 1/m — this is the quantity DATASET consumes. <code>VISIBILITY</code> is a visibility factor C divided by K, in metres.</p>
-
-  <div class="scroll">
-    <table>
-      <thead>
-        <tr><th>Setting</th><th>Where it lives</th><th class="num">Default</th><th>What changes if you alter it</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><b>Mass extinction coefficient</b></td><td>FDS <code>MASS_EXTINCTION_COEFFICIENT</code></td><td class="num">8700 m²/kg</td><td>Scales K, so it moves optical density and visibility together. The suggested value for flaming fuels, quoted with an uncertainty of about ±1100 m²/kg at 633 nm.</td></tr>
-        <tr><td><b>Visibility Factor</b></td><td>Simulation Parameters, Environment tab</td><td class="num">3.0</td><td>Only visibility. 3 is a light-reflecting sign, 8 is a light-emitting sign.</td></tr>
-        <tr><td><b>Maximum Visibility</b></td><td>Simulation Parameters, Environment tab</td><td class="num">30.0 m</td><td>The ceiling on the reported visibility. FDS cannot report infinity, so clear air reads exactly this number.</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">The visibility factor is worth one experiment before you trust any visibility number. Two identical runs on this project's Mac, one at C = 3 and one at C = 8, gave the same optical density to four figures — 0.3385 1/m — and visibilities of 3.855 m and 10.280 m. The ratio is 2.667, which is 8 divided by 3, everywhere the reading is below the 30 m cap. So switching that one field multiplies every uncapped visibility by 2.67 without a single molecule of smoke changing. Optical density is untouched by it, which is one good reason DATASET's wire contract asks for optical density per metre rather than visibility.</p>
-
-  <p class="prose">A smoke layer is not something FDS computes. It is a two-zone construct, and FDS reconstructs it after the fact by integrating temperature along one vertical line — the method of Janssens and Tran. The <span class="ui">New Layer Zoning Device</span> entry gives you that line, with three tick boxes: <span class="ui">Measure Layer Height</span>, <span class="ui">Upper Temperature</span> and <span class="ui">Lower Temperature</span>. Both ends of the path must lie in the same mesh.</p>
-
-  <details class="deeper">
-    <summary>How to read a layer height that is not moving</summary>
-    <div class="d-in">
-      <p class="prose">FDS integrates the temperature and its reciprocal up the line, solves for an interface height, and reports the upper and lower averages in °C. Solid cells in the column are skipped. The behaviour worth memorising is the fallback: if the computed upper-layer temperature is less than 1 K above the temperature of the lowest cell on the line, FDS returns the <b>full length of the line</b> as the layer height. In a 2.4 m room with the line running floor to ceiling, that is a flat 2.4 m.</p>
-      <p class="prose">So a layer height pinned at exactly the line length is FDS saying "I cannot find a layer here", not "the layer is at the ceiling". On the Mac verification run a corner line of length 1.0 m read 1.0 m for its whole three seconds, for that reason. Layer height is also measured from the lower end of the line, so start the line at z = 0 m if you want heights above the floor.</p>
-    </div>
-  </details>
-
-  <p class="prose">Last, FED — fractional effective dose. It is a device-only quantity; you cannot make a slice of it. More importantly, the FED device is <b>always a running time integral from the start of the simulation</b>, whatever averaging you ask for. FDS forces that internally. A FED column therefore never falls, and a FED value has no meaning without the time it belongs to. FDS's FED is the asphyxiant model: a carbon monoxide dose multiplied by a carbon dioxide hyperventilation factor, plus a separate oxygen-depletion dose, and no thermal term at all. A reaction with no CO yield leaves only the oxygen term, and heat never enters the number. The <span class="ui">FED Activity</span> level is 1 at rest, 2 doing light work, 3 doing heavy work, and the default is 2.</p>
-
-  <p class="phase">Build</p>
-
-  <p class="prose">DATASET consumes three channels per zone: <code>temperature_c</code> in °C, <code>optical_density</code> as OD per metre, and <code>co_ppm</code> in ppm. Occupancy is the fourth channel and it comes from the crowd simulator, never from FDS — a frame carrying a channel from the wrong owner is rejected. Each zone's physical node is one box holding a K-type thermocouple read through a MAX31855, a photoelectric obscuration chamber that reports OD per metre directly, and an electrochemical CO cell. Three devices at one point emulate that node.</p>
-
-  <p class="prose">The node's mounting height is not written down anywhere in the DATASET knowledge base, so this guide follows the reference case and puts the emulated node in the topmost cell, at 2.35 m in a 2.4 m room, where a detector would sit. The quantities that say how survivable the room is — visibility, which DATASET predicts alongside temperature and CO, and FED, oxygen and carbon dioxide, which you use to check it — go at head height, 1.85 m. Two positions: S1 at the room centre and S2 near the door, so you can see how much a node's reading depends on where in the room it hangs.</p>
-
-  <!--CHART:dataset-->
-
-  <p class="prose">That is the reference run's S1 ceiling node on 20 cm cells: the three DATASET channels from one point, over the full 1200 s programme. Note that all three respond to the step from 100 kW to 300 kW at 600 s, and that they respond at different speeds.</p>
-
-  <div class="scroll">
-    <table>
-      <thead>
-        <tr><th>Device</th><th>FDS quantity</th><th class="num">Height (m)</th><th>What it is for</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><b>S1_T, S2_T</b></td><td><code>THERMOCOUPLE</code></td><td class="num">2.35</td><td>The <code>temperature_c</code> channel</td></tr>
-        <tr><td><b>S1_CO, S2_CO</b></td><td><code>VOLUME FRACTION</code>, <code>SPEC_ID='CARBON MONOXIDE'</code></td><td class="num">2.35</td><td>The <code>co_ppm</code> channel</td></tr>
-        <tr><td><b>S1_OD, S2_OD</b></td><td><code>OPTICAL DENSITY</code></td><td class="num">2.35</td><td>The <code>optical_density</code> channel</td></tr>
-        <tr><td><b>S1_VIS, S2_VIS</b></td><td><code>VISIBILITY</code></td><td class="num">1.85</td><td>Tenability label</td></tr>
-        <tr><td><b>S1_FED, S2_FED</b></td><td><code>FED</code></td><td class="num">1.85</td><td>Tenability label, running integral</td></tr>
-        <tr><td><b>S1_O2, S2_O2</b></td><td><code>VOLUME FRACTION</code>, <code>SPEC_ID='OXYGEN'</code></td><td class="num">1.85</td><td>Feeds the FED you check by hand</td></tr>
-        <tr><td><b>S1_CO2, S2_CO2</b></td><td><code>VOLUME FRACTION</code>, <code>SPEC_ID='CARBON DIOXIDE'</code></td><td class="num">1.85</td><td>Feeds the FED you check by hand</td></tr>
-        <tr><td><b>LAYER_H, UPPER_T, LOWER_T</b></td><td><code>LAYER HEIGHT</code>, <code>UPPER TEMPERATURE</code>, <code>LOWER TEMPERATURE</code></td><td class="num">0.0–2.4</td><td>One vertical line, three readings</td></tr>
-        <tr><td><b>FLOOR_FLUX</b></td><td><code>GAUGE HEAT FLUX</code></td><td class="num">0.0</td><td>Solid-phase, floor centre, flashover indicator</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">S1 sits at x = 1.85 m, y = 1.25 m. S2 sits at x = 3.25 m, y = 1.25 m, which is 0.35 m inside the front wall. Both are cell centres on a 10 cm mesh, which is deliberate: it makes the device location and the value's true location the same point.</p>
-
-  <ol class="steps">
-    <li><div><p><span class="path">Devices › New Thermocouple</span> — name it <span class="val">S1_T</span> and set its location to x <span class="val">1.85</span> m, y <span class="val">1.25</span> m, z <span class="val">2.35</span> m. Leave the bead diameter, emissivity, density and specific heat at their defaults.</p></div></li>
-    <li><div><p><span class="path">Devices › New Gas-phase Device</span> — name it <span class="val">S1_CO</span>, at the same point, and pick the quantity that names carbon monoxide volume fraction. PyroSim's quantity list merges the species into some of its labels, so do not trust the label alone.</p></div></li>
-    <li><div><p><span class="path">Record View</span> (the tab at the bottom of the model view) — find the line you have made. It must read <code>QUANTITY='VOLUME FRACTION'</code> with <code>SPEC_ID='CARBON MONOXIDE'</code>. If it reads anything else, go back and choose again. Do this check once; after that you will recognise the right label.</p></div></li>
-    <li><div><p><span class="path">Devices › New Gas-phase Device</span> — name it <span class="val">S1_OD</span>, quantity optical density, at the same point as the other two. That completes the emulated ceiling node.</p></div></li>
-    <li><div><p><span class="path">Devices › New Gas-phase Device</span>, three times — <span class="val">S1_VIS</span> (visibility), <span class="val">S1_O2</span> (oxygen volume fraction) and <span class="val">S1_CO2</span> (carbon dioxide volume fraction), all at x <span class="val">1.85</span> m, y <span class="val">1.25</span> m, z <span class="val">1.85</span> m.</p></div></li>
-    <li><div><p><span class="path">Devices › New FED Device</span> — name it <span class="val">S1_FED</span>, same head-height point. Leave the activity level at its default of light work.</p></div></li>
-    <li><div><p><span class="path">Devices</span> — repeat steps 1 to 6 as <span class="val">S2_*</span> at x <span class="val">3.25</span> m, y <span class="val">1.25</span> m, with the same two heights. You now have fourteen devices, seven per node.</p></div></li>
-    <li><div><p><span class="path">Devices › New Layer Zoning Device</span> — name it <span class="val">LAYER</span> and set the path from x <span class="val">3.25</span> m, y <span class="val">2.15</span> m, z <span class="val">0.0</span> m to x <span class="val">3.25</span> m, y <span class="val">2.15</span> m, z <span class="val">2.4</span> m. Tick all three of layer height, upper temperature and lower temperature. Both ends are inside the room mesh, which is the requirement.</p></div></li>
-    <li><div><p><span class="path">Devices › New Solid-phase Device</span> — name it <span class="val">FLOOR_FLUX</span>, quantity gauge heat flux, at x <span class="val">1.85</span> m, y <span class="val">1.25</span> m, z <span class="val">0.0</span> m, with <span class="ui">Normal of Solid</span> set to Z = <span class="val">1.0</span>, pointing up out of the floor. In the exported file that becomes <code>IOR=3</code>.</p></div></li>
-    <li><div><p><span class="path">Analysis › Simulation Parameters › Output</span> — under <span class="ui">Output File Write Intervals</span>, set <span class="ui">Device</span> to <span class="val">1</span> s. Without this, output is written <code>(T_END − T_BEGIN)</code> divided by <code>NFRAMES</code> apart, and with the default of 1000 frames a 1200 s run would write devices every 1.2 s.</p></div></li>
-    <li><div><p><span class="path">Analysis › Simulation Parameters › Environment</span> — confirm <span class="ui">Visibility Factor</span> reads <span class="val">3.0</span> and <span class="ui">Maximum Visibility</span> reads <span class="val">30.0</span> m. You are not changing them; you are recording that you saw them, because every visibility number in this model depends on both.</p></div></li>
-    <li><div><p><span class="path">Output › 2D Slices</span> — the <span class="ui">Animated Planar Slices</span> dialog. Use <span class="ui">Insert Row</span> and fill the columns <span class="ui">Name</span>, <span class="ui">XYZ Plane</span>, <span class="ui">Plane Value</span>, <span class="ui">Gas Phase Quantity</span>, <span class="ui">Use Vector?</span> and <span class="ui">Cell Centered?</span> for four planes: temperature on Y = <span class="val">1.25</span> m with vectors on; carbon monoxide volume fraction on Y = <span class="val">1.25</span> m; visibility on Z = <span class="val">1.85</span> m; temperature on X = <span class="val">3.65</span> m, the doorway.</p></div></li>
-    <li><div><p><span class="path">File › Save</span> — then open <span class="path">Record View</span> once more and read the whole <code>&amp;DEVC</code> block from top to bottom. Every device you meant to place should be there, with the coordinates you meant.</p></div></li>
-  </ol>
-
-  <p class="prose">One optional addition is worth the ten minutes. Place seven thermocouples in a vertical line at x = 3.25 m, y = 2.15 m, at 0.25, 0.65, 1.05, 1.45, 1.85, 2.25 and 2.35 m — the same line as the layer device. A thermocouple tree on the same line lets you check the layer device against the temperatures it was derived from, which is what Day 6 does with it. The reference case also carries a six-point tree in the doorway at x = 3.65 m for the same reason.</p>
-
-  <div class="shot">
-    <div class="shot-frame">
-      <p class="sf-l">Screenshot slot</p>
-      <p class="sf-t">Capture the 3D view looking in through the door with all devices visible, and the <span class="ui">Devices</span> branch of the Navigation panel expanded beside it, so the names and the count can be read together.</p>
-    </div>
-  </div>
-
-  <p class="phase">Check</p>
-
-  <div class="check">
-    <h4>Check your result</h4>
-    <p class="prose">Count the devices in the Navigation panel. Fourteen sensor-node devices, three layer readings and one floor flux is eighteen; add the two thermocouple trees, thirteen devices, and the reference case's two doorway flow devices, and you reach its thirty-three. In the Record View, every gas device has an <code>XYZ</code> triple, the layer device has an <code>XB</code> sextuple with two of its three pairs equal, and the floor device carries <code>IOR=3</code>. On the Output tab, the device interval reads 1 s.</p>
-    <p class="prose">Nothing has run yet, so there are no numbers to check. What you are checking is that the file says what you think it says.</p>
-  </div>
-
-  <p class="prose">When you do run it, on Day 5, this is what these devices produced in the reference case — on 20 cm cells, which is coarse, so read them as this run's numbers and not as the truth about an ISO 9705 room. The temperature column is the top bead of the corner thermocouple tree, on the same vertical line as the layer device; the other four columns are S1.</p>
-
-  <div class="scroll">
-    <table>
-      <thead>
-        <tr><th>Time (s)</th><th class="num">Corner tree TC, 2.35 m (°C)</th><th class="num">S1 CO (ppm)</th><th class="num">S1 visibility (m)</th><th class="num">Floor flux (kW/m²)</th><th class="num">S1 FED</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><b>60</b></td><td class="num">121</td><td class="num">22</td><td class="num">4.8</td><td class="num">0.36</td><td class="num">—</td></tr>
-        <tr><td><b>300</b></td><td class="num">138</td><td class="num">25</td><td class="num">5.2</td><td class="num">0.52</td><td class="num">—</td></tr>
-        <tr><td><b>620</b></td><td class="num">246</td><td class="num">53</td><td class="num">3.0</td><td class="num">—</td><td class="num">—</td></tr>
-        <tr><td><b>900</b></td><td class="num">311</td><td class="num">58</td><td class="num">2.9</td><td class="num">2.9</td><td class="num">0.03</td></tr>
-        <tr><td><b>1195</b></td><td class="num">342</td><td class="num">61</td><td class="num">3.1</td><td class="num">3.7</td><td class="num">0.04</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="prose">A dash marks a value the reference table does not list; it is not a zero. Two things in that table are worth sitting with. Every visibility reading is far below the 30 m cap, so the soot is genuinely doing work — had you set the visibility factor to 8 instead of 3, the 3.1 m at 1195 s would read about 8.3 m for exactly the same smoke. And FED climbs from 0.03 to 0.04 and never comes back down, because it is an integral.</p>
-
-  <!--CHART:tenability-->
-
-  <p class="prose">Those are the tenability quantities from the same 20 cm run: visibility and the FED integral at head height, and the heat flux arriving at the floor centre. Visibility is the one DATASET also predicts; the other two say how survivable the room was. All three are quantities a beginner often finds stuck, and never because of the device. With the soot yield at zero, visibility sits at its 30 m maximum for the whole run; with the CO yield at zero, the FED integral barely moves; with the walls left on the default <code>INERT</code> surface, which is fixed at the ambient temperature, the floor flux reads low.</p>
-
-  <div class="watch">
-    <h4>Watch out</h4>
-    <p class="prose">A device placed outside every mesh does not stop the run and does not raise an error. FDS prints one line to the console — <code>WARNING: DEVC S2_T is not within any mesh.</code> — skips the device, finishes normally and reports <code>STOP: FDS completed successfully</code>. The only visible symptom is that the column is missing from <code>CHID_devc.csv</code>. On this project's Mac a test case with two devices, one of them outside the mesh, produced a CSV whose header held a single name. If you are generating hundreds of runs on Day 7, a mistyped coordinate silently costs you a channel in every one of them. Read the console log for <code>WARNING: DEVC</code> before you trust a batch, and count the columns in the CSV against the devices in the model.</p>
-    <p class="prose">A related silence: a solid-phase device on a wall that still has the default <code>INERT</code> surface reads ambient, flat, for the entire run — the reserved surface <code>INERT</code> is fixed at the ambient temperature by definition. Thunderhead's own tutorial teaches this with a ceiling that sits at a constant 22 °C from start to finish. The fix is a layered surface built from real materials — the aerated concrete the reference case gives this room — not the <code>ADIABATIC</code> surface, which the FDS guide says should only be used for testing.</p>
-  </div>
-
-  <p class="prose">One last sampling decision belongs to today, because it is written into the file and not into the post-processing. DATASET frames are 5 s apart, and the rule is to build them by <b>decimation</b> — keep every fifth 1 s sample — never by averaging into 5 s bins, because averaging low-passes exactly the rate of rise the trend features exist to detect. That is why the device interval is 1 s and not 5 s. One caveat belongs with it, and it is easy to miss because nothing warns you. FDS time-averages device output between printouts by default, so each 1 s row is already a mean over the preceding second. Your run's own <code>.out</code> file says so: search it for <code>TEMPORAL STATISTIC</code> and you will find <code>TIME AVERAGE</code> against every device except the FED ones, which are running integrals. Decimating that series therefore gives you one-second averages, not samples. For reading and plotting this does not matter. For DATASET it does, because the contract decimates precisely so that nothing is averaged — and a channel FDS has already averaged would then be averaged twice. Every case that ships with this guide therefore carries <code>TEMPORAL_STATISTIC='INSTANT VALUE'</code> on the twelve training channels, and leaves the two FED devices alone because a fractional effective dose is a running integral by definition. <code>TIME_AVERAGED=F</code> is the older spelling of the same instruction. Add one or the other to the file you export on Day 7, and confirm it the way you would confirm anything else: search the <code>.out</code> file afterwards and read what FDS says it did. Also settle, once, whether <code>temperature_c</code> means the reading at the node or a hot-gas-layer average, and write the answer next to the dataset. A detector is not a layer: in the reference run at 1195 s the thermocouple at the top of the corner line read 342 °C while the layer device on that same line reported an upper-layer average of 297 °C, a 45 °C gap between two readings taken from one vertical line at one instant.</p>
-
-  <p class="prose">The reference case below is the whole file. Read the <code>&amp;DEVC</code> block against what you built: two sensor nodes, two trees, the layer line, the floor flux, two doorway flow devices, then the four <code>&amp;SLCF</code> planes. The <code>&amp;DUMP</code> line near the top carries <code>DT_DEVC=1.0</code>, which is the Output tab field you set in step 10.</p>
-
-  <!--FDSBLOCK:iso9705_room-->
-
-  <div class="quiz">
-    <details class="q"><summary><span class="qt">You place a gas-phase device 3 cm from a wall, inside a 20 cm cell. What value does it report?</span></summary><div class="qa"><p>The value at the centre of that cell. FDS uses the coordinates only to choose the cell and does no interpolation, so anywhere inside the same cell gives the same number. To measure nearer the wall you need a finer mesh, not a nudged device.</p></div></details>
-    <details class="q"><summary><span class="qt">At one point and one instant, a <code>TEMPERATURE</code> device reads 172.6 °C and a <code>THERMOCOUPLE</code> device reads 84.8 °C. Which one is broken?</span></summary><div class="qa"><p>Neither. <code>TEMPERATURE</code> is the gas in the cell; <code>THERMOCOUPLE</code> is a modelled metal bead that has to heat up and that loses heat by radiation, so it lags the gas, and the lag is largest in a fast transient. Report whichever matches the instrument you are comparing against, and say which you used.</p></div></details>
-    <details class="q"><summary><span class="qt">The run ends with <code>STOP: FDS completed successfully</code> but one of your devices has no column in <code>CHID_devc.csv</code>. What happened?</span></summary><div class="qa"><p>Its coordinates fell outside every mesh, so FDS skipped it. The only trace is a console line reading <code>WARNING: DEVC &lt;name&gt; is not within any mesh.</code> Move the device inside the mesh and rerun, and add a check on the log and the column count before you trust a batch.</p></div></details>
-    <details class="q"><summary><span class="qt">You change the visibility factor from 3 to 8. What happens to optical density, and what happens to visibility?</span></summary><div class="qa"><p>Optical density does not change at all — it is the extinction coefficient divided by 2.3 and does not contain the visibility factor. Every visibility reading below the cap is multiplied by 2.67, which is 8 divided by 3. The 30 m maximum stays where it is. This was checked by running the same case twice.</p></div></details>
-    <details class="q"><summary><span class="qt">Your FED device reads 0.03 at 900 s and 0.04 at 1195 s. Can a FED column ever fall?</span></summary><div class="qa"><p>No. FDS forces the FED device to be a running time integral from the start of the simulation, whatever temporal statistic you ask for, so it only ever rises or stays flat. A FED figure is meaningless without the time it was reached at, and the FDS version carries no thermal term — it is the asphyxiant dose only.</p></div></details>
-  </div>
-
-  <div class="done-row"><input type="checkbox" id="done-day4" data-done="day4"><label for="done-day4">Day 4 done</label></div>
+<div class="day-head">
+<div>
+<p class="kicker">Day 4</p>
+<h2>Today you decide what the run writes down, where it is measured, and how often</h2>
+</div>
+<div class="day-meta"><b>2–3 h</b><span>time today</span></div>
+</div>
+<div class="goal">
+<span class="g-l">Goal</span>
+<p>Record temperature, CO and optical density at two sensor positions, plus additional layer, visibility and heat-flux measurements. The cases write one row every second.</p>
+</div>
+<p class="phase">Learn</p>
+<p class="prose">PyroSim has no object called a sensor. It has <b>devices</b>, and each one is a single FDS <code>&amp;DEVC</code> line that names a quantity and a place. FDS samples the device as the run steps and writes it as one column of <code>CHID_devc.csv</code>, one row per output interval. Nothing else in the run changes: a device measures, it does not affect the fire.</p>
+<p class="prose">Every device you place today comes from the <span class="ui">Devices</span> menu. These are its entries, in the order the menu lists them:</p>
+<ul class="plain">
+<li>New Gas-phase Device, New Solid-phase Device, New Thermocouple, New FED Device</li>
+<li>New Statistics Device, New Time Device, New Beam Detector Device, New Layer Zoning Device</li>
+<li>New Heat Release Rate Device, New Flow Measuring Device, New Aspirator</li>
+<li>New Smoke Detector, New Heat Detector, New Sprinkler, New Nozzle</li>
+<li>New HVAC Duct Device, New HVAC Node Device</li>
+</ul>
+<p class="prose">Today's build uses five of them: gas-phase, solid-phase, thermocouple, FED and layer zoning. The rest wait for a day when you model detection or ventilation.</p>
+<div class="shot">
+<div class="shot-frame">
+<p class="sf-l">Screenshot slot</p>
+<p class="sf-t">On the Windows computer, pull down the <span class="ui">Devices</span> menu and capture it at full height, so every entry label is readable. You will compare those labels against this list.</p>
+</div>
+</div>
+<p class="prose">The first division to understand is gas-phase against solid-phase. A gas-phase device measures a property of the air in a cell, and PyroSim's own documentation is blunt about what that means: the value is taken <b>at the cell centre, regardless of where in the cell you place the device</b>. A solid-phase device measures a property of a surface, and is taken at a cell face; it needs a <span class="ui">Normal of Solid</span> so FDS knows which way the surface points.</p>
+<details class="deeper">
+<summary>Why the position inside a cell does not matter</summary>
+<div class="d-in">
+<p class="prose">The FDS User's Guide states it directly: FDS uses the device coordinates only to decide which cell the device is in, then reads that cell's centred or face-centred value, and no interpolation is done. So on 10 cm cells a ceiling device typed at 2.35 m and one typed at 2.31 m return identical numbers, because both sit in the cell spanning 2.30 to 2.40 m. Change to 20 cm cells and the same device reads the centre of the 2.20 to 2.40 m cell instead — 2.30 m. The device did not move; the cell did.</p>
+<p class="prose">A device sitting exactly on a cell boundary is assigned to the cell with the greater coordinate. Thunderhead's tutorial adds a practical warning for solid-phase devices: put the horizontal position inside one cell rather than on a corner, because at a corner FDS will in effect pick one of the four adjoining cells.</p>
+</div>
+</details>
+<p class="prose">The second division is <code>TEMPERATURE</code> against <code>THERMOCOUPLE</code>, and it catches almost everyone. <code>TEMPERATURE</code> is the gas temperature in the cell. <code>THERMOCOUPLE</code> is the temperature of a modelled metal bead sitting in that cell, which absorbs and re-radiates heat and takes time to warm up. The guide's own words are that the thermocouple temperature lags the true gas temperature by an amount set mainly by its bead size. In a short verification run on the historical reference environment, a 20 kW burner in a 1 m box gave <span class="val">172.6 °C</span> for <code>TEMPERATURE</code> and <span class="val">84.8 °C</span> for <code>THERMOCOUPLE</code> at the same point at the same instant. Neither is wrong. They are different instruments.</p>
+<details class="deeper">
+<summary>What the bead model actually solves, and its defaults</summary>
+<div class="d-in">
+<p class="prose">FDS writes an energy balance on a small sphere: convection from the gas, plus absorbed radiation, minus what the bead re-radiates, divided by the bead's mass and specific heat. In FDS 6.10.1 — the version PyroSim 2026.1 bundles — the defaults are a bead diameter of 0.001 m, an emissivity of 0.85, and the density and specific heat of nickel, 8908 kg/m³ and 0.44 kJ/(kg·K). PyroSim exposes all four as <span class="ui">Bead Diameter</span>, <span class="ui">Emissivity</span>, <span class="ui">Bead Density</span> and <span class="ui">Bead Specific Heat</span>.</p>
+<p class="prose">FDS 6.11.1 changed those last two to Type-K values, 8700 kg/m³ with a specific heat that ramps from 0.4515 kJ/(kg·K) at 20 °C to 0.6010 kJ/(kg·K) at 1200 °C. You are not running 6.11.1, so you get nickel. If you later compare against a paper that used a newer FDS, that is one place the two can differ.</p>
+<p class="prose">The rule of thumb that follows: if you are emulating a real thermocouple or a real detector, use <code>THERMOCOUPLE</code>. If you want the gas temperature a zone model or a hand correlation would predict, use <code>TEMPERATURE</code>. Do not mix the two inside one channel, and whenever you quote a temperature, say which of the two it came from.</p>
+</div>
+</details>
+<p class="prose">Gases are not separate quantities in FDS 6. Carbon monoxide, carbon dioxide and oxygen are all read with the quantity <code>VOLUME FRACTION</code> plus a <code>SPEC_ID</code> naming the species: <code>'CARBON MONOXIDE'</code>, <code>'CARBON DIOXIDE'</code>, <code>'OXYGEN'</code>. There is no <code>OXYGEN VOLUME FRACTION</code> quantity in FDS 6, so a menu entry that reads like one is showing you a label, not a keyword. Volume fraction comes out in mol/mol, so a reading of 0.000061 is 61 ppm: ppm is mol/mol multiplied by 1,000,000.</p>
+<details class="deeper">
+<summary>Getting ppm out of PyroSim rather than out of a spreadsheet</summary>
+<div class="d-in">
+<p class="prose">FDS can do the multiplication for you. The <code>&amp;DEVC</code> keywords are <code>CONVERSION_FACTOR=1.0E6</code> with <code>UNITS='ppm'</code>, and that is exactly what the reference case uses, so its CO columns are already in ppm with <code>ppm</code> in the units row of the CSV. The research notes for this guide do not record a PyroSim dialog field that writes those two keywords, so on the Windows computer assume you will either multiply mol/mol by 1,000,000 when you read the CSV, or add the keywords to the exported <code>.fds</code> file on Day 7. Whichever you choose, write the choice down: a CO channel that is silently in mol/mol and one that is in ppm differ by six orders of magnitude and both look plausible in a plot.</p>
+<p class="prose">One more prerequisite, from Day 3: CO and soot only exist in the run if you set <code>CO_YIELD</code> and <code>SOOT_YIELD</code> on the reaction. Both default to zero. With them at zero a CO device does not error: the 1 m test box on the historical reference environment, run once with the yields left out, returned CO exactly 0, optical density 0 and visibility pinned at its 30 m maximum for the whole run.</p>
+</div>
+</details>
+<p class="prose">FDS optical density is extinction coefficient K divided by 2.3, in 1/m. The raw-frame exporter retains that quantity. Visibility is a visibility factor C divided by K, in metres.</p>
+<div class="scroll">
+<table>
+<thead>
+<tr><th>Setting</th><th>Where it lives</th><th class="num">Default</th><th>What changes if you alter it</th></tr>
+</thead>
+<tbody>
+<tr><td><b>Mass extinction coefficient</b></td><td>FDS <code>MASS_EXTINCTION_COEFFICIENT</code></td><td class="num">8700 m²/kg</td><td>Scales K, so it moves optical density and visibility together. The suggested value for flaming fuels, quoted with an uncertainty of about ±1100 m²/kg at 633 nm.</td></tr>
+<tr><td><b>Visibility Factor</b></td><td>Simulation Parameters, Environment tab</td><td class="num">3.0</td><td>Only visibility. 3 is a light-reflecting sign, 8 is a light-emitting sign.</td></tr>
+<tr><td><b>Maximum Visibility</b></td><td>Simulation Parameters, Environment tab</td><td class="num">30.0 m</td><td>The ceiling on the reported visibility. FDS cannot report infinity, so clear air reads exactly this number.</td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose">The visibility factor is worth one experiment before you trust any visibility number. Two identical runs on the historical reference environment, one at C = 3 and one at C = 8, gave the same optical density to four figures — 0.3385 1/m — and visibilities of 3.855 m and 10.280 m. The ratio is 2.667, which is 8 divided by 3, everywhere the reading is below the 30 m cap. So switching that one field multiplies every uncapped visibility by 2.67 without a single molecule of smoke changing. Optical density is untouched by it, which is one good reason this CSV format asks for optical density per metre rather than visibility.</p>
+<p class="prose">A smoke layer is not something FDS computes. It is a two-zone construct, and FDS reconstructs it after the fact by integrating temperature along one vertical line — the method of Janssens and Tran. The <span class="ui">New Layer Zoning Device</span> entry gives you that line, with three tick boxes: <span class="ui">Measure Layer Height</span>, <span class="ui">Upper Temperature</span> and <span class="ui">Lower Temperature</span>. Both ends of the path must lie in the same mesh.</p>
+<details class="deeper">
+<summary>How to read a layer height that is not moving</summary>
+<div class="d-in">
+<p class="prose">FDS integrates the temperature and its reciprocal up the line, solves for an interface height, and reports the upper and lower averages in °C. Solid cells in the column are skipped. The behaviour worth memorising is the fallback: if the computed upper-layer temperature is less than 1 K above the temperature of the lowest cell on the line, FDS returns the <b>full length of the line</b> as the layer height. In a 2.4 m room with the line running floor to ceiling, that is a flat 2.4 m.</p>
+<p class="prose">So a layer height pinned at exactly the line length is FDS saying "I cannot find a layer here", not "the layer is at the ceiling". On the Mac verification run a corner line of length 1.0 m read 1.0 m for its whole three seconds, for that reason. Layer height is also measured from the lower end of the line, so start the line at z = 0 m if you want heights above the floor.</p>
+</div>
+</details>
+<p class="prose">Last, FED — fractional effective dose. It is a device-only quantity; you cannot make a slice of it. More importantly, the FED device is <b>always a running time integral from the start of the simulation</b>, whatever averaging you ask for. FDS forces that internally. A FED column therefore never falls, and a FED value has no meaning without the time it belongs to. FDS's FED is the asphyxiant model: a carbon monoxide dose multiplied by a carbon dioxide hyperventilation factor, plus a separate oxygen-depletion dose, and no thermal term at all. A reaction with no CO yield leaves only the oxygen term, and heat never enters the number. The <span class="ui">FED Activity</span> level is 1 at rest, 2 doing light work, 3 doing heavy work, and the default is 2.</p>
+<p class="phase">Build</p>
+<p class="prose">This guide exports three raw sensor channels: <code>temperature_c</code> in °C, <code>optical_density</code> per metre, and <code>co_ppm</code> in ppm. Visibility and FED remain additional measurements. No project-specific schema or risk classifier is required.</p>
+<p class="prose">The public reference case places temperature, CO and optical-density devices at 2.35 m in a 2.4 m room. Visibility, FED, oxygen and carbon dioxide are measured at 1.85 m. S1 is near the room centre and S2 near the door; these are teaching choices, not standard instrument positions.</p>
+<!--CHART:dataset-->
+<p class="prose">That is the reference run's S1 ceiling node on 20 cm cells: the three sensor data channels from one point, over the full 1200 s programme. Note that all three respond to the step from 100 kW to 300 kW at 600 s, and that they respond at different speeds.</p>
+<div class="scroll">
+<table>
+<thead>
+<tr><th>Device</th><th>FDS quantity</th><th class="num">Height (m)</th><th>What it is for</th></tr>
+</thead>
+<tbody>
+<tr><td><b>S1_T, S2_T</b></td><td><code>THERMOCOUPLE</code></td><td class="num">2.35</td><td>The <code>temperature_c</code> channel</td></tr>
+<tr><td><b>S1_CO, S2_CO</b></td><td><code>VOLUME FRACTION</code>, <code>SPEC_ID='CARBON MONOXIDE'</code></td><td class="num">2.35</td><td>The <code>co_ppm</code> channel</td></tr>
+<tr><td><b>S1_OD, S2_OD</b></td><td><code>OPTICAL DENSITY</code></td><td class="num">2.35</td><td>The <code>optical_density</code> channel</td></tr>
+<tr><td><b>S1_VIS, S2_VIS</b></td><td><code>VISIBILITY</code></td><td class="num">1.85</td><td>Tenability label</td></tr>
+<tr><td><b>S1_FED, S2_FED</b></td><td><code>FED</code></td><td class="num">1.85</td><td>Tenability label, running integral</td></tr>
+<tr><td><b>S1_O2, S2_O2</b></td><td><code>VOLUME FRACTION</code>, <code>SPEC_ID='OXYGEN'</code></td><td class="num">1.85</td><td>Feeds the FED you check by hand</td></tr>
+<tr><td><b>S1_CO2, S2_CO2</b></td><td><code>VOLUME FRACTION</code>, <code>SPEC_ID='CARBON DIOXIDE'</code></td><td class="num">1.85</td><td>Feeds the FED you check by hand</td></tr>
+<tr><td><b>LAYER_H, UPPER_T, LOWER_T</b></td><td><code>LAYER HEIGHT</code>, <code>UPPER TEMPERATURE</code>, <code>LOWER TEMPERATURE</code></td><td class="num">0.0–2.4</td><td>One vertical line, three readings</td></tr>
+<tr><td><b>FLOOR_FLUX</b></td><td><code>GAUGE HEAT FLUX</code></td><td class="num">0.0</td><td>Solid-phase, floor centre, flashover indicator</td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose">S1 sits at x = 1.85 m, y = 1.25 m. S2 sits at x = 3.25 m, y = 1.25 m, which is 0.35 m inside the front wall. Both are cell centres on a 10 cm mesh, which is deliberate: it makes the device location and the value's true location the same point.</p>
+<ol class="steps">
+<li><div><p><span class="path">Devices › New Thermocouple</span> — name it <span class="val">S1_T</span> and set its location to x <span class="val">1.85</span> m, y <span class="val">1.25</span> m, z <span class="val">2.35</span> m. Leave the bead diameter, emissivity, density and specific heat at their defaults.</p></div></li>
+<li><div><p><span class="path">Devices › New Gas-phase Device</span> — name it <span class="val">S1_CO</span>, at the same point, and pick the quantity that names carbon monoxide volume fraction. PyroSim's quantity list merges the species into some of its labels, so do not trust the label alone.</p></div></li>
+<li><div><p><span class="path">Record View</span> (the tab at the bottom of the model view) — find the line you have made. It must read <code>QUANTITY='VOLUME FRACTION'</code> with <code>SPEC_ID='CARBON MONOXIDE'</code>. If it reads anything else, go back and choose again. Do this check once; after that you will recognise the right label.</p></div></li>
+<li><div><p><span class="path">Devices › New Gas-phase Device</span> — name it <span class="val">S1_OD</span>, quantity optical density, at the same point as the other two. That completes the emulated ceiling node.</p></div></li>
+<li><div><p><span class="path">Devices › New Gas-phase Device</span>, three times — <span class="val">S1_VIS</span> (visibility), <span class="val">S1_O2</span> (oxygen volume fraction) and <span class="val">S1_CO2</span> (carbon dioxide volume fraction), all at x <span class="val">1.85</span> m, y <span class="val">1.25</span> m, z <span class="val">1.85</span> m.</p></div></li>
+<li><div><p><span class="path">Devices › New FED Device</span> — name it <span class="val">S1_FED</span>, same head-height point. Leave the activity level at its default of light work.</p></div></li>
+<li><div><p><span class="path">Devices</span> — repeat steps 1 to 6 as <span class="val">S2_*</span> at x <span class="val">3.25</span> m, y <span class="val">1.25</span> m, with the same two heights. You now have fourteen devices, seven per node.</p></div></li>
+<li><div><p><span class="path">Devices › New Layer Zoning Device</span> — name it <span class="val">LAYER</span> and set the path from x <span class="val">3.25</span> m, y <span class="val">2.15</span> m, z <span class="val">0.0</span> m to x <span class="val">3.25</span> m, y <span class="val">2.15</span> m, z <span class="val">2.4</span> m. Tick all three of layer height, upper temperature and lower temperature. Both ends are inside the room mesh, which is the requirement.</p></div></li>
+<li><div><p><span class="path">Devices › New Solid-phase Device</span> — name it <span class="val">FLOOR_FLUX</span>, quantity gauge heat flux, at x <span class="val">1.85</span> m, y <span class="val">1.25</span> m, z <span class="val">0.0</span> m, with <span class="ui">Normal of Solid</span> set to Z = <span class="val">1.0</span>, pointing up out of the floor. In the exported file that becomes <code>IOR=3</code>.</p></div></li>
+<li><div><p><span class="path">Analysis › Simulation Parameters › Output</span> — under <span class="ui">Output File Write Intervals</span>, set <span class="ui">Device</span> to <span class="val">1</span> s. Without this, output is written <code>(T_END − T_BEGIN)</code> divided by <code>NFRAMES</code> apart, and with the default of 1000 frames a 1200 s run would write devices every 1.2 s.</p></div></li>
+<li><div><p><span class="path">Analysis › Simulation Parameters › Environment</span> — confirm <span class="ui">Visibility Factor</span> reads <span class="val">3.0</span> and <span class="ui">Maximum Visibility</span> reads <span class="val">30.0</span> m. You are not changing them; you are recording that you saw them, because every visibility number in this model depends on both.</p></div></li>
+<li><div><p><span class="path">Output › 2D Slices</span> — the <span class="ui">Animated Planar Slices</span> dialog. Use <span class="ui">Insert Row</span> and fill the columns <span class="ui">Name</span>, <span class="ui">XYZ Plane</span>, <span class="ui">Plane Value</span>, <span class="ui">Gas Phase Quantity</span>, <span class="ui">Use Vector?</span> and <span class="ui">Cell Centered?</span> for four planes: temperature on Y = <span class="val">1.25</span> m with vectors on; carbon monoxide volume fraction on Y = <span class="val">1.25</span> m; visibility on Z = <span class="val">1.85</span> m; temperature on X = <span class="val">3.65</span> m, the doorway.</p></div></li>
+<li><div><p><span class="path">File › Save</span> — then open <span class="path">Record View</span> once more and read the whole <code>&amp;DEVC</code> block from top to bottom. Every device you meant to place should be there, with the coordinates you meant.</p></div></li>
+</ol>
+<p class="prose">One optional addition is worth the ten minutes. Place seven thermocouples in a vertical line at x = 3.25 m, y = 2.15 m, at 0.25, 0.65, 1.05, 1.45, 1.85, 2.25 and 2.35 m — the same line as the layer device. A thermocouple tree on the same line lets you check the layer device against the temperatures it was derived from, which is what Day 6 does with it. The reference case also carries a six-point tree in the doorway at x = 3.65 m for the same reason.</p>
+<div class="shot">
+<div class="shot-frame">
+<p class="sf-l">Screenshot slot</p>
+<p class="sf-t">Capture the 3D view looking in through the door with all devices visible, and the <span class="ui">Devices</span> branch of the Navigation panel expanded beside it, so the names and the count can be read together.</p>
+</div>
+</div>
+<p class="phase">Check</p>
+<div class="check">
+<h4>Check your result</h4>
+<p class="prose">Count the devices in the Navigation panel. Fourteen sensor-node devices, three layer readings and one floor flux is eighteen; add the two thermocouple trees, thirteen devices, and the reference case's two doorway flow devices, and you reach its thirty-three. In the Record View, every gas device has an <code>XYZ</code> triple, the layer device has an <code>XB</code> sextuple with two of its three pairs equal, and the floor device carries <code>IOR=3</code>. On the Output tab, the device interval reads 1 s.</p>
+<p class="prose">Nothing has run yet, so there are no numbers to check. What you are checking is that the file says what you think it says.</p>
+</div>
+<p class="prose">When you do run it, on Day 5, this is what these devices produced in the reference case — on 20 cm cells, which is coarse, so read them as this run's numbers and not as the truth about an ISO 9705 room. The temperature column is the top bead of the corner thermocouple tree, on the same vertical line as the layer device; the other four columns are S1.</p>
+<div class="scroll">
+<table>
+<thead>
+<tr><th>Time (s)</th><th class="num">Corner tree TC, 2.35 m (°C)</th><th class="num">S1 CO (ppm)</th><th class="num">S1 visibility (m)</th><th class="num">Floor flux (kW/m²)</th><th class="num">S1 FED</th></tr>
+</thead>
+<tbody>
+<tr><td><b>60</b></td><td class="num">121</td><td class="num">22</td><td class="num">4.8</td><td class="num">0.36</td><td class="num">—</td></tr>
+<tr><td><b>300</b></td><td class="num">138</td><td class="num">25</td><td class="num">5.2</td><td class="num">0.52</td><td class="num">—</td></tr>
+<tr><td><b>620</b></td><td class="num">246</td><td class="num">53</td><td class="num">3.0</td><td class="num">—</td><td class="num">—</td></tr>
+<tr><td><b>900</b></td><td class="num">311</td><td class="num">58</td><td class="num">2.9</td><td class="num">2.9</td><td class="num">0.03</td></tr>
+<tr><td><b>1195</b></td><td class="num">342</td><td class="num">61</td><td class="num">3.1</td><td class="num">3.7</td><td class="num">0.04</td></tr>
+</tbody>
+</table>
+</div>
+<p class="prose">A dash marks a value the reference table does not list; it is not a zero. Two things in that table are worth sitting with. Every visibility reading is far below the 30 m cap, so the soot is genuinely doing work — had you set the visibility factor to 8 instead of 3, the 3.1 m at 1195 s would read about 8.3 m for exactly the same smoke. And FED climbs from 0.03 to 0.04 and never comes back down, because it is an integral.</p>
+<!--CHART:tenability-->
+<p class="prose">Visibility, FED and floor heat flux are additional physical measurements. With zero soot yield, visibility remains at its configured maximum; with zero CO yield, FED changes substantially. Inspect the reaction and wall boundary conditions before interpreting a flat series. These measurements do not create a safety classification.</p>
+<div class="watch">
+<h4>Watch out</h4>
+<p class="prose">A device placed outside every mesh does not stop the run and does not raise an error. FDS prints one line to the console — <code>WARNING: DEVC S2_T is not within any mesh.</code> — skips the device, finishes normally and reports <code>STOP: FDS completed successfully</code>. The only visible symptom is that the column is missing from <code>CHID_devc.csv</code>. On the historical reference environment a test case with two devices, one of them outside the mesh, produced a CSV whose header held a single name. If you are generating hundreds of runs on Day 7, a mistyped coordinate silently costs you a channel in every one of them. Read the console log for <code>WARNING: DEVC</code> before you trust a batch, and count the columns in the CSV against the devices in the model.</p>
+<p class="prose">A related silence: a solid-phase device on a wall that still has the default <code>INERT</code> surface reads ambient, flat, for the entire run — the reserved surface <code>INERT</code> is fixed at the ambient temperature by definition. Thunderhead's own tutorial teaches this with a ceiling that sits at a constant 22 °C from start to finish. The fix is a layered surface built from real materials — the aerated concrete the reference case gives this room — not the <code>ADIABATIC</code> surface, which the FDS guide says should only be used for testing.</p>
+</div>
+<p class="prose">For raw five-second frames, keep every fifth 1 s row rather than averaging into bins. FDS otherwise time-averages device output between printouts: set <code>TEMPORAL_STATISTIC='INSTANT VALUE'</code> on the sensor channels and confirm it in the <code>.out</code> file. FED remains a running time integral. The historical reference tables predate this change and contain one-second means.</p>
+<p class="prose">The reference case below is the whole file. Read the <code>&amp;DEVC</code> block against what you built: two sensor nodes, two trees, the layer line, the floor flux, two doorway flow devices, then the four <code>&amp;SLCF</code> planes. The <code>&amp;DUMP</code> line near the top carries <code>DT_DEVC=1.0</code>, which is the Output tab field you set in step 10.</p>
+<!--FDSBLOCK:iso9705_room-->
+<div class="quiz">
+<details class="q"><summary><span class="qt">You place a gas-phase device 3 cm from a wall, inside a 20 cm cell. What value does it report?</span></summary><div class="qa"><p>The value at the centre of that cell. FDS uses the coordinates only to choose the cell and does no interpolation, so anywhere inside the same cell gives the same number. To measure nearer the wall you need a finer mesh, not a nudged device.</p></div></details>
+<details class="q"><summary><span class="qt">At one point and one instant, a <code>TEMPERATURE</code> device reads 172.6 °C and a <code>THERMOCOUPLE</code> device reads 84.8 °C. Which one is broken?</span></summary><div class="qa"><p>Neither. <code>TEMPERATURE</code> is the gas in the cell; <code>THERMOCOUPLE</code> is a modelled metal bead that has to heat up and that loses heat by radiation, so it lags the gas, and the lag is largest in a fast transient. Report whichever matches the instrument you are comparing against, and say which you used.</p></div></details>
+<details class="q"><summary><span class="qt">The run ends with <code>STOP: FDS completed successfully</code> but one of your devices has no column in <code>CHID_devc.csv</code>. What happened?</span></summary><div class="qa"><p>Its coordinates fell outside every mesh, so FDS skipped it. The only trace is a console line reading <code>WARNING: DEVC &lt;name&gt; is not within any mesh.</code> Move the device inside the mesh and rerun, and add a check on the log and the column count before you trust a batch.</p></div></details>
+<details class="q"><summary><span class="qt">You change the visibility factor from 3 to 8. What happens to optical density, and what happens to visibility?</span></summary><div class="qa"><p>Optical density does not change at all — it is the extinction coefficient divided by 2.3 and does not contain the visibility factor. Every visibility reading below the cap is multiplied by 2.67, which is 8 divided by 3. The 30 m maximum stays where it is. This was checked by running the same case twice.</p></div></details>
+<details class="q"><summary><span class="qt">Your FED device reads 0.03 at 900 s and 0.04 at 1195 s. Can a FED column ever fall?</span></summary><div class="qa"><p>No. FDS forces the FED device to be a running time integral from the start of the simulation, whatever temporal statistic you ask for, so it only ever rises or stays flat. A FED figure is meaningless without the time it was reached at, and the FDS version carries no thermal term — it is the asphyxiant dose only.</p></div></details>
+</div>
+<div class="done-row"><input data-done="day4" id="done-day4" type="checkbox"/><label for="done-day4">Day 4 done</label></div>
 </section>

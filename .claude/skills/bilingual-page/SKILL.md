@@ -59,18 +59,15 @@ transcribed speech. Prefer 用 over 使用, 要 over 需要, 做 over 進行.
 
 **After `inject`, move `<meta charset="utf-8">` back to the first line.**
 `i18n inject` prepends its own `<style id="i18n-css">` block, which pushes
-the charset declaration down — on 2026-09-18 it landed at byte 1357, past the
-1024 bytes a browser reads when sniffing the encoding. The page then renders as
-Latin-1: every em dash becomes `â€"` and the 中文 button becomes `ä¸­æ–‡`.
+the charset declaration down, potentially past the first 1024 bytes used for
+encoding detection. An incorrect encoding can garble punctuation and Chinese.
 `i18n check` still reports full coverage, because coverage is not encoding.
 Confirm with `document.characterSet` in a browser, not by eye.
 
 **After every `inject`, put the doctype back too.** `extract` rewrites the
 head as `<!DOCTYPE html>` and `<meta charset="utf-8"/>`, and `inject` puts its
 style and toggle in front of them, so the doctype ends up stranded after the
-toggle's `</div>`, mid-page, and the charset near line 20. It happens on a new
-page (the old workspace's update page, 2026-10-07) as on a re-injected one
-(its sync page, 2026-09-29); both are history, not on this device. Restore
+toggle's `</div>`, mid-page. Check both new and re-injected pages. Restore
 the page's own first lines, `<!doctype html>` then `<meta charset="utf-8">`,
 remove the stranded copies, and diff the result against the page before
 `inject`: only the strings and the dictionary should differ.
