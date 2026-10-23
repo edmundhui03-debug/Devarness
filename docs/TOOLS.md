@@ -34,7 +34,7 @@ repository does not execute its code or register it with a client.
 | library | library: search, pick and check the offline catalogue of every tool, skill, agent and guide. |
 | md-format | md-format — the dev markdown house format: check, index and repair.  |
 | md-pages | md-pages — convert a document to Markdown with page markers.  |
-| new-device | new-device — which dev setup layers this device has, and the command that fixes each missing one.  |
+| new-device | Portable core readiness, using the shared bootstrap check; optional runtimes have separate checks. |
 | ngspice-setup | Install pinned ngspice in the ignored dev runtime, without a package manager.  |
 | notify | notify — push a phone alert through ntfy when an agent finishes work.  |
 | ocr | Local Docling OCR with page-marked Markdown. Does not replace md-pages. |

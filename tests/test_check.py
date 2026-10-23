@@ -19,6 +19,8 @@ SUITES = (
     '.claude/hooks/test_guard_vendor_code.py',
     '.claude/hooks/test_post_edit_check.py',
     'Harness/tests/test_line_endings.py',
+    'Harness/tests/test_new_device.py',
+    'Harness/tests/test_update_tools.py',
     'Harness/tests/test_delegate_refs.py',
     'Harness/tests/test_library.py',
     'Harness/tests/test_library_eval.py',
@@ -66,14 +68,14 @@ class CheckTests(unittest.TestCase):
                      for path in SUITES]
         self.assertEqual(calls, expected)
         self.assertEqual(code, 0, output)
-        self.assertIn('PASS: 18 portable check commands', output)
+        self.assertIn('PASS: 20 portable check commands', output)
 
     def test_timeout_reports_partial_bytes_and_runs_later_checks(self):
         fault = subprocess.TimeoutExpired(['synthetic'], 600,
                                           output=b'partial-out\xff', stderr=b'partial-err')
         code, output, calls = self.invoke(first=fault)
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(calls), 18)
+        self.assertEqual(len(calls), 20)
         self.assertIn('TIMEOUT', output)
         self.assertIn('partial-out', output)
         self.assertIn('partial-err', output)
@@ -81,23 +83,23 @@ class CheckTests(unittest.TestCase):
     def test_launch_error_is_failure_and_runs_later_checks(self):
         code, output, calls = self.invoke(first=FileNotFoundError('missing test executable'))
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(calls), 18)
+        self.assertEqual(len(calls), 20)
         self.assertIn('ERROR', output)
         self.assertIn('missing test executable', output)
 
     def test_nonzero_exit_never_turns_green(self):
         code, output, calls = self.invoke(first=subprocess.CompletedProcess([], 7, '', 'bad check'))
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(calls), 18)
+        self.assertEqual(len(calls), 20)
         self.assertIn('bad check', output)
-        self.assertNotIn('PASS: 18', output)
+        self.assertNotIn('PASS: 20', output)
 
     def test_selected_rerun_is_partial_and_uses_original_deadline(self):
         code, output, calls = self.invoke(['--only', 'test_tieitup'])
         self.assertEqual(code, 0, output)
         self.assertEqual(calls, [(['Harness/tests/test_tieitup.py'], 900)])
         self.assertIn('PARTIAL', output)
-        self.assertNotIn('PASS: 18', output)
+        self.assertNotIn('PASS: 20', output)
 
     def test_failed_selection_remains_partial_and_nonzero(self):
         code, output, calls = self.invoke(['--only', 'test_tieitup'],

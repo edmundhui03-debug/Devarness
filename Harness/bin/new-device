@@ -1,670 +1,78 @@
 #!/usr/bin/env python3
-"""new-device — which dev setup layers this device has, and the command that fixes each missing one.
-
-  new-device check [--root DEV] [--home HOME] [--json] [--no-system]
-
-Each layer reports ok, missing, note or n/a, a one-line detail and the exact
-fix, run from the dev root. The exit status is 1 when a required layer is
-missing, 0 otherwise, 2 on a usage error. It only reads: it writes nothing,
-makes no network call (no fetch, no ls-remote) and bounds every subprocess
-with a timeout. git status runs without optional locks, so it cannot rewrite
-an index either.
-
-dev may have no remote yet: an absent origin is a note, not a missing layer.
-Every fix is taken from a dev file, named where it is defined below.
-DEVARNESS_NEWDEVICE_PLATFORM and DEVARNESS_NEWDEVICE_TIMEOUT exist for the tests.
-Design: Setup/superpowers/specs/2026-10-08-dev-workspace-design.md
-"""
-
+"""Check the portable Devarness core; optional runtimes have separate checks."""
 import argparse
 import importlib.util
 import json
 import os
 from pathlib import Path
-import platform
-import re
-import shutil
 import subprocess
 import sys
-import time
-import urllib.parse
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import common  # noqa: E402
-
-OK, MISSING, NOTE, NA = "ok", "missing", "note", "n/a"
-
-# dev's own remote is the owner's to create (design spec, "After dev"); until
-# then a checkout has none, or the USB's bundle as origin.
-DEVARNESS_SOURCE = "<dev's remote, or the USB's dev bundle>"
-# Every device clones with the four settings, so they apply before the first file
-# is written (Setup/NEW_DEVICE.md); on Windows a clone made without them is moved
-# aside and made again.
-CLONE = ("git clone -c core.autocrlf=false -c core.eol=lf -c core.symlinks=true -c core.longpaths=true "
-         + DEVARNESS_SOURCE + " ~/dev")
-WINDOWS_CLONE = CLONE
-WINDOWS_RECLONE = "mv ~/dev ~/dev-bad-clone; " + WINDOWS_CLONE
-SETTINGS = (("core.autocrlf", "false"), ("core.eol", "lf"), ("core.symlinks", "true"), ("core.longpaths", "true"))
-# Bootstrap clones the vendored clones, writes the local settings and links the
-# launchers (Harness/bootstrap.sh). Git Bash copies a launcher instead of linking
-# it unless native symlinks are asked for.
-BOOTSTRAP = "Harness/bootstrap.sh"
-WINDOWS_BOOTSTRAP = "export MSYS=winsymlinks:nativestrict; " + BOOTSTRAP
-ADD_ORIGIN = "git remote add origin <dev's remote>, once the owner has made it"
-# update-tools moves an off-pin clone and runs its installer too; a bare checkout
-# left the runtime at the old pin (M14). Paths are quoted: one holds a space.
-PIN_FIX = "Harness/bin/update-tools apply --budget 1800 --only {}"             # Harness/bin/update-tools LONG_RUN
-DAILY_TASK = "DEVARNESS_update_daily"                                          # Harness/bin/update-tools DAILY_TASK
-DAILY_AGENT = "Harness/LaunchAgents/DEVARNESS_update_daily.plist"              # Harness/bin/update-tools agent_path
-DAILY_FIX = "Harness/bin/update-tools install-daily"
-UPDATE_STATE = ".claude/hooks/update-tools.state"
-LONG_RUN_STALE_HOURS = 36                                               # the banner's limit, update-tools
-LAUNCHER_LOOP = re.compile(r"^\s*for\s+b\s+in\s+([^;\n]+);\s*do\b", re.MULTILINE)   # bootstrap's "launcher wrappers"
-LOCAL_SETTINGS = ".claude/settings.local.json"
-# Bootstrap leaves an existing file alone, so a broken one is moved aside first;
-# .gitignore ignores *.bak-*, so no commit picks it up.
-BROKEN_SETTINGS = "mv {0} {0}.bak-broken; {1}"
-SEPARATE_LIST = "Harness/separate-projects.txt"                          # the one list; .gitignore keeps them out
-# The runtimes Harness/AGENT_LEARNING_TOOLS.md indexes, each found where its
-# installer records a finished install, under the pin repos.txt gives its clone.
-LABS = (
-    # name, clone, completion record (setup-learn-claude.py writes it), install command, POSIX only
-    ("learn-claude-code", "Harness/learn-claude-code", "installation.json",
-     "python3 Harness/setup-learn-claude.py --install", True),        # upstream imports fcntl
-)
-# REA's and reverse-skill's runtimes under Harness/.runtime, Windows builds
-# (Harness/setup/reverse-downloads.json); bootstrap restores them from the USB.
-REVERSE = "Harness/setup-reverse.py"
-REVERSE_FIX = "python Harness/setup-reverse.py --from <the USB's reverse folder>"
-HANDOFF = "Setup/NEW_DEVICE.md"            # "Agent memory is restored only from a dated snapshot"
-# The layers bootstrap's system steps install (Harness/bootstrap.sh), each read where its installer puts it.
-INDEX = ".claude/hooks/library/index.json"                               # Harness/library.py main
-INDEX_FIX = "python3 Harness/bin/library refresh"
-SUPERPOWERS = "superpowers@claude-plugins-official"                     # bootstrap "superpowers for ..."
-SUPERPOWERS_FIX = "claude plugin install " + SUPERPOWERS + "; python3 Harness/codex-setup.py"
-MARKITDOWN_FIX = 'uv tool install "markitdown[all]==0.1.8"'               # bootstrap "markitdown"; uv's bin is ~/.local/bin
-MCP_LOOP = re.compile(r'^for server in ((?:"[^"]*"\s*)+); do', re.MULTILINE)   # bootstrap "MCP servers for every folder"
-KNOWLEDGE = "Harness/knowledge-tools-sync.py"
-SYSTEM_FIX = "{} (without --no-system; run it again after installing Claude Code or Codex)"
-# Only bootstrap's system steps install these, so an install made with
-# --no-system (or DEVARNESS_NO_SYSTEM=1 in the environment) reports them as notes.
-SYSTEM_ONLY = ("mcp-servers", "superpowers", "markitdown", "knowledge-tools")
-TRUE, FALSE = ("true", "yes", "on", "1"), ("false", "no", "off", "0")
-# Set by a git hook, these would point every `git -C` at another repository.
-GIT_REDIRECTS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY")
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+SOURCE = Path(__file__).resolve().parents[2]
+GIT_TIMEOUT = 15
 
 
-def seconds():
+def own_repository(root):
+    # Inspect this checkout without environment redirects or personal Git config.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+               GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
     try:
-        return max(float(os.environ.get("DEVARNESS_NEWDEVICE_TIMEOUT") or 20), 0.1)
-    except ValueError:
-        return 20.0
-
-
-TIMEOUT = seconds()
-
-
-def fail(message):
-    print("new-device: " + message, file=sys.stderr)
-    sys.exit(2)
-
-
-def layer(name, required, status, detail, fix=""):
-    return {"layer": name, "required": required, "status": status, "detail": detail, "fix": fix}
-
-
-def run_git(repo, *args):
-    """The output of a read-only git command, or None and why there is none."""
-    env = {key: value for key, value in os.environ.items() if key not in GIT_REDIRECTS}
-    env.update(GIT_OPTIONAL_LOCKS="0", GIT_TERMINAL_PROMPT="0")
-    try:
-        done = subprocess.run(["git", "-C", str(repo), *args], stdin=subprocess.DEVNULL, capture_output=True,
-                              timeout=TIMEOUT, env=env, creationflags=NO_WINDOW)
-    except subprocess.TimeoutExpired:
-        return None, "timed out"
-    except OSError:
-        return None, "git could not start"
-    if done.returncode:
-        return None, "failed"
-    return done.stdout.decode("utf-8", "replace").strip(), ""
-
-
-def same_path(text, path):
-    try:
-        return Path(text).resolve() == path.resolve()
-    except (OSError, RuntimeError):
+        done = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                              stdin=subprocess.DEVNULL, capture_output=True,
+                              timeout=GIT_TIMEOUT, env=env,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return done.returncode == 0 and Path(done.stdout.decode("utf-8", "replace").strip()).resolve() == root
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
         return False
 
 
-def own_repository(path):
-    """True when path is the top of its own git work tree, not a folder inside another one."""
-    if not path.is_dir():
-        return False
-    top, _ = run_git(path, "rev-parse", "--show-toplevel")
-    return top is not None and same_path(top, path)
-
-
-def clean_remote(url):
-    """A remote safe to print: host and path only, never a credential, query or local path."""
-    url = url.strip()
-    if url.startswith(("/", ".", "\\", "~", "file:")) or re.match(r"^[A-Za-z]:[\\/]", url):
-        return "a local path"
-    if "://" not in url:
-        scp = re.match(r"^(?:[^@/\s]+@)?([A-Za-z0-9.-]+):([^?#\s]+)", url)
-        return "{}:{}".format(scp.group(1), scp.group(2)) if scp else "an unrecognised remote"
+def check(root):
+    state = {"schema": 1, "core_ready": False, "missing": []}
+    # --root selects data only; execute the trusted helper beside this script.
+    sys.dont_write_bytecode = True
+    spec = importlib.util.spec_from_file_location("devarness_bootstrap", SOURCE / "tools/bootstrap.py")
+    bootstrap = importlib.util.module_from_spec(spec)
     try:
-        parts = urllib.parse.urlsplit(url)
-        host, port = parts.hostname, parts.port
-    except ValueError:
-        return "an unrecognised remote"
-    if not parts.scheme or not host:
-        return "an unrecognised remote"
-    return "{}://{}{}{}".format(parts.scheme, host, ":{}".format(port) if port else "", parts.path)
-
-
-def manifest(dev, home):
-    """The pinned clones, tracked and personal (common.pinned_clones); None if unreadable."""
-    try:
-        return common.pinned_clones(dev, home)
-    except (OSError, ValueError):
-        return None
-
-
-def check_checkout(dev, plat, is_repo):
-    if not is_repo:
-        return layer("checkout", True, MISSING, "not the top of a git work tree",
-                     WINDOWS_CLONE if plat == "windows" else CLONE)
-    url, why = run_git(dev, "remote", "get-url", "origin")
-    if url is None and why != "failed":
-        return layer("checkout", True, NOTE, "origin not read: " + why)
-    where = "origin " + clean_remote(url) if url is not None else "no origin remote yet; commits stay on this device"
-    changes, why = run_git(dev, "status", "--porcelain")
-    if changes is None:
-        return layer("checkout", True, NOTE, "{}; uncommitted changes not read: {}".format(where, why))
-    count = len(changes.splitlines())
-    if count:
-        where += "; {} uncommitted change{}".format(count, "" if count == 1 else "s")
-    if url is None:
-        return layer("checkout", True, NOTE, where, ADD_ORIGIN)
-    return layer("checkout", True, NOTE if count else OK, where if count else "a clean work tree; " + where)
-
-
-def normal(value):
-    value = (value or "").strip().lower()
-    return "true" if value in TRUE else "false" if value in FALSE else value
-
-
-def check_git_settings(dev, plat, is_repo):
-    if plat != "windows":
-        return layer("git-settings", False, NA, "checked only on Windows")
-    if not is_repo:
-        return layer("git-settings", True, MISSING, "no dev clone to read them from", WINDOWS_CLONE)
-    wrong = []
-    for key, want in SETTINGS:
-        value, _ = run_git(dev, "config", "--get", key)
-        if normal(value) != want:
-            wrong.append("{} is {}, not {}".format(key, value if value is not None else "unset", want))
-    if wrong:
-        return layer("git-settings", True, MISSING, "; ".join(wrong), WINDOWS_RECLONE)
-    return layer("git-settings", True, OK, ", ".join("{}={}".format(key, want) for key, want in SETTINGS))
-
-
-def check_vendored(dev, bootstrap, rows):
-    if rows is None:
-        return layer("vendored-clones", True, MISSING, "Harness/repos.txt cannot be read")
-    failed, checkouts, rebuild = [], [], False
-    for row in rows:
-        path, pin = row.path, row.pin
-        full = dev.joinpath(*path.split("/"))
-        if not pin:
-            failed.append("{} ({} gives no pin)".format(path, row.where))
-            continue
-        if not full.is_dir():
-            failed.append(path + " (absent)")
-            rebuild = True
-            continue
-        found, why = run_git(full, "rev-parse", "--show-toplevel", "HEAD")
-        lines = found.splitlines() if found is not None else []
-        if found is None and why != "failed":
-            failed.append("{} ({})".format(path, why))
-        elif len(lines) != 2 or not same_path(lines[0], full):
-            failed.append(path + " (not its own git checkout)")
-            rebuild = True
-        elif lines[1] != pin:
-            failed.append("{} (at {}, pin {})".format(path, lines[1][:7], pin[:7]))
-            checkouts.append('"{}"'.format(path))
-    if not failed:
-        return layer("vendored-clones", True, OK, "all {} at their pins".format(len(rows)))
-    fixes = ([bootstrap] if rebuild else []) + ([PIN_FIX.format(" ".join(checkouts))] if checkouts else [])
-    return layer("vendored-clones", True, MISSING,
-                 "{} of {} not at their pin: {}".format(len(failed), len(rows), ", ".join(failed)),
-                 "; ".join(fixes))
-
-
-def check_local_settings(dev, bootstrap):
-    path = dev / ".claude" / "settings.local.json"
-    if not path.is_file():
-        return layer("local-settings", True, MISSING, LOCAL_SETTINGS + " is absent", bootstrap)
-    try:
-        json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return layer("local-settings", True, MISSING, LOCAL_SETTINGS + " does not parse as JSON",
-                     BROKEN_SETTINGS.format(LOCAL_SETTINGS, bootstrap))
-    return layer("local-settings", True, OK, LOCAL_SETTINGS + " parses")
-
-
-def launcher_names(dev):
-    """The launchers bootstrap links, read from its own loop so the two cannot drift apart."""
-    try:
-        text = (dev / "Harness" / "bootstrap.sh").read_text(encoding="utf-8")
-    except (OSError, ValueError):
-        return None
-    start = text.find('step "launcher wrappers"')
-    match = LAUNCHER_LOOP.search(text, start) if start >= 0 else None
-    return match.group(1).split() if match else None
-
-
-def dangling_launchers(dev, home):
-    """Links in ~/.local/bin into dev's Harness/bin whose launcher dev no longer has; bootstrap removes them."""
-    folder, gone = home / ".local" / "bin", []
-    real_bin = os.path.normcase(os.path.realpath(str(dev / "Harness" / "bin")))
-    try:
-        entries = sorted(folder.iterdir())
+        spec.loader.exec_module(bootstrap)
+        state = bootstrap.readiness(root)
     except OSError:
-        return gone
-    for link in entries:
-        if not link.is_symlink() or os.path.exists(str(link)):
-            continue
-        target = os.readlink(str(link))
-        target = target[4:] if target.startswith("\\\\?\\") else target
-        parent = os.path.dirname(os.path.join(str(folder), target))
-        if os.path.normcase(os.path.realpath(parent)) == real_bin:
-            gone.append(link.name)
-    return gone
-
-
-def check_launchers(dev, home, bootstrap):
-    names = launcher_names(dev)
-    if names is None:
-        return layer("launchers", True, MISSING, "Harness/bootstrap.sh gives no launcher list", bootstrap)
-    # Bootstrap links a launcher only when its source exists (its "launcher wrappers" loop).
-    names = [name for name in names if (dev / "Harness" / "bin" / name).is_file()]
-    failed = []
-    for name in names:
-        link = home / ".local" / "bin" / name
-        if not os.path.lexists(str(link)):
-            failed.append(name + " (absent)")
-        elif not link.is_symlink():
-            failed.append(name + " (a copy, not a link)")
-        elif not same_path(str(link), dev / "Harness" / "bin" / name):
-            failed.append(name + " (links elsewhere)")
-    failed += [name + " (dangling: dev no longer has it)" for name in dangling_launchers(dev, home)]
-    if failed:
-        return layer("launchers", True, MISSING, "{} of {} not linked into this checkout: {}".format(
-            len(failed), len(names), ", ".join(failed)), bootstrap)
-    return layer("launchers", True, OK, "all {} link into this checkout".format(len(names)))
-
-
-def client_home(home, home_given, variable, default):
-    """A client's config folder: under the given home, else where its variable says, else under home."""
-    return home / default if home_given or not os.environ.get(variable) else Path(os.environ[variable])
-
-
-def in_bin(home, name):
-    """In ~/.local/bin, where bootstrap links the launchers and uv puts a tool's command."""
-    return any(os.path.isfile(str(home / ".local" / "bin" / (name + ext))) for ext in ("", ".exe"))
-
-
-def check_skill_links(dev, home, bootstrap):
-    """dev's skills linked into the user's skill folders, so every client finds them in any folder."""
-    own = dev / ".claude" / "skills"
-    names = sorted(name for name in (os.listdir(str(own)) if own.is_dir() else [])
-                   if not os.path.isfile(str(own / name)))
-    if not names:
-        return layer("skill-links", True, MISSING, "no dev skills in .claude/skills", bootstrap)
-    missing =["~/{}/{}".format(where, name) for where in (".claude/skills", ".agents/skills") for name in names
-               if not os.path.isfile(str(home.joinpath(*where.split("/"), name, "SKILL.md")))]
-    if missing:
-        return layer("skill-links", True, MISSING, "{} of {} not reachable: {}".format(
-            len(missing), 2 * len(names), ", ".join(missing[:6]) + (", ..." if len(missing) > 6 else "")), bootstrap)
-    return layer("skill-links", True, OK, "all {} dev skills in ~/.claude/skills and ~/.agents/skills".format(len(names)))
-
-
-def check_mcp(dev, home, home_given, bootstrap):
-    """The MCP servers bootstrap registers for the user, read from its own loop."""
-    try:
-        loop = MCP_LOOP.search((dev / "Harness" / "bootstrap.sh").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        loop = None
-    if loop is None:
-        return layer("mcp-servers", True, MISSING, "Harness/bootstrap.sh gives no MCP server list", bootstrap)
-    names = re.findall(r'"(\S+)', loop.group(1))
-    claude_config = client_home(home, home_given, "CLAUDE_CONFIG_DIR", "") / ".claude.json"
-    try:
-        claude = json.loads(claude_config.read_text(encoding="utf-8")).get("mcpServers") or {}
-    except (OSError, ValueError, AttributeError):
-        claude = {}
-    try:
-        codex = (client_home(home, home_given, "CODEX_HOME", ".codex") / "config.toml").read_text(encoding="utf-8")
-    except (OSError, ValueError):
-        codex = ""
-    missing = ["{} for {}".format(name, client) for name in names for client, there in (
-        ("Claude Code", name in claude),
-        ("Codex", re.search(r"^\[mcp_servers\.{}\]".format(re.escape(name)), codex, re.MULTILINE))) if not there]
-    if missing:
-        return layer("mcp-servers", True, MISSING, "not registered: " + ", ".join(missing), SYSTEM_FIX.format(bootstrap))
-    return layer("mcp-servers", True, OK, "{} registered for Claude Code and Codex".format(", ".join(names)))
-
-
-def check_superpowers(home, home_given):
-    """The process skills, Claude's copy and Codex's at the same commit (Harness/codex-setup.py)."""
-    registry = client_home(home, home_given, "CLAUDE_CONFIG_DIR", ".claude") / "plugins" / "installed_plugins.json"
-    try:
-        in_claude = SUPERPOWERS in (json.loads(registry.read_text(encoding="utf-8")).get("plugins") or {})
-    except (OSError, ValueError, AttributeError, TypeError):
-        in_claude = False
-    cache = client_home(home, home_given, "CODEX_HOME", ".codex") / "plugins" / "cache" / "superpowers-dev" / "superpowers"
-    in_codex = any(cache.glob("*/.codex-plugin/plugin.json"))
-    missing = [client for client, there in (("Claude Code", in_claude), ("Codex", in_codex)) if not there]
-    if missing:
-        return layer("superpowers", True, MISSING, "not installed for " + " or ".join(missing), SUPERPOWERS_FIX)
-    return layer("superpowers", True, OK, "installed for Claude Code and Codex")
-
-
-def check_markitdown(home):
-    if in_bin(home, "markitdown"):
-        return layer("markitdown", True, OK, "in ~/.local/bin; md-pages and i18n run in its environment")
-    return layer("markitdown", True, MISSING, "not in ~/.local/bin, so md-pages and i18n cannot run", MARKITDOWN_FIX)
-
-
-def check_knowledge(dev, home, home_given):
-    """Understand-Anything and diagram-design: their own file inventory."""
-    env = dict(os.environ)
-    if home_given:
-        env["HOME"] = env["USERPROFILE"] = str(home)
-    fix = "python3 {} --install".format(KNOWLEDGE)
-    try:
-        done = subprocess.run([sys.executable, str(dev / KNOWLEDGE), "--check"], stdin=subprocess.DEVNULL,
-                              capture_output=True, timeout=TIMEOUT, env=env, creationflags=NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired):
-        return layer("knowledge-tools", True, MISSING, KNOWLEDGE + " --check did not answer", fix)
-    if done.returncode:
-        return layer("knowledge-tools", True, MISSING, "Understand-Anything or diagram-design not prepared", fix)
-    return layer("knowledge-tools", True, OK, "Understand-Anything and diagram-design prepared")
-
-
-def check_library_index(dev):
-    """The per-device library index: without it every prompt's picks are silently empty."""
-    sys.dont_write_bytecode = True      # it only reads: no __pycache__ in the checkout
-    try:
-        spec = importlib.util.spec_from_file_location("dev_library", str(dev / "Harness" / "library.py"))
-        library = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(library)
-        index = library._load_index(dev / INDEX)
-    except Exception as error:      # no library.py, or the index missing or corrupt
-        return layer("library-index", True, MISSING, "no usable index: " + str(error).split(";")[0], INDEX_FIX)
-    if index["diagnostics"]:
-        return layer("library-index", True, MISSING, "{} diagnostic(s), so search refuses it".format(
-            len(index["diagnostics"])), "python3 Harness/bin/library check; then " + INDEX_FIX)
-    if library._stale(index):
-        return layer("library-index", True, NOTE, "{} entries; sources changed since it was built".format(
-            len(index["entries"])), INDEX_FIX)
-    return layer("library-index", True, OK, "{} entries".format(len(index["entries"])))
-
-
-def check_laya(dev):
-    if (dev / "Harness" / ".runtime" / "laya" / "install.json").is_file():
-        return layer("laya", False, OK, "runtime installed for both agents' MCP tool")
-    return layer("laya", False, NOTE, "not installed, so its MCP tool cannot start",
-                 "python3 Harness/setup-laya.py --install")
-
-
-def check_statusline_tools(home):
-    absent = [name for name in ("cship", "starship") if not in_bin(home, name)]
-    if absent:
-        return layer("statusline-tools", False, NOTE, "not in ~/.local/bin: {}; the status bar renders short".format(
-            ", ".join(absent)), "the release binaries by hand, as Harness/INSTALL.md says")
-    return layer("statusline-tools", False, OK, "cship and starship in ~/.local/bin")
-
-
-def check_pi(home):
-    """May's client; its own login is the owner's."""
-    if shutil.which("pi") or any(os.path.isfile(str(home / ".pi" / "agent" / "bin" / name))
-                                 for name in ("pi", "pi.exe", "pi.cmd")):
-        return layer("pi", False, OK, "the Pi client is installed")
-    return layer("pi", False, NOTE, "the Pi client is not installed, so May cannot start",
-                 "install Pi, then its own login (" + HANDOFF + ")")
-
-
-def separate_projects(dev):
-    """The owner's separate projects, from the list md-format and i18n also read."""
-    try:
-        text = (dev / SEPARATE_LIST).read_text(encoding="utf-8")
-    except (OSError, ValueError):
-        return None
-    return [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("#")]
-
-
-def check_separate_projects(dev):
-    names = separate_projects(dev)
-    if names is None:
-        return layer("separate-projects", False, NOTE, SEPARATE_LIST + " cannot be read")
-    if not names:
-        return layer("separate-projects", False, OK, "none listed")
-    present = [name for name in names if dev.joinpath(*name.split("/")).is_dir()]
-    absent = [name for name in names if name not in present]
-    parts = (["present: " + ", ".join(present)] if present else []) + (["absent: " + ", ".join(absent)] if absent else [])
-    return layer("separate-projects", False, NOTE if absent else OK, "; ".join(parts))
-
-
-def check_labs(dev, plat, rows):
-    pins = {row.path: row.pin for row in rows or []}
-    installed, absent, skipped, fixes = [], [], [], []
-    for name, clone, record, install, posix_only in LABS:
-        if posix_only and plat == "windows":
-            skipped.append(name)
-            continue
-        pin = pins.get(clone)
-        if pin and (dev / "Harness" / ".runtime" / clone.split("/")[-1] / pin / record).is_file():
-            installed.append(name)
-        else:
-            absent.append(name)
-            fixes.append(install)
-    parts = [label + ": " + ", ".join(names) for label, names in
-             (("installed", installed), ("not installed", absent), ("n/a on Windows", skipped)) if names]
-    return layer("labs", False, NOTE if absent else OK, "; ".join(parts), "; ".join(fixes))
-
-
-def check_memory(dev, home, home_given):
-    tool = dev / "Harness" / "bin" / "agent-memory"
-    if not tool.is_file():
-        return layer("memory", False, NOTE, "agent-memory not installed")
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    if home_given:
-        env["HOME"] = env["USERPROFILE"] = str(home)
-    try:
-        done = subprocess.run([sys.executable, str(tool), "where"], stdin=subprocess.DEVNULL, capture_output=True,
-                              timeout=TIMEOUT, env=env, creationflags=NO_WINDOW)
-    except subprocess.TimeoutExpired:
-        return layer("memory", False, NOTE, "agent-memory where timed out")
-    except OSError:
-        return layer("memory", False, NOTE, "agent-memory where could not start")
-    lines = done.stdout.decode("utf-8", "replace").strip().splitlines()
-    if done.returncode or not lines:
-        return layer("memory", False, NOTE, "agent-memory where failed (exit {})".format(done.returncode))
-    folder = Path(lines[-1].strip())
-    if folder.is_dir():
-        return layer("memory", False, OK, "memory folder present: {}".format(folder))
-    detail = "no memory folder at {}".format(folder)
-    # A new device starts with none; a dated snapshot in Setup/handoff, when one was
-    # made, is the one to restore, the newest by its dated name.
-    snapshots = [p for p in (dev / "Setup" / "handoff").glob("claude-memory-*") if p.is_dir()]
-    if not snapshots:
-        return layer("memory", False, NOTE, detail + "; no claude-memory-* snapshot to restore")
-    newest = max(snapshots, key=lambda p: p.name)
-    source = newest.relative_to(dev).as_posix() + ("/originals.zip" if (newest / "originals.zip").is_file() else "/")
-    steps = ", following " + HANDOFF if (dev / HANDOFF).is_file() else ""
-    return layer("memory", False, NOTE, detail, "restore {} into {}{}".format(source, folder, steps))
-
-
-def check_reverse(dev, plat):
-    """The reverse tools' runtimes: setup-reverse.py --check, the fast one; dev-check runs the doctor."""
-    if plat != "windows":
-        return layer("reverse-tools", False, NA, "the runtimes are Windows builds")
-    try:
-        done = subprocess.run([sys.executable, str(dev / REVERSE), "--check"], stdin=subprocess.DEVNULL,
-                              capture_output=True, timeout=TIMEOUT, creationflags=NO_WINDOW)
-    except subprocess.TimeoutExpired:
-        return layer("reverse-tools", True, MISSING, REVERSE + " --check timed out", REVERSE_FIX)
-    except OSError:
-        return layer("reverse-tools", True, MISSING, REVERSE + " --check could not start", REVERSE_FIX)
-    if done.returncode == 0:
-        return layer("reverse-tools", True, OK, "REA and reverse-skill runtimes in place")
-    absent = [line.split()[0] for line in done.stdout.decode("utf-8", "replace").splitlines()
-              if line.strip().endswith("MISSING")]
-    detail = "not installed: " + ", ".join(absent) if absent else "{} --check failed (exit {})".format(
-        REVERSE, done.returncode)
-    return layer("reverse-tools", True, MISSING, detail, REVERSE_FIX)
-
-
-def check_notify(home):
-    """notify's ntfy topic, a key kept per device and outside git."""
-    if os.environ.get("DEVARNESS_NTFY_TOPIC") or (common.config_dir(home) / "ntfy-topic").is_file():
-        return layer("notify", False, OK, "ntfy topic set; notify test sends one alert")
-    return layer("notify", False, NOTE, "no ntfy topic, so no phone alerts",
-                 "write the topic to ~/.config/devarness/ntfy-topic, then notify test")
-
-
-def registered_task(name):
-    """Whether Task Scheduler knows the task; None when schtasks cannot answer.
-    /Query only reads; its console-code-page output is not parsed."""
-    try:
-        done = subprocess.run(["schtasks", "/Query", "/TN", name], stdin=subprocess.DEVNULL,
-                              capture_output=True, timeout=TIMEOUT, creationflags=NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return done.returncode == 0
-
-
-def last_long_run(dev):
-    """When update-tools's last long run ended here; None when it never did."""
-    try:
-        state = json.loads((dev / UPDATE_STATE).read_text(encoding="utf-8"))
-        return float(state.get("last_long_run") or state["last_long_scan"])
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-
-
-def check_daily_run(dev, home, plat):
-    """The daily long run that clones, installs and updates plugins (M6, M14)."""
-    if plat == "macos":
-        registered = (home / DAILY_AGENT).is_file()
-    elif plat == "windows":
-        registered = registered_task(DAILY_TASK)
-    else:
-        return layer("daily-run", False, NA, "no daily run on " + plat)
-    last = last_long_run(dev)
-    hours = None if last is None else (time.time() - last) / 3600
-    age = "last long run " + ("never" if hours is None else "{:.0f} h ago".format(hours))
-    if registered is None:
-        return layer("daily-run", False, NOTE, "Task Scheduler did not answer; " + age)
-    if not registered:
-        return layer("daily-run", False, NOTE, "not registered; " + age, DAILY_FIX)
-    if hours is None or hours > LONG_RUN_STALE_HOURS:
-        return layer("daily-run", False, NOTE, "registered; " + age)
-    return layer("daily-run", False, OK, "registered; " + age)
-
-
-def detect_platform():
-    forced = os.environ.get("DEVARNESS_NEWDEVICE_PLATFORM")
-    if forced:
-        return forced
-    system = platform.system()
-    if system == "Darwin":
-        return "macos"
-    if system.startswith(("Windows", "CYGWIN", "MSYS", "MINGW")):     # as bootstrap reads uname
-        return "windows"
-    return system.lower() or "unknown"
-
-
-def run_checks(dev, home, home_given, plat):
-    bootstrap = WINDOWS_BOOTSTRAP if plat == "windows" else BOOTSTRAP
-    is_repo = own_repository(dev)
-    rows = manifest(dev, home)
-    return [check_checkout(dev, plat, is_repo),
-            check_git_settings(dev, plat, is_repo),
-            check_vendored(dev, bootstrap, rows),
-            check_local_settings(dev, bootstrap),
-            check_launchers(dev, home, bootstrap),
-            check_skill_links(dev, home, bootstrap),
-            check_mcp(dev, home, home_given, bootstrap),
-            check_superpowers(home, home_given),
-            check_markitdown(home),
-            check_knowledge(dev, home, home_given),
-            check_library_index(dev),
-            check_separate_projects(dev),
-            check_labs(dev, plat, rows),
-            check_reverse(dev, plat),
-            check_daily_run(dev, home, plat),
-            check_memory(dev, home, home_given),
-            check_notify(home),
-            check_laya(dev),
-            check_statusline_tools(home),
-            check_pi(home)]
-
-
-def verdict(layers):
-    missing = sum(1 for row in layers if row["required"] and row["status"] == MISSING)
-    if not missing:
-        return "NEW DEVICE READY"
-    return "NEW DEVICE INCOMPLETE — {} required layer{} missing".format(missing, "" if missing == 1 else "s")
-
-
-def as_text(report):
-    lines = ["new-device check", "  dev       " + report["root"], "  home      " + report["home"],
-             "  platform  " + report["platform"], "",
-             "{:<19}{:<10}{:<9}{}".format("LAYER", "REQUIRED", "STATUS", "DETAIL")]
-    for row in report["layers"]:
-        lines.append("{:<19}{:<10}{:<9}{}".format(row["layer"], "yes" if row["required"] else "no",
-                                                  row["status"], row["detail"]))
-        if row["fix"]:
-            lines.append(" " * 38 + "fix: " + row["fix"])
-    return "\n".join(lines + ["", report["verdict"]])
+        state["missing"].append("Core files or Harness/repos.txt are missing or unreadable")
+    except ValueError as error:
+        state["missing"].append("Manifest: " + str(error))
+    if not own_repository(root):
+        state["missing"].append("Git checkout: select the root of its own worktree")
+    state["core_ready"] = not state["missing"]
+    state.update(root=str(root), scope="portable-core",
+                 verdict="NEW DEVICE READY" if state["core_ready"] else "NEW DEVICE INCOMPLETE")
+    return state
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog="new-device", description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog="new-device", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    checking = commands.add_parser("check", help="report each setup layer and the command that fixes it")
-    checking.add_argument("--root", help="the dev checkout to check (default: the one this script is in)")
-    checking.add_argument("--home", help="the home whose .local/bin and memory are checked (default: yours)")
-    checking.add_argument("--json", action="store_true", help="print the report as JSON")
-    checking.add_argument("--no-system", action="store_true",
-                          help="the install skipped bootstrap's system steps: their layers are notes (also DEVARNESS_NO_SYSTEM=1)")
+    checking = commands.add_parser("check", help="report portable core readiness without installing anything")
+    checking.add_argument("--root", type=Path, default=SOURCE, help="checkout root to inspect")
+    checking.add_argument("--home", help="compatibility option; personal homes are no longer inspected")
+    checking.add_argument("--json", action="store_true", help="print the versioned portable report")
+    checking.add_argument("--no-system", action="store_true", help="compatibility option; checks are always local")
     args = parser.parse_args(argv)
-    if args.root:
-        dev = Path(args.root).expanduser()
-        if not dev.is_dir():
-            fail("no such folder: " + args.root)
+    root = args.root.expanduser().resolve()
+    if not root.is_dir():
+        parser.error("no such checkout folder: " + str(root))
+    report = check(root)
+    if args.json:
+        print(json.dumps(report, indent=2))
     else:
-        dev = Path(__file__).resolve().parents[2]
-        if not (dev / "Harness" / "bin" / "new-device").is_file():
-            fail("cannot find dev around this script; run Harness/bin/new-device from a dev checkout or pass --root")
-    dev = dev.resolve()
-    home = Path(args.home).expanduser() if args.home else Path.home()
-    plat = detect_platform()
-    layers = run_checks(dev, home, bool(args.home), plat)
-    if args.no_system or os.environ.get("DEVARNESS_NO_SYSTEM", "").strip().lower() in TRUE:
-        for row in layers:
-            if row["layer"] in SYSTEM_ONLY and row["status"] == MISSING:
-                row.update(status=NOTE, detail=row["detail"] + "; system-only, skipped under --no-system")
-    report = {"root": str(dev), "home": str(home), "platform": plat, "layers": layers, "verdict": verdict(layers)}
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(errors="replace")
-    print(json.dumps(report, indent=2) if args.json else as_text(report))
-    return 1 if any(row["required"] and row["status"] == MISSING for row in layers) else 0
+        print("new-device portable core check")
+        for missing in report["missing"]:
+            print("Missing: " + missing)
+        if "optional_sources_total" in report:
+            print("Optional source checkouts: {optional_sources_present}/{optional_sources_total}".format(**report))
+        print("Optional runtime readiness requires its specialist checks.")
+        print(report["verdict"])
+    return 0 if report["core_ready"] else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

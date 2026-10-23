@@ -18,6 +18,8 @@ PORTABLE_SUITES = (
     '.claude/hooks/test_guard_vendor_code.py',
     '.claude/hooks/test_post_edit_check.py',
     'Harness/tests/test_line_endings.py',
+    'Harness/tests/test_new_device.py',
+    'Harness/tests/test_update_tools.py',
     'Harness/tests/test_delegate_refs.py',
     'Harness/tests/test_library.py',
     'Harness/tests/test_library_eval.py',

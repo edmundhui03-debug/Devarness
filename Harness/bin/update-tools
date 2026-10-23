@@ -58,6 +58,8 @@ COMMAND_TIMEOUT = 900       # the most an installer may take; a run's budget can
 PLUGIN_TIMEOUT = 45
 LIBRARY_TIMEOUT = 60         # each local catalogue step, also bounded by the run's remaining time
 PUSH_TIMEOUT = 30
+CLEANUP_TIMEOUT = 5         # each cleanup wait is bounded even when a tree cannot be ended
+TIMEOUT_STATUS = 124
 PHASE2_MINIMUM = 30         # the scan is 15 s at most; a light move fits in the rest of a start
 INSTALL_MINIMUM = 300       # an installer or the plugin step needs a long run, never a start's 60 s
 MOVE_MARGIN = 20            # left for a checkout: session_start ends the tree at budget + 5 s
@@ -166,24 +168,40 @@ def git(repo, *args, timeout=LS_TIMEOUT, index=None):
     return run_bounded(argv, timeout, env=env)
 
 
-def kill_tree(process) -> None:
+def kill_tree(process) -> str:
+    problems = []
     if os.name == "nt":
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True,
-                       creationflags=subprocess.CREATE_NO_WINDOW)     # windowless, as run_bounded is
+        try:
+            done = subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True,
+                                  timeout=CLEANUP_TIMEOUT, creationflags=subprocess.CREATE_NO_WINDOW)
+            if done.returncode:
+                problems.append("taskkill exited %s" % done.returncode)
+        except subprocess.TimeoutExpired:
+            problems.append("taskkill timed out")
+        except OSError as error:
+            problems.append(str(error))
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
-    process.kill()
+        except ProcessLookupError:
+            pass  # The process group already ended.
+        except OSError as error:
+            problems.append(str(error))
+    try:
+        process.kill()
+    except ProcessLookupError:
+        pass  # The root process already ended.
+    except OSError as error:
+        problems.append(str(error))
+    return "; ".join(problems)
 
 
 def run_bounded(argv: list, timeout: float, cwd=None, env=None):
-    """Run argv with a deadline that ends its whole process tree.
+    """Run argv with bounded command and cleanup waits; report failed cleanup.
 
     subprocess.run's timeout kills only the root: a .cmd launcher's Python
     child, or a syncer's git child, kept the pipes open and the wait never
-    ended. The tree is ended the way session_start.py ends a stuck sync.
+    ended. Attempt to end the tree, but keep the wait bounded if cleanup fails.
     Windowless on Windows: a long run has no console, under the task's
     pythonw or started detached, and each console child would open one.
     """
@@ -199,12 +217,16 @@ def run_bounded(argv: list, timeout: float, cwd=None, env=None):
         out, err = process.communicate(timeout=timeout)
         return process.returncode, out, err
     except subprocess.TimeoutExpired:
-        kill_tree(process)
+        cleanup = kill_tree(process)
         try:
-            out, err = process.communicate(timeout=5)
+            out, err = process.communicate(timeout=CLEANUP_TIMEOUT)
         except subprocess.TimeoutExpired:
             out, err = "", ""
-        return 124, out, (err or "") + "timed out after %ss" % timeout
+            cleanup = (cleanup + "; " if cleanup else "") + "output pipes remained open"
+        note = "timed out after %ss" % timeout
+        if cleanup:
+            note += "; cleanup: " + cleanup
+        return TIMEOUT_STATUS, out, (err + "\n" if err else "") + note
 
 
 def bash_path() -> str:
@@ -337,7 +359,7 @@ def clone_missing(root: Path, row: Row, deadline: float):
         rc, _, err = git(repo, *argv, timeout=max(1, deadline - time.monotonic() - reserve))
         if rc != 0:
             remove_tree(partial)
-            if rc != 124:                                 # run_bounded's code for a timeout
+            if rc != TIMEOUT_STATUS:
                 return False, "%s: %s" % (argv[0], last_line(err))
             if share < CLONE_RECORD_SECONDS:              # a late start; the next long run gives it more
                 return False, "out of time; the next long run clones it"
@@ -977,7 +999,7 @@ def push_pins(root: Path, deadline: float) -> str:
         rc, _, _ = git(root, "push", "--quiet", "origin", branch, timeout=time_left(deadline, PUSH_TIMEOUT))
         if rc == 0:
             return "pushed" if attempt == 0 else "rebased onto origin and pushed"
-        if rc == 124:
+        if rc == TIMEOUT_STATUS:
             return "pin commit unpushed: the push did not finish"
         why = rebase_pins(root, branch, deadline)
         if why:

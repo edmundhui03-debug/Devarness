@@ -66,7 +66,7 @@ accounts, credentials and effort are chosen by each user.
 | Telling the owner's phone an agent finished or is stuck | `notify` through ntfy |
 | The statusline | cship through `statusline`; Codex keeps its own `tui.status_line`; a preview's sample cost is never reported as live |
 | The start check | `start-check`; terminal sessions through `claude-start` and `codex-start` |
-| Bringing up the portable workspace | `python3 tools/bootstrap.py --check`; legacy `new-device` is a full-install reference |
+| Bringing up the portable workspace | `python3 tools/bootstrap.py --check`; `new-device check` shares its core readiness check |
 | Checking optional client memory files | `agent-memory check`, read-only, when asked |
 | Checking a reusable release | `python3 tools/check.py`; legacy `dev-check` assumes the full optional installation |
 | Keeping clones and installed plugins at their latest | `update-tools`, policy in `Harness/updates.txt` |

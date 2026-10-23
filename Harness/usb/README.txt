@@ -1,6 +1,11 @@
 dev on a new Windows PC, from this USB
 ======================================
 
+These are legacy full-install instructions for an optional prepared USB.
+For the supported portable core, follow README.md at the checkout root.
+The public bootstrap does not perform the global setup described below;
+new-device check now reports portable core readiness only.
+
 This folder installs dev, the workspace with every tool, skill and the
 library, on a new machine. Everything is here except your logins, the
 statusline's two programs (section 3, step 5) and the Python and Node
@@ -81,9 +86,9 @@ the commands into ~/.local/bin and every skill into ~/.claude/skills and
 ~/.agents/skills, registers the laya and rea MCP servers for Claude Code and
 Codex, installs the tools' Python and Node packages, registers the daily
 update-tools and dev-check runs and the laya service, and ends with
-new-device check. Reading "NEW DEVICE READY" means every layer the install
-makes is in place; the steps in section 3 are still yours. It is safe to run
-again.
+new-device check. In the portable release, "NEW DEVICE READY" verifies only
+the checkout's core files and manifest. Optional runtimes and the steps in
+section 3 need their own checks; the old full-install layer report is retired.
 
 The commands, skills and MCP servers then work in any folder, not only in
 ~/dev.
@@ -120,8 +125,8 @@ installed Claude Code or Codex afterwards.
      cship-x86_64-pc-windows-msvc.exe, saved as cship.exe) and starship
      (https://github.com/starship/starship/releases, the file
      starship-x86_64-pc-windows-msvc.zip, unzipped to starship.exe), both
-     into %USERPROFILE%\.local\bin. new-device check then shows
-     statusline-tools ok.
+     into %USERPROFILE%\.local\bin. Check each binary with --version;
+     new-device check does not inspect optional statusline tools.
   6. Done by the install; repeat only if it failed, or after a later
      install. The library's index. In ~/dev:
        library refresh

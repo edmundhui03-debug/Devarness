@@ -29,12 +29,15 @@ TOOL = ROOT / "Harness" / "bin" / "update-tools"
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t",
            GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t", PYTHONIOENCODING="utf-8")
 SAVED = {}
+TEST_HOME = None
 
 
 def setUpModule():
     # The runner's own ~/.config/devarness/personal-repos.txt must not add rows to a fake dev,
     # in this process or in a run_tool child; restored for the next module in a discover run.
-    home = tempfile.mkdtemp(prefix="update-tools-home-")
+    global TEST_HOME
+    TEST_HOME = tempfile.TemporaryDirectory(prefix="update-tools-home-")
+    home = TEST_HOME.name
     SAVED.update({key: os.environ.get(key) for key in ("HOME", "USERPROFILE")})
     os.environ["HOME"] = os.environ["USERPROFILE"] = home
     ENV.update(HOME=home, USERPROFILE=home)
@@ -46,6 +49,7 @@ def tearDownModule():
             os.environ.pop(key, None)
         else:
             os.environ[key] = value
+    TEST_HOME.cleanup()
 
 
 def git(*args, cwd=None):
@@ -59,6 +63,42 @@ def load():
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
     return module
+
+
+class BoundedCleanupTests(unittest.TestCase):
+    def test_windows_cleanup_has_its_own_deadline_and_reports_failure(self):
+        mod = load()
+        for error in (subprocess.TimeoutExpired("taskkill", 5), OSError("taskkill unavailable")):
+            with self.subTest(error=type(error).__name__):
+                process = mock.Mock(pid=4242)
+                process.communicate.side_effect = [subprocess.TimeoutExpired("fixture", 2), ("", "")]
+                def taskkill(argv, **options):
+                    self.assertLessEqual(options.get("timeout", float("inf")), 5,
+                                         "timeout cleanup itself must have a deadline")
+                    raise error
+                with mock.patch.object(mod.os, "name", "nt"), \
+                        mock.patch.object(mod.subprocess, "CREATE_NO_WINDOW", 0, create=True), \
+                        mock.patch.object(mod.subprocess, "Popen", return_value=process), \
+                        mock.patch.object(mod.subprocess, "run", side_effect=taskkill):
+                    result = mod.run_bounded(["fixture"], 2)
+                self.assertEqual(result[0], 124)
+                self.assertIn("cleanup", result[2])
+                process.kill.assert_called_once()
+
+    def test_failed_cleanup_and_open_pipes_still_return_a_timeout(self):
+        mod = load()
+        process = mock.Mock(pid=4242)
+        process.kill.side_effect = OSError("cannot end process")
+        process.communicate.side_effect = subprocess.TimeoutExpired("fixture", 2)
+        with mock.patch.object(mod.os, "name", "nt"), \
+                mock.patch.object(mod.subprocess, "CREATE_NO_WINDOW", 0, create=True), \
+                mock.patch.object(mod.subprocess, "Popen", return_value=process), \
+                mock.patch.object(mod.subprocess, "run", return_value=types.SimpleNamespace(returncode=1)):
+            code, out, err = mod.run_bounded(["fixture"], 2)
+        self.assertEqual((code, out), (124, ""))
+        self.assertIn("cleanup", err)
+        self.assertIn("cannot end process", err)
+        self.assertLessEqual(process.communicate.call_args.kwargs["timeout"], 5)
 
 
 class Fixture:
@@ -157,7 +197,8 @@ class ReaderTests(unittest.TestCase):
         self.fx.manifest([("Harness/a", "https://x/a.git", "a" * 40)])
         self.fx.policy("Harness/p\tauto\tsetup-p.py --install\t-\n")
         self.personal("# mine\nHarness/p\thttps://x/p.git\t" + "p" * 40 + "\n")
-        rows = self.mod.read_manifest(self.fx.dev)
+        with mock.patch.dict(os.environ, DEVARNESS_ALLOW_PERSONAL_REPOS="1"):
+            rows = self.mod.read_manifest(self.fx.dev)
         self.assertEqual([(r.path, r.personal) for r in rows], [("Harness/a", False), ("Harness/p", True)])
         policy = self.mod.read_policy(self.fx.dev, rows)
         self.assertEqual((policy["Harness/p"].kind, policy["Harness/p"].after), ("report", None))
@@ -302,13 +343,17 @@ class DailyRunTests(unittest.TestCase):
         self.assertEqual((calls[0][0], calls[0][1]["task"], calls[0][1]["hour"]), (True, "DEVARNESS_update_daily", 4))
         self.assertEqual(self.mod.agent_path(self.home), self.home / "Harness" / "LaunchAgents" / "DEVARNESS_update_daily.plist")
 
-    def test_bootstrap_links_update_tools_and_registers_the_daily_run(self):
-        text = (ROOT / "Harness" / "bootstrap.sh").read_text(encoding="utf-8")
-        loop = re.search(r"^\s*for\s+b\s+in\s+([^;\n]+);\s*do\b",
-                         text[text.index('step "launcher wrappers"'):], re.M).group(1).split()
-        self.assertIn("update-tools", loop)
-        self.assertNotIn("mirror", loop)      # dev has no mirrors
-        self.assertRegex(text, r'"\$\w+/Harness/bin/update-tools" install-daily')
+    def test_portable_bootstrap_leaves_daily_setup_explicit(self):
+        # Default onboarding reports the core without writing launchers or tasks.
+        marker = self.home / "existing-profile"
+        marker.write_text("unchanged", encoding="utf-8")
+        done = subprocess.run([sys.executable, str(ROOT / "tools/bootstrap.py"), "--json"],
+                              capture_output=True, text=True, timeout=20,
+                              env=dict(ENV, HOME=str(self.home), USERPROFILE=str(self.home)))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertTrue(json.loads(done.stdout)["core_ready"])
+        self.assertEqual(list(self.home.iterdir()), [marker])
+        self.assertEqual(marker.read_text(encoding="utf-8"), "unchanged")
 
 
 class LaunchTests(unittest.TestCase):
@@ -418,6 +463,7 @@ class LaunchTests(unittest.TestCase):
 
         def run(argv, **options):
             calls.append((argv[0], options.get("creationflags", 0)))
+            return types.SimpleNamespace(returncode=0)
         with mock.patch.object(self.mod.subprocess, "run", side_effect=run):
             self.mod.kill_tree(mock.Mock(pid=4242))       # a stand-in: nothing is ended
         self.assertEqual(calls[0][0], "taskkill")
@@ -841,7 +887,8 @@ class AdvanceTests(unittest.TestCase):
         personal.write_text("Harness/p\t%s\t%s\n" % (url, old), encoding="utf-8")
         self.addCleanup(personal.unlink)
         new = self.fx.push_commit("p", "second")
-        results, moves = self.advance()
+        with mock.patch.dict(os.environ, DEVARNESS_ALLOW_PERSONAL_REPOS="1"):
+            results, moves = self.advance()
         self.assertEqual((results[0].state, moves), ("report", []), results)
         self.assertIn(new[:7], results[0].note)
         self.assertEqual(personal.read_text(encoding="utf-8"), "Harness/p\t%s\t%s\n" % (url, old))
@@ -1273,7 +1320,7 @@ class ApplyTests(unittest.TestCase):
         second.clone("Harness/a", "a", old)
         (second.dev / "Harness" / "repos.txt").write_bytes((self.fx.dev / "Harness" / "repos.txt").read_bytes())
         newest = self.fx.push_commit("a", "third")     # upstream moved again; B must not take it
-        done = subprocess.run([sys.executable, str(TOOL), "--root", str(second.dev), "apply", "--budget", "30"],
+        done = subprocess.run([sys.executable, str(TOOL), "--root", str(second.dev), "apply", "--budget", "30", "--no-plugins"],
                               capture_output=True, text=True, timeout=120, env=ENV)
         self.assertIn("followed", done.stdout)
         self.assertEqual(git("rev-parse", "HEAD", cwd=second.dev / "Harness" / "a").stdout.strip(), new)

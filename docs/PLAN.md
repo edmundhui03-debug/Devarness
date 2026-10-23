@@ -14,7 +14,7 @@
 - [The dashboard and directory update establishes the public core](#the-dashboard-and-directory-update-establishes-the-public-core)
 - [Verification distinguishes the core from optional capabilities](#verification-distinguishes-the-core-from-optional-capabilities)
 - [The privacy follow-up removes inherited project and device records](#the-privacy-follow-up-removes-inherited-project-and-device-records)
-- [The legacy installer checker still expects the earlier shell bootstrap](#the-legacy-installer-checker-still-expects-the-earlier-shell-bootstrap)
+- [Legacy onboarding shares the core and updater cleanup stays bounded](#legacy-onboarding-shares-the-core-and-updater-cleanup-stays-bounded)
 - [Further expansion waits for a concrete task and evidence](#further-expansion-waits-for-a-concrete-task-and-evidence)
 
 ## One task record carries the objective, checks and next action
@@ -134,21 +134,52 @@ in model reasoning. Generic patterns cannot identify every confidential
 project fact; source review remains part of publication. Git history, old
 clones and past hosted artifacts remain outside current-source removal.
 
-## The legacy installer checker still expects the earlier shell bootstrap
+## Legacy onboarding shares the core and updater cleanup stays bounded
 
-`open` · compatibility follow-up; portable onboarding is the supported path
+`fixed` · all 20 portable acceptance commands pass locally
 
-The additional legacy new-device suite reports 33 failures and one skip across
-38 tests. Two representative failures reproduce on unchanged 8efe7c9: the
-checker parses launcher/MCP loops that the portable bootstrap wrapper no longer
-contains. This update does not claim full optional-install readiness. A future
-task should adapt or retire that legacy contract using a failing control;
-tools/bootstrap.py and tools/session.py remain the public onboarding path.
+The reference at 9069c7e reproduces 33 failures and one skip in 38 legacy
+new-device tests. The checker parses launcher and MCP loops removed from the
+portable bootstrap. The replacement delegates to the shipped core readiness
+helper, validates the selected Git root, and never imports selected-root code
+or inspects personal settings (`Harness/bin/new-device:16`). Compatibility
+flags and exit statuses remain; JSON schema 1 retires the old layer report.
+Ten portable controls pass, including two that fail on the old checker.
+Mutations that import selected-root code or accept a nested root are rejected.
 
-The additional full updater suite reached its 600-second acceptance deadline;
-its complete result is unverified. The three directly affected updater controls
-pass, covering the generalized fixture, scheduler arguments and ignored state.
-This limit does not qualify the full legacy updater as verified.
+The canonical updater reference completes 138 tests in 454.2 seconds, with
+one failure and two errors: two tests omit the now-required personal-repository
+opt-in, and one expects automatic global setup from the old bootstrap.
+Those fixtures now match the portable boundary and use disposable homes.
+The hung-CLI control passes on the reference; the earlier 600-second cutoff
+during concurrent extra checks does not establish a production hang.
+
+Two new controls expose a separate timeout risk: Windows taskkill has no
+deadline, and a cleanup failure can escape the timeout result. Each cleanup
+wait is now bounded at five seconds; failed cleanup returns timeout status
+124 with a diagnostic (`Harness/bin/update-tools:171`). The direct process
+kill is still attempted when tree cleanup fails. Nine focused checks pass,
+including the existing hung-CLI, slow-installer and rollback controls.
+The complete repaired updater suite passes all 140 tests in 463.6 seconds
+on Windows, within the existing 600-second acceptance deadline. These runs
+establish correctness controls; they do not establish a speed improvement.
+
+Kept: shared readiness and bounded cleanup, supported by failing controls.
+Kept unchanged: command budgets, personal opt-in and explicit optional setup.
+Both deterministic suites join the existing sequential portable acceptance
+list (`tools/check.py:21`), without a larger deadline or new runner.
+Source reviews supply an independent same-model read, not model diversity.
+No paid model experiment or model-quality improvement is claimed. Full
+optional-install readiness remains outside the core report. This maintenance
+adds no service, dashboard, dependency or global setup; history is retained.
+
+Final local acceptance passes all 20 default commands: 35 core controls,
+10 portable onboarding controls, 140 updater tests and the remaining
+deterministic tools. TieItUp passes 80 tests with one optional skip. The
+staged privacy check is clean; inventory matches 328 files and 31 skill
+links. Changed Markdown and staged TieItUp checks pass. The existing
+[workflow](https://github.com/edmundhui03-debug/Devarness/actions/workflows/portable.yml)
+records Linux, macOS and Windows acceptance for the published commit.
 
 ## Further expansion waits for a concrete task and evidence
 

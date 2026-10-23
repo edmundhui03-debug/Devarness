@@ -102,9 +102,13 @@ generic patterns cannot recognize every private fact.
 
 See docs/ARCHITECTURE.md for integration boundaries, docs/TOOLS.md for
 the tool catalogue, docs/ADAPTATION.md for scope and verification, and
-THIRD_PARTY.md for attribution. The legacy new-device checker still expects
-the earlier full-install shell bootstrap; use the portable core checks above.
-Its compatibility work is tracked in docs/PLAN.md.
+THIRD_PARTY.md for attribution. `python3 Harness/bin/new-device check` now
+shares the portable core readiness check. It accepts the older `--root`,
+`--home`, `--json` and `--no-system` options; personal homes and global
+installation state are no longer inspected. JSON schema 1 reports
+`core_ready`, `missing`, optional source counts and the text verdict;
+the earlier full-install `layers` report is retired. Optional source presence
+does not establish runtime readiness. Verification is tracked in docs/PLAN.md.
 
 The public harness's current work and verification are tracked in
 [docs/PLAN.md](docs/PLAN.md). Personal dashboards and their local state
