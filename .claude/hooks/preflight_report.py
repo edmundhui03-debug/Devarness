@@ -29,7 +29,7 @@ def on(short):
 
 # Off by the owner's choice on 2026-10-07, so neither is listed: the n8n
 # skills were removed and Matt Pocock's plugin is off, its three kept skills
-# linked from Library/skills. A plugin listed here degrades the banner when off.
+# linked from Harness/skills. A plugin listed here degrades the banner when off.
 PLUGINS = [
     ("superpowers",       "process gates"),
     ("codex",             "codex from claude"),
@@ -56,11 +56,11 @@ try:
     for package, market in (("superpowers", "superpowers-dev"),):
         manifests = list((codex_home / "plugins/cache" / market / package).glob("*/.codex-plugin/plugin.json"))
         if not manifests:
-            degraded.append(f"Codex plugin {package} not cached — run python3 {here('Library/codex-setup.py')}")
+            degraded.append(f"Codex plugin {package} not cached — run python3 {here('Harness/codex-setup.py')}")
         lines.append(f"  {package:<18}{'cached' if manifests else 'MISSING':<12}native Codex plugin")
     skills = list((Path(root) / ".agents/skills").glob("*/SKILL.md"))
     if not skills:
-        degraded.append(f"no Codex skills in .agents/skills — run python3 {here('Library/codex-setup.py')}")
+        degraded.append(f"no Codex skills in .agents/skills — run python3 {here('Harness/codex-setup.py')}")
     lines.append(f"  {'dev skills':<18}{len(skills):<12}Codex .agents/skills entries")
     # Glob counts hide orphaned links and partial installs. Name each unusable
     # entry without following vendor trees or changing the installation.
@@ -106,18 +106,18 @@ except Exception as exc:
     degraded.append(f"Codex inventory could not be read: {type(exc).__name__}: {exc}")
     lines.append(f"  {'codex files':<18}{'UNREADABLE':<12}{type(exc).__name__}")
 lines.append("  Verify loaded skills in the client; configured plugins are not session exposure.")
-library_files = ('Library/library.py', 'Library/bin/library', 'Library/library-sources.json',
-                 'Library/library-policy.json',
+library_files = ('Harness/library.py', 'Harness/bin/library', 'Harness/library-sources.json',
+                 'Harness/library-policy.json',
                  '.claude/skills/library/SKILL.md', '.agents/skills/library/SKILL.md')
 library_ready = all((Path(root) / name).is_file() for name in library_files)
 # The index, not the files: without it every prompt's picks are silently empty.
 library_state, library_note = 'MISSING', 'offline discovery and per-prompt picks'
 if not library_ready:
-    degraded.append(f"Library files missing — run python3 {here('Library/setup-library.py')} --install")
+    degraded.append(f"Library files missing — run python3 {here('Harness/setup-library.py')} --install")
 else:
     try:
         import importlib.util
-        library_spec = importlib.util.spec_from_file_location('dev_library', here('Library/library.py'))
+        library_spec = importlib.util.spec_from_file_location('dev_library', here('Harness/library.py'))
         library_module = importlib.util.module_from_spec(library_spec)
         library_spec.loader.exec_module(library_module)
         index = library_module._load_index(Path(root) / '.claude/hooks/library/index.json')
@@ -133,19 +133,19 @@ else:
         degraded.append(f"no usable library index ({type(exc).__name__}): per-prompt picks are empty — "
                         "run library refresh")
 lines.append(f"  {'library':<18}{library_state:<12}{library_note}")
-vercel_ready = (Path(root) / 'Library/.runtime/vercel-skills/node_modules/skills/bin/cli.mjs').is_file()
+vercel_ready = (Path(root) / 'Harness/.runtime/vercel-skills/node_modules/skills/bin/cli.mjs').is_file()
 lines.append(f"  {'vercel-find':<18}{'installed' if vercel_ready else 'MISSING':<12}approved keyword search per prompt; no auto-install")
 if not vercel_ready:
-    degraded.append(f"Vercel discovery runtime missing: python3 {here('Library/setup-vercel-skills.py')} --install")
+    degraded.append(f"Vercel discovery runtime missing: python3 {here('Harness/setup-vercel-skills.py')} --install")
 
 lines.append(f"  {'docker':<18}{docker:<12}{'local inventory; daemon health not verified' if docker != 'absent' else ''}")
 
 for source in ('reverse-skill', 'rea'):
-    present = (Path(root) / 'Library' / source / 'README.md').is_file()
+    present = (Path(root) / 'Harness' / source / 'README.md').is_file()
     lines.append(f"  {source:<18}{'present' if present else 'MISSING':<12}"
                  "pinned reverse-tool source; owner-named targets only, see its library entry")
     if not present:
-        degraded.append(f"{source} pinned source missing — run {here('Library/bootstrap.sh')}")
+        degraded.append(f"{source} pinned source missing — run {here('Harness/bootstrap.sh')}")
 
 # Clone-installed tools. Neither is a plugin, so neither shows in the block
 # above; both are checked by presence rather than by asking them their version.
@@ -157,7 +157,7 @@ lines.append(f"  {'md-format':<18}{md_skill:<12}markdown house format; md-format
 # Pinned Archify inventory only: no renderer, browser or network on startup.
 try:
     import runpy
-    archify = runpy.run_path(str(Path(root) / 'Library/bin/archify'))
+    archify = runpy.run_path(str(Path(root) / 'Harness/bin/archify'))
     archify_issues = archify['problems'](Path(root))
     for rel in ('.claude/skills/archify/SKILL.md', '.agents/skills/archify/SKILL.md'):
         if not (Path(root) / rel).is_file():
@@ -170,7 +170,7 @@ if archify_issues:
 
 # Ponytail uses the existing instruction path; no extra hooks or idle worker.
 try:
-    ponytail = runpy.run_path(str(Path(root) / 'Library/ponytail-check.py'))
+    ponytail = runpy.run_path(str(Path(root) / 'Harness/ponytail-check.py'))
     ponytail_issues = ponytail['problems'](Path(root))
 except Exception as exc:
     ponytail_issues = [type(exc).__name__ + ': Ponytail inventory unavailable']
@@ -181,7 +181,7 @@ if ponytail_issues:
 # TieItUp loads Ponytail first; with a file missing, agents fall back to Ponytail.
 # Changed Ponytail skills or a harness past the benchmark is stale, shown but never DEGRADED (owner, 2026-10-15).
 try:
-    tieitup = runpy.run_path(str(Path(root) / 'Library/tieitup-check.py'))
+    tieitup = runpy.run_path(str(Path(root) / 'Harness/tieitup-check.py'))
     tieitup_issues = tieitup['problems'](Path(root))
     tieitup_stale = [] if tieitup_issues else tieitup['stale'](Path(root))
     tieitup_open = 0 if tieitup_issues else tieitup['proposals'](Path(root))
@@ -199,27 +199,27 @@ for name, relative in (
     ('Docling OCR', 'docling/.venv/lib'),
     ('browser CLI', 'playwright-cli/node_modules/@playwright/cli/playwright-cli.js'),
 ):
-    runtime = Path(root) / 'Library/.runtime' / relative
+    runtime = Path(root) / 'Harness/.runtime' / relative
     present = runtime.exists()
     if name == 'Docling OCR':
-        env_root = Path(root) / 'Library/.runtime/docling/.venv'
+        env_root = Path(root) / 'Harness/.runtime/docling/.venv'
         present = (any(env_root.glob('lib/python*/site-packages/docling/__init__.py')) or
                    (env_root / 'Lib/site-packages/docling/__init__.py').is_file())
     shared = all((Path(root) / base / 'browser-docs/SKILL.md').is_file()
                  for base in ('.claude/skills', '.agents/skills'))
     ok = present and shared
-    lines.append(f"  {name:<18}{'installed' if ok else 'MISSING':<12}shared Peter/Aster; task-driven, see {here('Library/SHARED_BROWSER_DOCS.md')}")
+    lines.append(f"  {name:<18}{'installed' if ok else 'MISSING':<12}shared Peter/Aster; task-driven, see {here('Harness/SHARED_BROWSER_DOCS.md')}")
     if not ok:
-        degraded.append(name + f" incomplete — run python3 {here('Library/setup-browser-docs.py')} --install")
+        degraded.append(name + f" incomplete — run python3 {here('Harness/setup-browser-docs.py')} --install")
 try:
-    ua_pin = next(line.split('\t')[2] for line in (Path(root) / 'Library/repos.txt').read_text().splitlines()
-                  if line.startswith('Library/Understand-Anything\t'))
-    ua_root = Path(root) / 'Library/.runtime/understand-anything' / ua_pin / 'understand-anything-plugin'
-    ua_policy_path = Path(root) / 'Library/library-policy.json'
+    ua_pin = next(line.split('\t')[2] for line in (Path(root) / 'Harness/repos.txt').read_text().splitlines()
+                  if line.startswith('Harness/Understand-Anything\t'))
+    ua_root = Path(root) / 'Harness/.runtime/understand-anything' / ua_pin / 'understand-anything-plugin'
+    ua_policy_path = Path(root) / 'Harness/library-policy.json'
     ua_policy = json.loads(ua_policy_path.read_text()) if ua_policy_path.is_file() else {}
     ua_library_only = (ua_policy.get('entries', {}).get('dev:skill:understand', {})
                        .get('mode') == 'library-only')
-    ua_instructions = ((Path(root) / 'Library/Understand-Anything/understand-anything-plugin'
+    ua_instructions = ((Path(root) / 'Harness/Understand-Anything/understand-anything-plugin'
                         / 'skills/understand/SKILL.md').is_file() if ua_library_only else
                        all((Path(root) / c / 'skills/understand/SKILL.md').is_file()
                            for c in ('.claude', '.agents')))
@@ -230,12 +230,12 @@ except (OSError, StopIteration, IndexError, ValueError, AttributeError, TypeErro
     ua_ok = False
 diagram_ok = (all((Path(root) / c / 'skills/diagram-design/SKILL.md').is_file() for c in ('.claude', '.agents'))
               and (Path.home() / '.diagram-design/profiles/house.md').is_file()
-              and any((Path(root) / 'Library/.runtime/diagram-tools' / p).is_file()
+              and any((Path(root) / 'Harness/.runtime/diagram-tools' / p).is_file()
                       for p in ('bin/python', 'Scripts/python.exe'))
-              and (Path(root) / 'Library/bin/diagram').is_file())
+              and (Path(root) / 'Harness/bin/diagram').is_file())
 lines.append(f"  {'understand':<18}{'prepared' if ua_ok else 'MISSING':<12}pinned instructions + local viewer; analyze on request")
 lines.append(f"  {'diagram-design':<18}{'prepared' if diagram_ok else 'MISSING':<12}shared skill + house profile; diagram doctor")
-anthropic_design_ok = all((Path(root) / 'Library/anthropic-design/skills' / name / 'SKILL.md').is_file()
+anthropic_design_ok = all((Path(root) / 'Harness/anthropic-design/skills' / name / 'SKILL.md').is_file()
                           for name in ('canvas-design', 'theme-factory'))
 lines.append(f"  {'anthropic-design':<18}{'source only' if anthropic_design_ok else 'absent':<12}library-only static art and theme references; no Canva integration")
 ngspice = shutil.which('ngspice')
@@ -255,13 +255,13 @@ lines.append(f"  {'fds':<18}{fds_state:<12}{fds_note}")
 pyrosim_ok = all((Path(root) / c / 'skills/pyrosim/SKILL.md').is_file() for c in ('.claude', '.agents'))
 lines.append(f"  {'pyrosim':<18}{'prepared' if pyrosim_ok else 'MISSING':<12}shared skill; PyroSim itself is Windows-only")
 if not pyrosim_ok:
-    degraded.append(f"pyrosim skill link missing — see {here('Library/INSTALL.md')}")
+    degraded.append(f"pyrosim skill link missing — see {here('Harness/INSTALL.md')}")
 # Cheap local inventory; these lines do not execute lessons, models or servers.
 def learning_runtime(repo):
     try:
-        pin = next(line.split('\t')[2] for line in (Path(root) / 'Library/repos.txt').read_text().splitlines()
-                   if line.startswith('Library/' + repo + '\t'))
-        return Path(root) / 'Library/.runtime' / repo / pin
+        pin = next(line.split('\t')[2] for line in (Path(root) / 'Harness/repos.txt').read_text().splitlines()
+                   if line.startswith('Harness/' + repo + '\t'))
+        return Path(root) / 'Harness/.runtime' / repo / pin
     except (OSError, StopIteration, IndexError):
         return None
 def has_interpreter(venv):
@@ -278,9 +278,9 @@ learn_root = learning_runtime('learn-claude-code')
 learn_ok = bool(learn_root and all((learn_root / p).is_file() for p in
     ('installation.json', 'source/s01_agent_loop/code.py', 'source/s17_goal_loop/code.py'))
     and has_interpreter(learn_root / '.venv')
-    and (Path(root) / 'Library/bin/learn-claude').is_file())
+    and (Path(root) / 'Harness/bin/learn-claude').is_file())
 support_ok = all((Path(root) / c / 'skills/task-support/SKILL.md').is_file() for c in ('.claude', '.agents'))
-# Library/setup-learn-claude.py refuses anything but POSIX (upstream imports fcntl),
+# Harness/setup-learn-claude.py refuses anything but POSIX (upstream imports fcntl),
 # so elsewhere the lab is not applicable rather than missing, as new-device says.
 learn_applicable = os.name == 'posix'
 if learn_applicable or learn_ok:
@@ -289,10 +289,10 @@ else:
     lines.append(f"  {'learn-claude-code':<18}{'n/a':<12}local lessons need POSIX; use WSL on Windows")
 # laya's MCP server starts with each agent session; without the runtime it
 # only fails to start, so a device that has not installed it is not DEGRADED.
-laya_root = Path(root) / 'Library/.runtime/laya'
+laya_root = Path(root) / 'Harness/.runtime/laya'
 laya_ok = (laya_root / 'install.json').is_file() and has_interpreter(laya_root / '.venv')
 lines.append(f"  {'laya':<18}{'prepared' if laya_ok else 'not set up':<12}"
-             f"{'typed decisions for both agents over MCP' if laya_ok else 'python3 ' + here('Library/setup-laya.py') + ' --install'}")
+             f"{'typed decisions for both agents over MCP' if laya_ok else 'python3 ' + here('Harness/setup-laya.py') + ' --install'}")
 # notify's phone alerts need the ntfy topic, kept per device outside git. Without
 # it an agent's work is unaffected, so the device is not DEGRADED.
 ntfy_ok = bool(os.environ.get('DEVARNESS_NTFY_TOPIC')) or (Path.home() / '.config/dev/ntfy-topic').is_file()
@@ -306,7 +306,7 @@ lines.append(f"  {'pi':<18}{'installed' if pi_ok else 'absent':<12}May's client 
 # device without it is not DEGRADED: it has the PDFs, or no library at all.
 try:
     import importlib.util
-    books_spec = importlib.util.spec_from_file_location('books_engine', str(Path(root) / 'Library/books.py'))
+    books_spec = importlib.util.spec_from_file_location('books_engine', str(Path(root) / 'Harness/books.py'))
     books_engine = importlib.util.module_from_spec(books_spec)
     books_spec.loader.exec_module(books_engine)
     shelf = books_engine.summary(books_engine.LIBRARY, books_engine.OUT)
@@ -325,22 +325,22 @@ lines.append(f"  {'task-support':<18}{'prepared' if support_ok else 'MISSING':<1
 # Informational only: video-study needs system binaries, so it may not turn
 # another device's banner DEGRADED.
 watch_ok = bool(all(shutil.which(t) for t in ('yt-dlp', 'ffmpeg', 'ffprobe'))
-    and (Path(root) / 'Library/bin/video-study').is_file())
+    and (Path(root) / 'Harness/bin/video-study').is_file())
 lines.append(f"  {'video-study':<18}{'ready' if watch_ok else 'unavailable':<12}video study: transcript, contact sheets, exact frames")
 if not all((learn_ok or not learn_applicable, support_ok)):
-    degraded.append(f"agent learning setup incomplete — see {here('Library/AGENT_LEARNING_TOOLS.md')}")
+    degraded.append(f"agent learning setup incomplete — see {here('Harness/AGENT_LEARNING_TOOLS.md')}")
 if not ua_ok or not diagram_ok:
-    degraded.append(f"knowledge/diagram setup incomplete — run python3 {here('Library/knowledge-tools-sync.py')} --install")
+    degraded.append(f"knowledge/diagram setup incomplete — run python3 {here('Harness/knowledge-tools-sync.py')} --install")
 statusline = sys.argv[9] if len(sys.argv) > 9 else "missing"
 lines.append(f"  {'statusline':<18}{('ready' if statusline == 'on PATH' else 'MISSING'):<12}the statusLine command; bare name via ~/.local/bin")
 if statusline != "on PATH":
-    degraded.append(f"statusline is not on PATH — the statusline will be blank; run {here('Library/bootstrap.sh')}")
+    degraded.append(f"statusline is not on PATH — the statusline will be blank; run {here('Harness/bootstrap.sh')}")
 lines.append(f"  {'cship':<18}{cship:<12}statusline, cship.toml at the root")
 lines.append(f"  {'codex cli':<18}{codex:<12}" + ("/codex:review, /codex:rescue" if codex == "ready" else "run: codex login"))
 if markitdown != "ready":
-    degraded.append(f"markitdown: {markitdown} — install the uv tool by hand, see {here('Library/INSTALL.md')}")
+    degraded.append(f"markitdown: {markitdown} — install the uv tool by hand, see {here('Harness/INSTALL.md')}")
 if prompt_master != "ready":
-    degraded.append(f"prompt-master missing — run python3 {here('Library/setup-prompt-master.py')} --install")
+    degraded.append(f"prompt-master missing — run python3 {here('Harness/setup-prompt-master.py')} --install")
 if page_skill != "ready":
     degraded.append(f"bilingual-page: {page_skill} — new HTML cannot get its EN/Cantonese toggle")
 if md_skill != "ready":

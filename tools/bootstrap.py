@@ -25,8 +25,8 @@ def parse_manifest(text):
         parsed = urlsplit(url)
         if (path.is_absolute() or '..' in path.parts or '.' in path.parts
                 or '\\' in relative or len(path.parts) < 2
-                or path.parts[0] != 'Library' or '.git' in path.parts):
-            raise ValueError('Manifest path must remain inside Library')
+                or path.parts[0] != 'Harness' or '.git' in path.parts):
+            raise ValueError('Manifest path must remain inside Harness')
         if (parsed.scheme != 'https' or parsed.hostname != 'github.com'
                 or parsed.username or parsed.password or parsed.query or parsed.fragment
                 or not re.fullmatch(r'/[\w.-]+/[\w.-]+(?:\.git)?', parsed.path)):
@@ -49,14 +49,14 @@ def skill_target(root, relative, link):
     return destination
 
 def readiness(root=ROOT):
-    required = ['CLAUDE.md', 'AGENTS.md', 'LICENSE', 'Library/repos.txt',
+    required = ['CLAUDE.md', 'AGENTS.md', 'LICENSE', 'Harness/repos.txt',
                 'tools/release_check.py', '.claude/hooks/guard_git_amend.py']
     missing = [path for path in required if not (root / path).is_file()]
     if sys.version_info < (3, 9):
         missing.append('Python 3.9+')
     if not shutil.which('git'):
         missing.append('Git')
-    entries = parse_manifest((root / 'Library/repos.txt').read_text(encoding='utf-8'))
+    entries = parse_manifest((root / 'Harness/repos.txt').read_text(encoding='utf-8'))
     return {'schema': 1, 'core_ready': not missing, 'missing': missing,
             'optional_sources_present': sum((root / e['path'] / '.git').exists() for e in entries),
             'optional_sources_total': len(entries)}
@@ -80,7 +80,7 @@ def fetch(entry):
     run('git', '-c', 'core.autocrlf=false', '-c', 'core.symlinks=true',
         '-c', 'core.longpaths=true', 'clone', '--filter=blob:none', '--no-checkout',
         entry['url'], str(destination))
-    if entry['path'] == 'Library/reverse-skill':
+    if entry['path'] == 'Harness/reverse-skill':
         run('git', '-C', str(destination), 'sparse-checkout', 'init', '--no-cone')
         exclude = destination / '.git/info/sparse-checkout'
         with exclude.open('w', encoding='utf-8', newline='\n') as stream:
@@ -131,7 +131,7 @@ def main():
     parser.add_argument('--link-skills', action='store_true')
     parser.add_argument('--no-system', action='store_true', help='compatibility: onboarding is always checkout-local')
     args = parser.parse_args()
-    entries = parse_manifest((ROOT / 'Library/repos.txt').read_text(encoding='utf-8'))
+    entries = parse_manifest((ROOT / 'Harness/repos.txt').read_text(encoding='utf-8'))
     if args.list:
         for entry in entries:
             print(Path(entry['path']).name, entry['pin'], entry['url'])

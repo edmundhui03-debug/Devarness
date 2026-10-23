@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="cship-preview-") as tmp:
         },
     }
     print("CSHIP PREVIEW — synthetic sample values, not live session usage", flush=True)
-    command = [str(root / "Library/bin/statusline")]
+    command = [str(root / "Harness/bin/statusline")]
     if os.name == "nt":
         # Windows cannot execute the bash wrapper directly (WinError 193); run it
         # through the Git Bash that `statusline --preview` was started from.

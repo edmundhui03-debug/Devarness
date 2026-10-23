@@ -244,7 +244,7 @@ class PortabilityGuardTests(Sandbox):
         self.assertIn('run.sh', done.stderr)
 
     def test_the_checkers_that_spell_out_the_patterns_are_exempt(self):
-        for relative in ('Library/publish-check.py', 'Library/tests/test_publish_check.py',
+        for relative in ('Harness/publish-check.py', 'Harness/tests/test_publish_check.py',
                          '.claude/hooks/guard_vendor_code.py', '.claude/hooks/test_guard_vendor_code.py'):
             with self.subTest(file=relative):
                 repo = self.repo('checker-' + relative.replace('/', '_'))
@@ -263,7 +263,7 @@ class PortabilityGuardTests(Sandbox):
 
     def test_documents_that_quote_paths_as_evidence_are_exempt(self):
         for relative in ('Setup/superpowers/specs/design.md', 'CLAUDE.md',
-                         'sub/_review/log.md', 'Library/INSTALL.md', 'board.kicad_pcb',
+                         'sub/_review/log.md', 'Harness/INSTALL.md', 'board.kicad_pcb',
                          'PRDs and Specs/003 Tool/evidence/run.json'):
             with self.subTest(file=relative):
                 repo = self.repo('exempt-' + relative.replace('/', '_'))

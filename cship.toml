@@ -16,7 +16,7 @@
 # This config uses Nerd Font glyphs. Ghostty supplies them by default, which is
 # why the plain-Unicode fallback of the previous config is no longer needed.
 # If you switch terminals and see boxes, set the terminal font to
-# JetBrainsMono Nerd Font Mono (already installed in ~/Library/Fonts).
+# JetBrainsMono Nerd Font Mono (already installed in ~/Harness/Fonts).
 # Row-2 icons stay inside the BMP (U+E000–U+F8FF) since 2026-09-24: cmux-windows
 # truncates code points above U+FFFF, so the plane-15 Material icons drew wrong
 # glyphs there whatever the font.

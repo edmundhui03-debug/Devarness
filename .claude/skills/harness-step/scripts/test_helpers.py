@@ -110,7 +110,7 @@ class LinkedRunTests(unittest.TestCase):
             def link(t):
                 seen["aside"] = own.with_name(own.name + linked_run.ASIDE).is_dir()
                 seen["own_gone"] = not own.exists()
-                return ["Library/x"]
+                return ["Harness/x"]
 
             with mock.patch.object(linked_run.probe, "link_clones", side_effect=link), \
                     mock.patch.object(linked_run.probe, "unlink_clones") as unlink:
@@ -118,7 +118,7 @@ class LinkedRunTests(unittest.TestCase):
             self.assertEqual(code, 3)
             self.assertIn("table", output)
             self.assertEqual(seen, {"aside": True, "own_gone": True})
-            unlink.assert_called_once_with(tree, ["Library/x"])
+            unlink.assert_called_once_with(tree, ["Harness/x"])
             self.assertEqual((own / "stale.txt").read_text(encoding="utf-8"), "worktree's own")
             self.assertFalse(own.with_name(own.name + linked_run.ASIDE).exists())
 
@@ -144,13 +144,13 @@ class LinkedRunMainCheckoutTests(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.main = Path(folder.name) / "main"
         self.main.mkdir()
-        (self.main / ".gitignore").write_text("/.claude/hooks/library/\n/Library/\n", encoding="utf-8")
+        (self.main / ".gitignore").write_text("/.claude/hooks/library/\n/Harness/\n", encoding="utf-8")
         for args in (["init", "-q"], ["add", "-A"],
                      ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"]):
             linked_run.probe.git(*args, cwd=self.main)
-        (self.main / "Library" / "shared" / "skill").mkdir(parents=True)
-        (self.main / "Library" / ".runtime").mkdir()
-        (self.main / "Library" / "repos.txt").write_text("Library/shared\turl\tpin\n", encoding="utf-8")
+        (self.main / "Harness" / "shared" / "skill").mkdir(parents=True)
+        (self.main / "Harness" / ".runtime").mkdir()
+        (self.main / "Harness" / "repos.txt").write_text("Harness/shared\turl\tpin\n", encoding="utf-8")
         self.main_index = self.main / self.INDEX
         self.main_index.parent.mkdir(parents=True)
         self.main_index.write_text("main", encoding="utf-8")
@@ -188,7 +188,7 @@ class LinkedRunMainCheckoutTests(unittest.TestCase):
         link = self.tree / ".claude" / "skills" / "skill"
         link.parent.mkdir(parents=True)
         try:  # how Git for Windows checks out a link whose target does not exist yet
-            os.symlink(os.path.join("..", "..", "Library", "shared", "skill"), link)
+            os.symlink(os.path.join("..", "..", "Harness", "shared", "skill"), link)
         except OSError as error:
             self.skipTest("cannot make symlinks here: {}".format(error))
         linked_run.probe.git("add", str(link), cwd=self.tree)

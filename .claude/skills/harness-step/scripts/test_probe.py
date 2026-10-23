@@ -157,19 +157,19 @@ class RunTests(unittest.TestCase):
         self.assertIn("--include-hook-events", seen["cmd"])  # else prompt hooks are not streamed
 
     def add_clones(self):
-        """Library/repos.txt naming one present clone, a runtime and a tracked skill link into the clone."""
-        library = self.repo / "Library"
+        """Harness/repos.txt naming one present clone, a runtime and a tracked skill link into the clone."""
+        library = self.repo / "Harness"
         library.mkdir()
-        (library / "repos.txt").write_text("# comment\nLibrary/kept\turl\tpin\nLibrary/absent\turl\tpin\n",
+        (library / "repos.txt").write_text("# comment\nHarness/kept\turl\tpin\nHarness/absent\turl\tpin\n",
                                            encoding="utf-8")
         (library / "kept").mkdir()
         (library / "kept" / "SKILL.md").write_text("clone\n", encoding="utf-8")
         (library / ".runtime").mkdir()
-        (self.repo / ".gitignore").write_text("/Library/kept/\n/Library/.runtime/\n", encoding="utf-8")
+        (self.repo / ".gitignore").write_text("/Harness/kept/\n/Harness/.runtime/\n", encoding="utf-8")
         probe.git("config", "core.symlinks", "true", cwd=self.repo)
         probe.git("add", "-A", cwd=self.repo)
         # A tracked skill link into a clone, as .claude/skills/grilling is in dev.
-        blob = subprocess.run(["git", "hash-object", "-w", "--stdin"], cwd=self.repo, input=b"../Library/kept",
+        blob = subprocess.run(["git", "hash-object", "-w", "--stdin"], cwd=self.repo, input=b"../Harness/kept",
                               capture_output=True, check=True).stdout.decode().strip()
         probe.git("update-index", "--add", "--cacheinfo", "120000,{},skills/kept".format(blob), cwd=self.repo)
         probe.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "repos", cwd=self.repo)
@@ -196,7 +196,7 @@ class RunTests(unittest.TestCase):
         seen = {}
 
         def claude(cmd, cwd, stdout, **kw):
-            seen["clone"] = (Path(cwd) / "Library" / "kept" / "SKILL.md").is_file()
+            seen["clone"] = (Path(cwd) / "Harness" / "kept" / "SKILL.md").is_file()
             link = Path(cwd) / "skills" / "kept"
             # The preflight's test: on Windows a link git made before its target existed is a file link.
             seen["skill"] = (link / "SKILL.md").is_file() and (
@@ -207,7 +207,7 @@ class RunTests(unittest.TestCase):
         code, s = self.run_with(claude)
         self.assertTrue(seen["clone"])
         self.assertTrue(seen["skill"])  # git made the link after its target existed
-        self.assertEqual(s["links"], ["Library/kept", "Library/.runtime"])
+        self.assertEqual(s["links"], ["Harness/kept", "Harness/.runtime"])
         self.assertNotIn("kept", (self.out / "base.diff").read_text(encoding="utf-8"))
         self.assertFalse(seen["tree"].exists())
         self.assertTrue((library / "kept" / "SKILL.md").is_file())  # the source survives removal

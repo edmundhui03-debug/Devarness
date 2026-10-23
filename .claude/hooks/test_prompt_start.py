@@ -4,7 +4,7 @@ and retro-last after every prompt in dev, with the library's picks between them.
 
 Run: python .claude/hooks/test_prompt_start.py
 
-Most tests copy the hook into a throwaway dev tree whose Library/bin/library is
+Most tests copy the hook into a throwaway dev tree whose Harness/bin/library is
 a stand-in: it logs its arguments and prints, fails, hangs or floods as each
 test asks. One test times the real hook on this checkout.
 """
@@ -79,7 +79,7 @@ class FakeDevTests(unittest.TestCase):
         self.hook = self.root / ".claude" / "hooks" / "prompt-start.py"
         self.hook.parent.mkdir(parents=True)
         shutil.copy2(str(HOOK), str(self.hook))
-        self.library = self.root / "Library" / "bin" / "library"
+        self.library = self.root / "Harness" / "bin" / "library"
         self.library.parent.mkdir(parents=True)
         self.library.write_text(FAKE_LIBRARY, encoding="utf-8")
         self.log = self.root / "fake.log"
@@ -175,7 +175,7 @@ class FakeDevTests(unittest.TestCase):
         self.assertTrue(lines[-1].startswith("retro-last:"))
 
     def test_vercel_find_runs_only_for_a_curated_keyword(self):
-        (self.root / "Library" / "vercel_find.py").write_text(FAKE_VERCEL, encoding="utf-8")
+        (self.root / "Harness" / "vercel_find.py").write_text(FAKE_VERCEL, encoding="utf-8")
         unmatched = self.context(self.run_hook("which tool owns fire simulation work here")[0])
         self.assertFalse([line for line in unmatched if line.startswith("vercel-find")])
         matched = self.context(self.run_hook("which tool reviews a pcb layout here")[0])

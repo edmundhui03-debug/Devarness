@@ -1,0 +1,1518 @@
+#!/usr/bin/env python3
+"""update-tools — keep every device on the pinned tools, and advance the pins.
+
+  update-tools check [--json]                every clone and plugin: current, behind or held
+  update-tools apply [--budget S] [--force] [--only PATH ...]
+  update-tools status                        the last run on this device
+  update-tools banner                        the session banner: pending, held, how old each check is
+  update-tools launch                        start the long run in the background when work waits
+  update-tools install-daily | uninstall-daily   the 04:00 long run: DEVARNESS_update_daily, by Task Scheduler or launchd
+
+Phase 1, at every run: a clone whose HEAD is not its pin in Harness/repos.txt
+(or in the owner's ~/.config/devarness/personal-repos.txt) is checked out at the pin
+and its post-update command from Harness/updates.txt runs. Phase 2, at every
+run since 2026-09-25: every upstream is asked for its default-branch head; a
+row whose policy is auto is moved, its installer and check run, and the new
+commit is written into every repos.txt row with that URL, committed by path
+and pushed. A personal clone is always report: its pin is the owner's to move.
+A failed installer or check rolls the clone and the manifest back and holds
+the tool on this device at that upstream commit. A start has 60 s, so
+installers, missing clones and the once-a-day plugin step wait for a long run
+(--budget 1800). There is no sweeping sync: a pin commit update-tools cannot
+push waits for a person.
+"""
+from __future__ import annotations
+
+import argparse
+import calendar
+from concurrent.futures import ThreadPoolExecutor
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import time
+from typing import NamedTuple, Optional
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "Harness"))
+import common  # noqa: E402
+MANIFEST = "Harness/repos.txt"
+POLICY = "Harness/updates.txt"
+STATE = ".claude/hooks/update-tools.state"
+LOGS = ".claude/hooks/update-tools"
+FLOOR_HOURS = 24            # a plugin check older than this shows as unchecked in update-tools check
+PLUGIN_FLOOR_HOURS = 20     # the plugin step's floor: a daily run a little earlier than yesterday's still counts
+SCAN_ENOUGH = 0.8          # a scan that reached fewer upstreams than this counts for nothing
+LS_TIMEOUT = 10
+SCAN_TIMEOUT = 15
+FETCH_TIMEOUT = 60
+COMMAND_TIMEOUT = 900       # the most an installer may take; a run's budget can cut it shorter
+PLUGIN_TIMEOUT = 45
+LIBRARY_TIMEOUT = 60         # each local catalogue step, also bounded by the run's remaining time
+PUSH_TIMEOUT = 30
+PHASE2_MINIMUM = 30         # the scan is 15 s at most; a light move fits in the rest of a start
+INSTALL_MINIMUM = 300       # an installer or the plugin step needs a long run, never a start's 60 s
+MOVE_MARGIN = 20            # left for a checkout: session_start ends the tree at budget + 5 s
+CLONE_MINIMUM = 60          # a missing clone is not started with less than this above its reserve
+CLONE_RECORD_SECONDS = 900  # half a long run: a clone that timed out with less is not recorded
+UNFINISHED = "did not finish in one run; update-tools apply --only %s --budget 6000 gives it the time"
+LOCK = ".claude/hooks/update-tools.lock"
+LOCK_STALE_HOURS = 2
+# The queue the last launch had waits this long: work a long run cannot finish
+# launches at most four times a day; new work launches at once.
+LAUNCH_EVERY_HOURS = 6
+
+
+class Row(NamedTuple):
+    path: str
+    url: str
+    sha: str
+    sparse: str
+    personal: bool = False      # from ~/.config/devarness/personal-repos.txt: never written, never committed
+
+
+class Policy(NamedTuple):
+    kind: str
+    reason: str
+    after: Optional[str]
+    check: Optional[str]
+
+
+class Result(NamedTuple):
+    what: str
+    state: str
+    note: str
+
+
+def read_manifest(root: Path) -> list:
+    """Harness/repos.txt's rows, then the owner's personal ones (common.pinned_clones)."""
+    rows = []
+    for clone in common.pinned_clones(root):
+        if not clone.url or not clone.pin:
+            raise SystemExit("%s has no url or no pin" % clone.where)
+        rows.append(Row(clone.path, clone.url, clone.pin, clone.sparse, clone.personal))
+    return rows
+
+
+# A personal pin lives outside git, so a move is reported and the owner makes it.
+PERSONAL = "a personal clone; move its pin in ~/.config/devarness/" + common.PERSONAL_REPOS
+
+
+def read_policy(root: Path, rows: list = ()) -> dict:
+    """updates.txt's table; each personal row of rows is report, whatever updates.txt says."""
+    table = {}
+    path = root / POLICY
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    for number, line in enumerate(lines, 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = (line.split("\t") + ["-", "-", "-"])[:4]
+        kind, _, reason = fields[1].partition(" ")
+        if kind not in ("auto", "hold", "report"):
+            raise SystemExit("updates.txt:%d has the unknown policy %r" % (number, fields[1]))
+        table[fields[0]] = Policy(kind, reason.strip(),
+                                  None if fields[2] == "-" else fields[2],
+                                  None if fields[3] == "-" else fields[3])
+    table.update({row.path: Policy("report", PERSONAL, None, None) for row in rows if row.personal})
+    return table
+
+
+def now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def hours_since(stamp) -> Optional[float]:
+    """Hours since an epoch number or an ISO time as now_iso writes it; None for none."""
+    if isinstance(stamp, (int, float)):
+        return (time.time() - stamp) / 3600
+    try:
+        return (time.time() - calendar.timegm(time.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ"))) / 3600
+    except (TypeError, ValueError):
+        return None
+
+
+def local_clock(stamp: str) -> str:
+    """HH:MM on this device's clock: the stamps are UTC, and the owner reads local time."""
+    try:
+        epoch = calendar.timegm(time.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ"))
+    except (TypeError, ValueError):
+        return str(stamp)[11:16]
+    return time.strftime("%H:%M", time.localtime(epoch))
+
+
+def last_line(text: str) -> str:
+    text = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", text)   # an installer's terminal colours
+    lines = [line for line in text.strip().splitlines() if line.strip()]
+    return (lines[-1] if lines else "")[:160]
+
+
+def git(repo, *args, timeout=LS_TIMEOUT, index=None):
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
+    if index:
+        env["GIT_INDEX_FILE"] = str(index)      # a scratch index: the shared one is never touched
+    argv = ["git"] + (["-C", str(repo)] if repo else []) + list(args)
+    # Bounded as a tree: subprocess.run's timeout then waits without limit
+    # on a surviving git-remote-https that still holds the pipes. run_bounded
+    # decodes UTF-8 explicitly: an arrow in a commit subject or a Chinese path
+    # would otherwise stop the run on a Windows code page such as cp950.
+    return run_bounded(argv, timeout, env=env)
+
+
+def kill_tree(process) -> None:
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True,
+                       creationflags=subprocess.CREATE_NO_WINDOW)     # windowless, as run_bounded is
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    process.kill()
+
+
+def run_bounded(argv: list, timeout: float, cwd=None, env=None):
+    """Run argv with a deadline that ends its whole process tree.
+
+    subprocess.run's timeout kills only the root: a .cmd launcher's Python
+    child, or a syncer's git child, kept the pipes open and the wait never
+    ended. The tree is ended the way session_start.py ends a stuck sync.
+    Windowless on Windows: a long run has no console, under the task's
+    pythonw or started detached, and each console child would open one.
+    """
+    try:
+        process = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                   encoding="utf-8", errors="replace",
+                                   start_new_session=(os.name != "nt"),
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except OSError as exc:
+        return 127, "", str(exc)
+    try:
+        out, err = process.communicate(timeout=timeout)
+        return process.returncode, out, err
+    except subprocess.TimeoutExpired:
+        kill_tree(process)
+        try:
+            out, err = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            out, err = "", ""
+        return 124, out, (err or "") + "timed out after %ss" % timeout
+
+
+def bash_path() -> str:
+    """The bash to run a script with: on Windows, Git for Windows' own.
+
+    A bare "bash" given to subprocess on Windows is System32's, WSL's, which
+    runs nothing of ours and says nothing; dev-check met the same on
+    2026-09-19. Git's bash sits in the bin folder of the install that holds git.
+    """
+    if os.name != "nt":
+        return "bash"
+    git_exe = shutil.which("git")
+    if git_exe:
+        for folder in list(Path(git_exe).resolve().parents)[:3]:
+            candidate = folder / "bin" / "bash.exe"
+            if candidate.is_file():
+                return str(candidate)
+    return "bash"
+
+
+def tool_name(row: Row) -> str:
+    return Path(row.path).name
+
+
+def clone_head(root: Path, row: Row) -> Optional[str]:
+    """The clone's commit; None when there is no clone with a commit.
+
+    --git-dir keeps git inside the folder: run plainly under dev, rev-parse in
+    an empty or half-made .git answers with dev's own HEAD (verified
+    2026-09-25), and every later git call would then act on dev."""
+    repo = root / row.path
+    if not (repo / ".git").exists():
+        return None
+    rc, out, _ = git(repo, "--git-dir=.git", "rev-parse", "--verify", "-q", "HEAD")
+    return out.strip() if rc == 0 else None
+
+
+def local_changes(repo: Path) -> int:
+    rc, out, _ = git(repo, "status", "--porcelain", "--untracked-files=no")
+    return len(out.splitlines()) if rc == 0 else 0
+
+
+def checkout(root: Path, row: Row, sha: str, log: Path, deadline: Optional[float] = None):
+    """Move the clone to sha, fetching it when absent. Never forces.
+
+    With a deadline the fetch leaves MOVE_MARGIN for the checkout: a killed
+    fetch is harmless, a killed checkout leaves a half-written clone that
+    reads as a hand edit at every later run.
+    """
+    repo = root / row.path
+    if clone_head(root, row) == sha:
+        return True, ""         # a restore where nothing moved
+    changed = local_changes(repo)
+    if changed:
+        return False, "local changes: %d files; a vendored clone is never edited" % changed
+    if git(repo, "cat-file", "-e", sha + "^{commit}")[0] != 0:
+        allowed = FETCH_TIMEOUT if deadline is None else min(
+            FETCH_TIMEOUT, deadline - time.monotonic() - MOVE_MARGIN)
+        if allowed < 1:
+            return False, "out of time before the fetch"
+        rc, _, err = git(repo, "fetch", "--quiet", "origin", timeout=allowed)
+        if rc != 0:
+            return False, "fetch: " + last_line(err)
+        if git(repo, "cat-file", "-e", sha + "^{commit}")[0] != 0:
+            return False, "commit %s is not on origin" % sha[:7]
+    rc, _, err = git(repo, "checkout", "-q", "--detach", sha, timeout=FETCH_TIMEOUT)
+    if rc != 0:
+        return False, "checkout: " + last_line(err)
+    return True, ""
+
+
+def remove_tree(path: Path):
+    """Delete a folder git wrote. Returns (gone, why), and never raises.
+
+    Windows marks git's pack files read-only, which a chmod and a second try
+    clear. Any other failure is reported as it was: on POSIX rmtree can hand
+    the handler os.open, and retrying that raised TypeError. A file another
+    program holds open, a virus scanner say, cannot be deleted at all: the
+    folder stays, kept out of git by the *.partial/ rule, and a later run
+    tries again."""
+    def writable(function, target, error):
+        if os.name == "nt" and function in (os.unlink, os.rmdir):
+            os.chmod(target, stat.S_IWRITE)
+            function(target)
+            return
+        raise error if isinstance(error, BaseException) else error[1]
+    if not path.exists():
+        return True, ""
+    try:
+        if sys.version_info >= (3, 12):
+            shutil.rmtree(path, onexc=writable)
+        else:
+            shutil.rmtree(path, onerror=writable)
+    except Exception as exc:
+        return False, str(exc)
+    return True, ""
+
+
+def clone_missing(root: Path, row: Row, deadline: float):
+    """A missing clone, made whole in <path>.partial and renamed into place.
+
+    --filter=blob:none fetches file contents for the pinned commit only, so
+    most of docling's 412 MB of history is never downloaded. A clone cut
+    short, or a pin upstream no longer has, leaves nothing at the path, and
+    the next long run starts again. The clone may use the run only down to a
+    reserve of INSTALL_MINIMUM, which the scan, the moves and the plugin step
+    keep; one that runs out of a share of CLONE_RECORD_SECONDS or more
+    returns UNFINISHED, which follow_pins records. Returns (ok, why)."""
+    target = root / row.path
+    if target.exists() and any(target.iterdir()):
+        return False, "a folder that is not a clone is there; move it aside and the next long run clones it"
+    reserve = MOVE_MARGIN + INSTALL_MINIMUM
+    share = deadline - time.monotonic() - reserve
+    if share < CLONE_MINIMUM:
+        return False, "out of time; the next long run clones it"
+    partial = target.with_name(target.name + ".partial")
+    gone, why = remove_tree(partial)                      # a clone killed in an earlier run
+    if not gone:
+        return False, "%s.partial could not be removed: %s; the next long run tries again" % (row.path, why)
+    partial.parent.mkdir(parents=True, exist_ok=True)
+    settings = ["-c", "core.autocrlf=false", "-c", "core.eol=lf",
+                "-c", "core.symlinks=true", "-c", "core.longpaths=true"]
+    # bootstrap.sh's sequence for a sparse row (Harness/bootstrap.sh:96-105), partial for every row.
+    first = ["--sparse"] if row.sparse else ["--no-checkout"]
+    steps = [(None, ["clone", "--quiet", "--filter=blob:none"] + first + settings + [row.url, str(partial)])]
+    if row.sparse:
+        steps.append((partial, ["sparse-checkout", "set"] + row.sparse.split()))
+    steps.append((partial, ["checkout", "-q", "--detach", row.sha]))
+    for repo, argv in steps:
+        rc, _, err = git(repo, *argv, timeout=max(1, deadline - time.monotonic() - reserve))
+        if rc != 0:
+            remove_tree(partial)
+            if rc != 124:                                 # run_bounded's code for a timeout
+                return False, "%s: %s" % (argv[0], last_line(err))
+            if share < CLONE_RECORD_SECONDS:              # a late start; the next long run gives it more
+                return False, "out of time; the next long run clones it"
+            return False, UNFINISHED % row.path
+    try:
+        if target.exists():
+            target.rmdir()                                # the empty folder a gitlink leaves
+        os.replace(partial, target)
+    except OSError as exc:                                # on Windows, a file held open inside stops it
+        return False, "%s.partial could not be moved into place: %s; the next long run tries again" % (row.path, exc)
+    return True, ""
+
+
+def console_python() -> str:
+    """python.exe beside the task's pythonw: CREATE_NO_WINDOW is ignored for
+    pythonw, which has no console, and each console child of it opens a window.
+    python.exe gets a hidden console that its children share, as dev-check's daily does."""
+    python = Path(sys.executable)
+    if os.name == "nt" and python.with_name("python.exe").is_file():
+        return str(python.with_name("python.exe"))
+    return str(python)
+
+
+def command_argv(root: Path, text: str) -> list:
+    words = text.split()
+    first = words[0]
+    target = root / "Harness" / first
+    if first.endswith(".py"):
+        return [console_python(), str(target)] + words[1:]
+    if first.endswith(".sh"):
+        return [bash_path(), str(target)] + words[1:]
+    if first.startswith("bin/"):
+        with target.open("rb") as handle:
+            head = handle.readline()
+        return ([bash_path()] if b"bash" in head else [console_python()]) + [str(target)] + words[1:]
+    return words
+
+
+def run_command(root: Path, text: str, log: Path, timeout=COMMAND_TIMEOUT):
+    argv = command_argv(root, text)
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", GIT_TERMINAL_PROMPT="0")
+    rc, out, err = run_bounded(argv, timeout, cwd=str(root), env=env)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write("== %s  %s\n%s%s-- exit %d\n" % (now_iso(), text, out, err, rc))
+    return rc, last_line(err) or last_line(out)
+
+
+def mark_installing(root: Path, state: dict, paths: list, sha: str) -> None:
+    """Stuck, on disk, until the installer passes: a run killed inside one
+    leaves a half-built runtime, which the next run then names and retries."""
+    for path in paths:
+        state.setdefault("stuck", {})[path] = {
+            "at": sha, "reason": "its installer did not finish at %s" % sha[:7], "when": now_iso()}
+    save_state(root, state)
+
+
+LONG_RUN = "update-tools apply --budget 1800"
+# A start's 60 s never reaches an installer or the plugin step; this task is
+# the daily long run on Windows, done before DEVARNESS_check_daily's 05:00.
+DAILY_TASK = dict(task="DEVARNESS_update_daily", arguments=LONG_RUN.split(" ", 1)[1], hour=4, limit="PT40M",
+                  description="update-tools's daily long run: pins, installers and plugins.")
+
+
+def load_dev_check():
+    """dev-check's scheduled-task code, which registers this task too."""
+    path = Path(__file__).resolve().parent / "dev-check"
+    loader = importlib.machinery.SourceFileLoader("dev_check", str(path))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("dev_check", loader))
+    loader.exec_module(module)
+    return module
+
+
+# The Mac's launchd job carries the task's name: dev-check's schedule() writes both daily jobs
+# there since 2026-09-27 (925471a, verified on the MacBook Air), as Task Scheduler does here.
+LAUNCH_AGENT = DAILY_TASK["task"]
+
+
+def agent_path(home: Path) -> Path:
+    return home / "Harness" / "LaunchAgents" / (LAUNCH_AGENT + ".plist")
+
+
+def run_quiet(argv: list) -> int:
+    """A scheduler command, bounded; only its exit code matters."""
+    return run_bounded(argv, 30)[0]
+
+
+def install_daily(install: bool, root: Path) -> int:
+    """The daily long run, through dev-check's schedule(): Task Scheduler on Windows and
+    launchd on a Mac; it says so, and exits 2, anywhere else."""
+    return load_dev_check().schedule(install, tool=str(Path(__file__).resolve()), **DAILY_TASK)
+
+
+def timed_out(state: dict, row: Row) -> bool:
+    """Whether a clone of row ran out of a whole share of a run at its current pin."""
+    return state.get("clone_timeouts", {}).get(row.path, {}).get("sha") == row.sha
+
+
+def follow_pins(root: Path, rows: list, policy: dict, deadline: float, logs: Path,
+                state: Optional[dict] = None, only: tuple = ()) -> list:
+    """Phase 1: every clone to its pin. No network unless the pin is absent locally.
+
+    A row with an installer is moved only when the run has the time an
+    installer needs; a start with 60 s leaves the clone at the old pin,
+    working, and says so. A tool whose installer failed after the move is
+    `stuck`: recorded, said at every run, and its installer tried again at
+    every run with time, until it passes. A missing clone that did not finish
+    in one run is recorded at its pin and skipped until --only names it (only)
+    or the pin moves: on a slow link it would otherwise download again at
+    every run and never finish.
+    """
+    state = state if state is not None else {}
+    stuck = state.setdefault("stuck", {})
+    timeouts = state.setdefault("clone_timeouts", {})
+    results = []
+    for row in rows:
+        head = clone_head(root, row)
+        after = policy[row.path].after if row.path in policy else None
+        log = logs / (tool_name(row) + ".log")
+        remaining = deadline - time.monotonic()
+        if head is None:
+            # Since 2026-09-25 a missing clone comes back by itself in a long
+            # run: partial, at its pin, then its installer (owner, Q1-Q3).
+            if row.path in timeouts and not timed_out(state, row):
+                del timeouts[row.path]                            # a new pin gets a new try
+            if timed_out(state, row) and row.path not in only:
+                results.append(Result(row.path, "absent", UNFINISHED % row.path))
+                continue
+            if remaining < INSTALL_MINIMUM:
+                results.append(Result(row.path, "absent", "no clone; the background run clones it: " + LONG_RUN))
+                continue
+            ok, why = clone_missing(root, row, deadline)
+            if not ok:
+                if why == UNFINISHED % row.path:
+                    timeouts[row.path] = {"at": now_iso(), "sha": row.sha}
+                results.append(Result(row.path, "absent", why))
+                continue
+            timeouts.pop(row.path, None)
+            if after:
+                mark_installing(root, state, [row.path], row.sha)
+                rc, why = run_command(root, after, log, timeout=command_timeout(deadline))
+                if rc != 0:
+                    stuck[row.path] = {"at": row.sha, "reason": "%s failed: %s" % (after.split()[0], why),
+                                       "when": now_iso()}
+                    results.append(Result(row.path, "stuck", stuck[row.path]["reason"]))
+                    continue
+            stuck.pop(row.path, None)
+            results.append(Result(row.path, "cloned", "partial clone at %s" % row.sha[:7]))
+            continue
+        if head == row.sha:
+            if row.path not in stuck:
+                continue
+            if not after:
+                stuck.pop(row.path)
+                continue
+            if remaining < INSTALL_MINIMUM:
+                results.append(Result(row.path, "stuck", stuck[row.path]["reason"] + "; needs a long run: " + LONG_RUN))
+                continue
+            rc, why = run_command(root, after, log, timeout=command_timeout(deadline))
+            if rc == 0:
+                stuck.pop(row.path)
+                results.append(Result(row.path, "followed", "installer passed at %s" % row.sha[:7]))
+            else:
+                stuck[row.path] = {"at": row.sha, "reason": "%s failed: %s" % (after.split()[0], why),
+                                   "when": now_iso()}
+                results.append(Result(row.path, "stuck", stuck[row.path]["reason"]))
+            continue
+        if remaining < MOVE_MARGIN:
+            results.append(Result(row.path, "deferred", "out of time; update-tools apply"))
+            continue
+        if after and remaining < INSTALL_MINIMUM:
+            results.append(Result(row.path, "deferred", "behind the pin; its installer needs a long run: " + LONG_RUN))
+            continue
+        ok, why = checkout(root, row, row.sha, log, deadline)
+        if ok and after:
+            mark_installing(root, state, [row.path], row.sha)
+            rc, why = run_command(root, after, log, timeout=command_timeout(deadline))
+            ok = rc == 0
+            if not ok:
+                why = "%s failed: %s" % (after.split()[0], why)
+                stuck[row.path] = {"at": row.sha, "reason": why, "when": now_iso()}
+        if ok:
+            stuck.pop(row.path, None)
+        results.append(Result(row.path, "followed" if ok else "stuck",
+                              "%s→%s" % (head[:7], row.sha[:7]) if ok else why))
+    return results
+
+
+def scan_upstreams(urls: list, timeout=SCAN_TIMEOUT) -> dict:
+    """The head of each upstream's default branch, in parallel; None when unreached."""
+    def one(url):
+        rc, out, _ = git(None, "ls-remote", "-q", url, "HEAD", timeout=LS_TIMEOUT)
+        return url, (out.split()[0] if rc == 0 and out.split() else None)
+    heads = {url: None for url in urls}
+    pool = ThreadPoolExecutor(max_workers=8)
+    futures = [pool.submit(one, url) for url in urls]
+    end = time.monotonic() + timeout
+    for future in futures:
+        try:
+            url, head = future.result(timeout=max(0.1, end - time.monotonic()))
+        except Exception:
+            continue
+        heads[url] = head
+    pool.shutdown(wait=False, cancel_futures=True)
+    return heads
+
+
+def record_scan(state: dict, heads: dict, whole: bool) -> None:
+    """Remember each upstream's head; a scan that reached too few counts for nothing.
+
+    A row whose upstream was not reached keeps the head the last scan saw,
+    so an offline start never empties what the banner says is waiting (M2).
+    A run on a few rows (--only) keeps its heads but is not the scan."""
+    state.setdefault("heads", {}).update({url: head for url, head in heads.items() if head})
+    if not whole:
+        return
+    reached = sum(1 for head in heads.values() if head)
+    state["scan"] = {"at": time.time(), "reached": reached, "total": len(heads)}
+    if heads and reached >= SCAN_ENOUGH * len(heads):
+        state["last_scan"] = state["scan"]["at"]
+
+
+def plugins_due(state: dict, force: bool) -> bool:
+    """The plugin step runs once a day: a start now launches a long run
+    whenever work waits, and eleven CLI calls each time would be waste."""
+    age = hours_since(state.get("last_plugins", {}).get("at"))
+    return force or age is None or age >= PLUGIN_FLOOR_HOURS
+
+
+def set_pin(text: str, url: str, sha: str) -> str:
+    """The manifest text with sha in every row whose URL is url; every other byte kept."""
+    out = []
+    for line in text.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        fields = body.split("\t")
+        if len(fields) >= 3 and not body.startswith("#") and fields[1] == url:
+            fields[2] = sha
+            line = "\t".join(fields) + line[len(body):]
+        out.append(line)
+    return "".join(out)
+
+
+def write_pins(root: Path, url: str, sha: str) -> None:
+    """The new commit into every manifest row with that URL; every other byte kept."""
+    path = root / MANIFEST
+    text = set_pin(path.read_text(encoding="utf-8"), url, sha)
+    # Whole or not at all: a run killed mid-write would leave a truncated
+    # manifest for the next sync to commit. The temporary file is ignored.
+    temporary = root / LOGS / "repos.txt.tmp"
+    temporary.parent.mkdir(parents=True, exist_ok=True)
+    with temporary.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(text)
+    os.replace(temporary, path)
+
+
+def pins_by_url(text: str) -> dict:
+    """{url: sha} of a manifest's rows; the first row of a URL speaks for the rest."""
+    pins = {}
+    for line in text.splitlines():
+        fields = line.split("\t")
+        if len(fields) >= 3 and not line.startswith("#"):
+            pins.setdefault(fields[1], fields[2])
+    return pins
+
+
+def reapply_pins(remote: str, base: str, ours: str) -> str:
+    """Origin's manifest with this device's moves written in, row by row.
+
+    A move is a URL whose pin differs between the merge base and HEAD. Where
+    origin also moved that URL since the base, origin's pin stands and the
+    next scan decides again, so one device never undoes another's move."""
+    before, mine, theirs = pins_by_url(base), pins_by_url(ours), pins_by_url(remote)
+    for url, sha in mine.items():
+        if sha != before.get(url) and theirs.get(url) == before.get(url):
+            remote = set_pin(remote, url, sha)
+    return remote
+
+
+def command_timeout(deadline: float) -> float:
+    """What an installer may take now: the budget left, never more than the cap.
+
+    A runtime rebuild at a new commit can outlast a session start; it is then
+    rolled back and held with the time it was given, and a run with more time
+    tries again rather than the hold standing for ever.
+    """
+    return max(5.0, min(COMMAND_TIMEOUT, deadline - time.monotonic()))
+
+
+def move_group(root: Path, group: list, new_sha: str, policy: dict, logs: Path, timeout: float,
+               deadline: Optional[float] = None):
+    """Every clone of one upstream to new_sha, the manifest, the installer, the check.
+    On any failure it stops and says why; restore_group puts things back."""
+    log = logs / (tool_name(group[0]) + ".log")
+    for row in group:
+        ok, why = checkout(root, row, new_sha, log, deadline)
+        if not ok:
+            return False, "%s: %s" % (row.path, why)
+    write_pins(root, group[0].url, new_sha)
+    for row in group:
+        pol = policy.get(row.path)
+        if not pol:
+            continue
+        for label, command in (("after", pol.after), ("check", pol.check)):
+            if not command:
+                continue
+            rc, why = run_command(root, command, log, timeout=timeout)
+            if rc != 0:
+                return False, "%s %s failed: %s" % (label, command.split()[0], why)
+    return True, ""
+
+
+def restore_group(root: Path, group: list, old: str, policy: dict, logs: Path, timeout: float):
+    """Back to the old pin: the manifest, every clone, the installer at the old
+    pin so its runtime is whole. Bounded like the move, and honest about a
+    restore that itself fails, which is worse than the move failing."""
+    log = logs / (tool_name(group[0]) + ".log")
+    write_pins(root, group[0].url, old)
+    problems = []
+    for row in group:
+        ok, why = checkout(root, row, old, log)
+        if not ok:
+            problems.append("%s: %s" % (row.path, why))
+            continue
+        after = policy[row.path].after if row.path in policy else None
+        if after:
+            rc, why = run_command(root, after, log, timeout=timeout)
+            if rc != 0:
+                problems.append("%s at %s: %s" % (after.split()[0], old[:7], why))
+    return (not problems), "; ".join(problems)
+
+
+def needs_installer(group: list, policy: dict) -> bool:
+    return any(r.path in policy and (policy[r.path].after or policy[r.path].check) for r in group)
+
+
+def advance(root: Path, rows: list, policy: dict, heads: dict, state: dict,
+            deadline: float, logs: Path, checkpoint=None):
+    """Phase 2: each upstream that moved, by policy, atomically per URL.
+
+    checkpoint(move) is called after each successful move with (path, old,
+    new), and checkpoint() after a hold is recorded — before the restore, so a
+    run ended mid-restore still leaves the hold on disk. run_apply commits
+    the manifest and saves the state there.
+    """
+    groups = {}
+    for row in rows:
+        groups.setdefault(row.url, []).append(row)
+    results, moves = [], []
+    held = state.setdefault("held", {})
+    for url, group in groups.items():
+        first = group[0]
+        head = heads.get(url)
+        if head is None:
+            results.append(Result(first.path, "unknown", "upstream not reached"))
+            continue
+        if head == first.sha:
+            continue
+        missing = [r for r in group if clone_head(root, r) is None]
+        if missing:
+            results.append(Result(first.path, "absent", UNFINISHED % missing[0].path if timed_out(state, missing[0])
+                                  else "no clone yet; the long run clones it at its pin"))
+            continue
+        kinds = {policy[r.path].kind for r in group if r.path in policy}
+        for kind in ("hold", "report"):
+            if kind in kinds:
+                reason = next(policy[r.path].reason for r in group
+                              if r.path in policy and policy[r.path].kind == kind)
+                results.append(Result(first.path, kind, "%s→%s available: %s"
+                                      % (first.sha[:7], head[:7], reason)))
+                break
+        else:
+            remaining = deadline - time.monotonic()
+            timeout = command_timeout(deadline)
+            hold = held.get(first.path, {})
+            # Before the time checks: a start that called a held tool pending
+            # would launch a long run that only says it is held.
+            if hold.get("at") == head and hold.get("timeout", COMMAND_TIMEOUT) >= timeout:
+                results.append(Result(first.path, "held", hold["reason"]))
+                continue
+            if remaining < MOVE_MARGIN:
+                results.append(Result(first.path, "pending", "%s→%s; out of time, update-tools apply"
+                                      % (first.sha[:7], head[:7])))
+                continue
+            if needs_installer(group, policy) and remaining < INSTALL_MINIMUM:
+                results.append(Result(first.path, "pending", "%s→%s; its installer needs a long run: %s"
+                                      % (first.sha[:7], head[:7], LONG_RUN)))
+                continue
+            installing = [r.path for r in group if r.path in policy and policy[r.path].after]
+            if installing:
+                mark_installing(root, state, installing, head)
+            ok, why = move_group(root, group, head, policy, logs, timeout, deadline)
+            if ok:
+                for path in installing:
+                    state["stuck"].pop(path, None)
+                held.pop(first.path, None)
+                moves.append((first.path, first.sha, head))
+                results.append(Result(first.path, "advanced", "%s→%s" % (first.sha[:7], head[:7])))
+                if checkpoint:
+                    checkpoint((first.path, first.sha, head))
+                continue
+            # A fetch that failed says nothing against the upstream: any later
+            # run tries again (a timeout of 0 is outbid by every run).
+            held[first.path] = {"at": head, "reason": why, "when": now_iso(),
+                                "timeout": 0 if ": fetch: " in why else round(timeout)}
+            if checkpoint:
+                checkpoint()
+            restored, trouble = restore_group(root, group, first.sha, policy, logs, timeout)
+            if restored:
+                for path in installing:
+                    state["stuck"].pop(path, None)
+                results.append(Result(first.path, "rolled back", why))
+            else:
+                # Degrades as stuck does: named and retried at every run until it passes.
+                for row in group:
+                    state.setdefault("stuck", {})[row.path] = {
+                        "at": first.sha, "reason": "restore failed: " + trouble, "when": now_iso()}
+                if checkpoint:
+                    checkpoint()
+                results.append(Result(first.path, "rollback failed", "%s; restore: %s" % (why, trouble)))
+    return results, moves
+
+
+def load_state(root: Path) -> dict:
+    path = root / STATE
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state(root: Path, state: dict) -> None:
+    """Whole or not at all: load_state reads half a file as {} and would forget
+    holds, clone timeouts and stuck tools. The temporary sits in the ignored
+    log folder, named for this process; Windows refuses os.replace while
+    another process reads the state, so it tries again for half a second and
+    then writes in place."""
+    path = root / STATE
+    temporary = root / LOGS / ("update-tools.state.%d.tmp" % os.getpid())
+    temporary.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(state, indent=2, sort_keys=True) + "\n"
+    temporary.write_text(text, encoding="utf-8")
+    for _ in range(10):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            time.sleep(0.05)
+    path.write_text(text, encoding="utf-8")
+    try:
+        temporary.unlink()
+    except OSError:
+        pass
+
+
+def commit_manifest(root: Path, moves: list):
+    """One commit of Harness/repos.txt alone, right after a group's check passed,
+    so the manifest is dirty for seconds rather than for the whole run."""
+    message = "update-tools: " + ", ".join("%s %s→%s" % (Path(path).name, old[:7], new[:7])
+                                         for path, old, new in moves)
+    git(root, "add", MANIFEST)
+    rc, _, err = git(root, "commit", "--quiet", "--only", MANIFEST, "-m", message, timeout=FETCH_TIMEOUT)
+    if rc != 0:
+        return False, "commit failed: " + last_line(err)
+    return True, "committed"
+
+
+SYNC_LOCK = ".claude/hooks/.sync.lock"     # sync.sh's LOCK
+SYNC_OFF = ".claude/hooks/sync.off"      # the owner's pause: sync.sh returns at once
+RESTORE_TRIES = 4                         # a second apart: another session's git holds index.lock briefly
+PIN_SUBJECT = "update-tools: "
+BUSY = ("rebase-merge", "rebase-apply", "MERGE_HEAD", "CHERRY_PICK_HEAD", "BISECT_LOG")
+
+
+def git_busy(root: Path, timeout: float = LS_TIMEOUT) -> bool:
+    """True while a rebase, merge, cherry-pick or bisect is stopped half way."""
+    for mark in BUSY:
+        rc, out, _ = git(root, "rev-parse", "--git-path", mark, timeout=timeout)
+        path = Path(out.strip())
+        if rc == 0 and (path if path.is_absolute() else root / path).exists():
+            return True
+    return False
+
+
+def ahead(root: Path, upstream: str, tip: str = "HEAD", timeout: float = LS_TIMEOUT) -> Optional[list]:
+    """[(subject, [files])] of each commit on tip that upstream lacks; None when git cannot say."""
+    rc, out, _ = git(root, "log", "--format=%x00%s", "--name-only", upstream + ".." + tip, timeout=timeout)
+    if rc != 0:
+        return None
+    commits = []
+    for block in out.split("\x00")[1:]:
+        lines = [line for line in block.splitlines() if line.strip()]
+        commits.append((lines[0] if lines else "", lines[1:]))
+    return commits
+
+
+def pins_only(commits: Optional[list]) -> bool:
+    """True when every commit is one of this tool's pin commits; False when git could not say."""
+    return commits is not None and all(s.startswith(PIN_SUBJECT) and files == [MANIFEST] for s, files in commits)
+
+
+def time_left(deadline: float, cap: float) -> float:
+    """A git call's timeout: cap, or the run's time left when that is less; never under a second."""
+    return max(1.0, min(cap, deadline - time.monotonic()))
+
+
+def rebase_pins(root: Path, branch: str, deadline: float) -> str:
+    """Put this device's pin commits on origin's tip, as a rebase would,
+    without touching another session's files. '' when HEAD can be pushed
+    again, else why not.
+
+    git rebase refuses a dirty tree, and this one is shared by every session
+    on the device; --autostash would stash their files. So the pins are
+    written into origin's repos.txt in a scratch index and committed on
+    origin's tip, and the branch moves there by a two-way read-tree, which
+    keeps every staged and unstaged change and refuses, touching nothing,
+    where origin changed a file someone is editing (verified 2026-09-25).
+
+    It starts only with MOVE_MARGIN left and bounds every git call by the
+    run's deadline: a start is killed 5 s after its budget, and a kill inside
+    the two-way read-tree would leave the shared index half-written."""
+    def run(*args, cap=LS_TIMEOUT, index=None):
+        return git(root, *args, timeout=time_left(deadline, cap), index=index)
+
+    if (root / SYNC_OFF).exists():
+        return "the sync is paused: " + SYNC_OFF
+    if deadline - time.monotonic() < MOVE_MARGIN:
+        return "out of time to rebase; push it by hand"
+    if (root / SYNC_LOCK).exists() or git_busy(root, time_left(deadline, LS_TIMEOUT)):
+        return "the sync or a rebase is running"
+    # Read once, first: the compare-and-swap below guards only what came after
+    # this read, and another session's commit may land at any moment.
+    old = run("rev-parse", "HEAD")[1].strip()
+    if not old:
+        return "could not read HEAD"
+    # The fetch leaves half the margin for the steps that follow it.
+    rc, _, err = run("fetch", "--quiet", "origin", branch,
+                     cap=min(FETCH_TIMEOUT, deadline - time.monotonic() - MOVE_MARGIN / 2))
+    if rc != 0:
+        return "fetch: " + last_line(err)
+    # Origin's tip, read once: a fetch by another session moves the ref name,
+    # and a parent read after it would pair the new tip with the old tree.
+    rc, out, err = run("rev-parse", "--verify", "refs/remotes/origin/%s^{commit}" % branch)
+    upstream = out.strip()
+    if rc != 0 or not upstream:
+        return "could not read origin's tip: " + last_line(err)
+    commits = ahead(root, upstream, old, time_left(deadline, LS_TIMEOUT))
+    if not pins_only(commits):
+        return "other commits are ahead of origin; push them by hand first"
+    rc, out, err = run("merge-base", old, upstream)
+    base = out.strip()
+    if rc != 0 or not base:                    # an empty base would make show read the shared index
+        return "could not find the merge base with origin: " + last_line(err)
+    versions = []
+    for rev in (upstream, base, old):          # no empty or failed read stands in for a version
+        rc, out, err = run("show", "%s:%s" % (rev, MANIFEST))
+        if rc != 0 or not out:
+            return "could not read %s:%s: %s" % (rev, MANIFEST, last_line(err))
+        versions.append(out)
+    remote, before, mine = versions
+    # Only pins are carried over, so a commit that changed anything else in
+    # repos.txt (a row another session was adding) stays as it is.
+    if reapply_pins(before, before, mine) != mine:
+        return "repos.txt has edits beside the pins; commit and push them by hand"
+    merged = reapply_pins(remote, before, mine)
+    new = upstream
+    if merged != remote:                       # else origin already has every move
+        scratch = root / LOGS / "rebase"
+        scratch.mkdir(parents=True, exist_ok=True)
+        (scratch / "repos.txt").write_bytes(merged.encode("utf-8"))
+        index = scratch / "index"
+        if index.exists():
+            index.unlink()
+        blob = run("hash-object", "-w", "--no-filters", str(scratch / "repos.txt"))[1].strip()
+        # Each step checked: a read-tree that fails leaves no scratch index, and
+        # write-tree then gives the empty tree, which would delete every file.
+        for step in (["read-tree", upstream], ["update-index", "--cacheinfo", "100644,%s,%s" % (blob, MANIFEST)]):
+            rc, _, err = run(*step, index=index)
+            if rc != 0:
+                return "could not rebuild the pin commit: " + last_line(err)
+        tree = run("write-tree", index=index)[1].strip()
+        message = PIN_SUBJECT + ", ".join(s[len(PIN_SUBJECT):] for s, _ in reversed(commits))
+        rc, out, err = run("commit-tree", tree, "-p", upstream, "-m", message)
+        if rc != 0 or not tree or not blob:
+            return "could not rebuild the pin commit: " + last_line(err)
+        new = out.strip()
+    # git's two-way merge takes a missing file as up to date and writes over an
+    # ignored one, so any local state at all at a path origin changed stops it.
+    rc, out, err = run("diff-tree", "-r", "--name-only", "-z", old, new)
+    changed = [path for path in out.split("\x00") if path]
+    if rc == 0 and changed:
+        rc, out, err = run("--literal-pathspecs", "status", "--porcelain", "--ignored",
+                           "--untracked-files=all", "--", *changed)
+        if rc == 0 and out.strip():
+            return "local edits where origin changed a file: " + last_line(out)
+    if rc != 0:
+        return "could not check the files origin changed: " + last_line(err)
+    rc, _, err = run("read-tree", "-m", "-u", old, new, cap=FETCH_TIMEOUT)
+    if rc != 0:
+        return "local edits where origin changed a file: " + last_line(err)
+    rc, _, _ = run("update-ref", "-m", "update-tools: rebase the pin commit", "refs/heads/" + branch, new, old)
+    if rc == 0:
+        return ""
+    # Another session committed after old was read: its commit stands, and the
+    # index and files go back to it.
+    for attempt in range(RESTORE_TRIES):
+        if attempt:
+            time.sleep(1)
+        rc, _, err = run("read-tree", "-m", "-u", new, "HEAD", cap=FETCH_TIMEOUT)
+        if rc == 0:
+            return "the branch moved while rebasing"
+    head = run("rev-parse", "HEAD")[1].strip()
+    return ("NEEDS A PERSON: the branch moved while rebasing, and the index and files could not be put back "
+            "(%s): they are at %s, the branch at %s; put them back with: git -C \"%s\" read-tree -m -u %s HEAD"
+            % (last_line(err), new[:12], head[:12], root, new))
+
+
+def push_pins(root: Path, deadline: float) -> str:
+    """Push the pin commits; when origin moved, rebase them onto it and push again.
+
+    Only the pin commits, never a sweep of the tree, which would publish another
+    agent's half-written files. Bounded by the run's deadline."""
+    if git(root, "remote", "get-url", "origin", timeout=time_left(deadline, LS_TIMEOUT))[0] != 0:
+        return "no origin to push to"
+    rc, branch, _ = git(root, "rev-parse", "--abbrev-ref", "HEAD", timeout=time_left(deadline, LS_TIMEOUT))
+    branch = branch.strip()
+    if rc != 0 or not branch or branch == "HEAD":
+        return "pin commit unpushed: not on a branch"
+    # A plain push carries every commit beneath the pins; on 2026-10-01 it
+    # published seven the owner had not released (LESSONS.md).
+    if not pins_only(ahead(root, "refs/remotes/origin/" + branch, "HEAD", time_left(deadline, LS_TIMEOUT))):
+        return "pin commit unpushed: other commits are ahead of origin; push them by hand"
+    for attempt in range(2):
+        if deadline - time.monotonic() < 1:
+            return "pin commit unpushed: out of time; push it by hand"
+        rc, _, _ = git(root, "push", "--quiet", "origin", branch, timeout=time_left(deadline, PUSH_TIMEOUT))
+        if rc == 0:
+            return "pushed" if attempt == 0 else "rebased onto origin and pushed"
+        if rc == 124:
+            return "pin commit unpushed: the push did not finish"
+        why = rebase_pins(root, branch, deadline)
+        if why:
+            return "pin commit unpushed: " + why
+    return "pin commit unpushed: origin moved again"
+
+
+def unpushed_pins(root: Path) -> int:
+    """update-tools's own commits on HEAD that origin's branch lacks, as of the last fetch."""
+    rc, branch, _ = git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    if rc != 0 or branch.strip() in ("", "HEAD"):
+        return 0
+    commits = ahead(root, "refs/remotes/origin/" + branch.strip())
+    return sum(1 for subject, _ in commits or [] if subject.startswith(PIN_SUBJECT))
+
+
+def pid_alive(pid: int) -> bool:
+    """Whether a process runs; True when that cannot be told."""
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            pass
+        return True
+    # os.kill(pid, 0) would end the process on Windows; ask for its exit code.
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x1000, False, pid)      # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return ctypes.get_last_error() == 5              # access denied: it exists
+    code = wintypes.DWORD()
+    kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+    kernel.CloseHandle(handle)
+    return code.value == 259                             # STILL_ACTIVE
+
+
+def lock_holder(path: Path) -> Optional[str]:
+    """What a live run wrote in the lock; None when there is none, or its run died.
+
+    taskkill /F skips the cleanup that removes the lock, so a lock is only
+    honoured while its writer runs and for two hours at most.
+    ponytail: a recycled PID reads as alive; the two-hour limit still ends it.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+        age = time.time() - path.stat().st_mtime
+    except OSError:
+        return None
+    match = re.match(r"pid (\d+)", text)
+    if age < LOCK_STALE_HOURS * 3600 and (not match or pid_alive(int(match.group(1)))):
+        return text[:80] or "held"
+    return None
+
+
+LONG_WORK = ("absent", "deferred", "pending")     # what only a long run can finish
+
+
+def queued(state: dict) -> list:
+    """What the last run left for a long run: a missing clone, an installer,
+    the plugin step. A stuck installer alone is left to the 04:00 run. A clone
+    with a timeout record waits for the --only command its note names: every
+    run skips it, so a launch for it would only spend a run."""
+    skipped = state.get("clone_timeouts", {})
+    return sorted({Path(r["what"]).name for r in state.get("last_run", {}).get("results", [])
+                   if r["state"] in LONG_WORK and not (r["state"] == "absent" and r["what"] in skipped)})
+
+
+def spawn_detached(root: Path) -> None:
+    """The long run as a process of its own, for a device with no daily run
+    registered. Claude's process-tree cleanup can still reach it, which is why
+    the task or the agent comes first and the banner says this one is missing."""
+    flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
+    subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--root", str(root)] + LONG_RUN.split()[1:],
+                     cwd=str(root), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, creationflags=flags, start_new_session=(os.name != "nt"))
+
+
+def launch(root: Path, state: dict, system: Optional[str] = None, home: Optional[Path] = None,
+           run=None, spawn=None) -> str:
+    """Start the long run in the background when the last run left it work: one line, or ''.
+
+    Windows runs the registered task, which outlives Claude's process-tree
+    cleanup and refuses a second copy (IgnoreNew); macOS kicks its
+    LaunchAgent; a device with neither gets a detached process, and the line
+    says the daily run is missing. A run already going is left alone, and so
+    is the queue the last launch had, for LAUNCH_EVERY_HOURS."""
+    work = queued(state)
+    last = state.get("launched", {})
+    age = hours_since(last.get("at"))
+    repeat = work == last.get("for") and age is not None and age < LAUNCH_EVERY_HOURS
+    if not work or repeat or lock_holder(root / LOCK):
+        return ""
+    system = system or platform.system()
+    run = run or run_quiet
+    uid = getattr(os, "getuid", lambda: 0)()
+    if system == "Windows" and run(["schtasks", "/Run", "/TN", DAILY_TASK["task"]]) == 0:
+        how = DAILY_TASK["task"]
+    elif (system == "Darwin" and agent_path(home or Path.home()).is_file()
+          and run(["launchctl", "kickstart", "gui/%d/%s" % (uid, LAUNCH_AGENT)]) == 0):
+        how = LAUNCH_AGENT
+    else:
+        (spawn or spawn_detached)(root)
+        how = "a detached process; the daily run is not registered: update-tools install-daily"
+    state["launched"] = {"at": now_iso(), "how": how, "for": work}
+    save_state(root, state)
+    return "updates: background run started (%s) for %s" % (how, ", ".join(work))
+
+
+def acquire_lock(root: Path):
+    """One run at a time on a device: a session start beside a long run would
+    share the state file and could move a clone back under the other's move."""
+    path = root / LOCK
+    path.parent.mkdir(parents=True, exist_ok=True)
+    holder = lock_holder(path)
+    if holder:
+        return None, holder
+    try:
+        path.unlink(missing_ok=True)      # its run was killed, or started two hours ago
+    except OSError:
+        return None, "held"
+    try:
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return None, "just taken"
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write("pid %d since %s\n" % (os.getpid(), now_iso()))
+    return path, ""
+
+
+def plugin_registry() -> Path:
+    return Path(os.environ.get("DEVARNESS_UPDATE_PLUGIN_REGISTRY")
+                or (Path.home() / ".claude/plugins/installed_plugins.json"))
+
+
+def update_plugins(root: Path, state: dict, deadline: float, log: Path) -> list:
+    """Every marketplace, every installed plugin, then Codex's copies; each bounded."""
+    claude = shutil.which("claude")
+    if not claude:
+        return [Result("plugins", "skipped", "claude is not on PATH")]
+
+    def run(argv, timeout=None):
+        rc, out, err = run_bounded(argv, timeout or PLUGIN_TIMEOUT, cwd=str(root))
+        text = out + err
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as handle:
+            handle.write("== %s  %s\n%s\n-- exit %d\n" % (now_iso(), " ".join(argv[1:]), text, rc))
+        return rc, text
+
+    # Eleven CLI calls at 15–25 s each on the Windows PC: a start with 60 s
+    # would be killed inside the step with nothing saved. Only a long run.
+    if deadline - time.monotonic() < INSTALL_MINIMUM:
+        return [Result("plugins", "pending", "needs a long run: " + LONG_RUN)]
+
+    def time_left():
+        return deadline - time.monotonic() >= PLUGIN_TIMEOUT
+
+    results, reached = [], set()
+    before = run([claude, "plugin", "list"])[1]
+    if time_left():
+        reached.add("marketplaces")
+        rc, text = run([claude, "plugin", "marketplace", "update"])
+        if rc != 0:
+            results.append(Result("marketplaces", "failed", last_line(text)))
+    try:
+        registry = json.loads(plugin_registry().read_text(encoding="utf-8"))
+        names = list(registry.get("plugins", registry).keys())
+    except (OSError, ValueError, AttributeError):
+        registry, names = None, []
+    for name in names:
+        if not time_left():
+            results.append(Result("plugins", "pending", "out of time before " + name))
+            break
+        reached.add(name)
+        rc, text = run([claude, "plugin", "update", "-y", "--json", name])
+        if rc != 0:
+            results.append(Result(name, "failed", last_line(text)))
+    after = run([claude, "plugin", "list"])[1] if time_left() else before
+    changed = sorted(set(after.splitlines()) - set(before.splitlines()))
+    codex = root / "Harness" / "codex-setup.py"
+    if codex.is_file() and time_left():
+        reached.add("codex copies")
+        rc, why = run_command(root, "codex-setup.py", log, timeout=command_timeout(deadline))
+        if rc != 0:
+            results.append(Result("codex copies", "failed", why))
+    # The next start's run replaces last_run, so check reads failures here; a
+    # step this run did not reach keeps the failure it had (M4), except a
+    # plugin a registry it read no longer lists, which no run will reach again.
+    earlier = state.get("last_plugins", {}).get("failed", {})
+    failed = {what: why for what, why in earlier.items() if what not in reached
+              and (registry is None or what in names or what in ("marketplaces", "codex copies"))}
+    failed.update({r.what: r.note for r in results if r.state == "failed"})
+    state["last_plugins"] = {"at": now_iso(), "changed": changed[:20], "failed": failed}
+    results.append(Result("plugins", "updated, restart to load" if changed else "current",
+                          "; ".join(changed)[:160] if changed else "%d checked" % len(names)))
+    return results
+
+
+def run_apply(root: Path, budget: float, force: bool, only: list, plugins: bool = True):
+    start = time.monotonic()
+    deadline = start + budget
+    lock, holder = acquire_lock(root)
+    if lock is None:
+        return [Result("update-tools", "busy", "another update-tools is running (%s); nothing done" % holder)], 0
+    try:
+        return apply_under_lock(root, start, deadline, force, only, plugins)
+    finally:
+        try:
+            lock.unlink()
+        except OSError:
+            pass
+
+
+def refresh_library(root: Path, deadline: float, log: Path) -> Result:
+    """Rebuild discovery after source/plugin changes and report incomplete checks."""
+    if not (root / "Harness/bin/library").is_file():
+        return Result("library", "failed", "Harness/bin/library is missing; restore the launcher")
+    for step in ("refresh", "check", "coverage"):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return Result("library", "pending", "budget exhausted before %s; run library refresh, check and coverage" % step)
+        rc, why = run_command(root, "bin/library " + step, log,
+                              timeout=min(LIBRARY_TIMEOUT, remaining))
+        if rc != 0:
+            return Result("library", "failed", "%s failed: %s; see .claude/hooks/update-tools/library.log" % (step, why or "exit %d" % rc))
+    return Result("library", "healthy", "refreshed; freshness and coverage passed")
+
+
+def apply_under_lock(root: Path, start: float, deadline: float, force: bool, only: list, plugins: bool):
+    state = load_state(root)
+    logs = root / LOGS
+    manifest = read_manifest(root)
+    rows = [r for r in manifest if not only or r.path in only]
+    policy = read_policy(root, manifest)
+    if force:
+        # A deliberate run tries held tools again: a hold made at the 900 s
+        # cap can never be outbid by a larger budget, and the cause — an
+        # installer, a policy row — may have been fixed since.
+        for path in [p for p in state.get("held", {}) if not only or p in only]:
+            state["held"].pop(path)
+    results = follow_pins(root, rows, policy, deadline, logs, state, only)
+    save_state(root, state)         # a run ended later still leaves this on disk
+    remaining = deadline - time.monotonic()
+    long_run = remaining >= INSTALL_MINIMUM
+    commit_notes = []
+
+    def checkpoint(move=None):
+        if move:
+            ok, note = commit_manifest(root, [move])
+            commit_notes.append(note if ok else "uncommitted: " + note)
+        save_state(root, state)
+
+    push_note = ""
+    if remaining >= PHASE2_MINIMUM:
+        # Every run scans since 2026-09-25 (owner, Q1): every upstream answered
+        # in about 10 s, inside a start's 60. Only the plugin step keeps a floor.
+        heads = scan_upstreams(sorted({r.url for r in rows}), min(SCAN_TIMEOUT, remaining))
+        record_scan(state, heads, whole=not only)
+        save_state(root, state)
+        results.append(Result("upstreams", "scanned", "%d of %d reached"
+                              % (sum(1 for head in heads.values() if head), len(heads))))
+        if git_busy(root, time_left(deadline, LS_TIMEOUT)):
+            # A pin commit must not land inside another session's stopped
+            # rebase or merge, now that long runs start by day.
+            advanced, moves = [Result("repos.txt", "waits", "a rebase or merge is stopped in dev; "
+                                      "the pins move at a later run")], []
+        else:
+            advanced, moves = advance(root, rows, policy, heads, state, deadline, logs, checkpoint)
+        results += advanced
+        refused = [note for note in commit_notes if note.startswith("uncommitted")]
+        if refused:
+            results.append(Result("repos.txt", "uncommitted",
+                                  "; ".join(refused)[:120] + "; commit Harness/repos.txt by hand"))
+        elif moves or unpushed_pins(root):
+            push_note = push_pins(root, deadline)
+            results.append(Result("repos.txt", "unpushed" if push_note.startswith("pin commit unpushed")
+                                  else "committed", "%d commit(s); %s" % (len(moves), push_note)))
+        if plugins and plugins_due(state, force):
+            results += update_plugins(root, state, deadline, logs / "plugins.log")
+    else:
+        results.append(Result("upstreams", "not scanned",
+                              "%d s left of the start; update-tools apply" % max(0, remaining)))
+    results.append(refresh_library(root, deadline, logs / "library.log"))
+    if long_run:
+        state["last_long_run"] = time.time()
+    count = unpushed_pins(root)
+    if count:
+        why = push_note.replace("pin commit unpushed: ", "") or state.get("unpushed", {}).get("why", "")
+        state["unpushed"] = {"count": count, "why": why or "push it by hand"}
+    else:
+        state.pop("unpushed", None)
+    summarize(root, read_manifest(root), policy, state)    # the whole manifest, --only or not, new pins
+    state.pop("behind", None)                              # retired 2026-09-25 for pending/held_rows
+    state["last_run"] = {"at": now_iso(), "seconds": round(time.monotonic() - start, 1),
+                         "results": [r._asdict() for r in results]}
+    save_state(root, state)
+    code = 3 if any(r.state in ("rolled back", "rollback failed") or
+                    (r.what == "library" and r.state == "failed") for r in results) else 0
+    return results, code
+
+
+def plugin_rows(state: dict) -> list:
+    """Each installed plugin at its version, as the last plugin step left it; no CLI call."""
+    try:
+        registry = json.loads(plugin_registry().read_text(encoding="utf-8"))
+        plugins = registry.get("plugins", registry)
+    except (OSError, ValueError, AttributeError):
+        return []
+    last = state.get("last_plugins", {})
+    at, failed = last.get("at"), last.get("failed", {})
+    age = hours_since(at)
+    fresh = age is not None and age < FLOOR_HOURS
+    rows = []
+    for name, entries in plugins.items():
+        entry = (entries[0] if entries else {}) if isinstance(entries, list) else entries
+        version = entry.get("version", "?") if isinstance(entry, dict) else "?"
+        if name in failed:
+            rows.append(Result(name, "failed", "%s: %s" % (version, failed[name])))
+        elif fresh:
+            rows.append(Result(name, "current", "%s, checked %s" % (version, at)))
+        else:
+            rows.append(Result(name, "unchecked", "%s; %s: %s" % (
+                version, "last checked " + at if at else "never checked", LONG_RUN)))
+    # The steps that are not a plugin: the marketplaces and Codex's copies.
+    rows += [Result(name, "failed", why) for name, why in failed.items() if name not in plugins]
+    return rows
+
+
+def run_check(root: Path):
+    rows = read_manifest(root)
+    policy = read_policy(root, rows)
+    state = load_state(root)
+    held, stuck = state.get("held", {}), state.get("stuck", {})
+    heads = scan_upstreams(sorted({r.url for r in rows}))
+    out, behind, unknown = [], 0, 0
+    for row in rows:
+        head = clone_head(root, row)
+        pol = policy.get(row.path, Policy("auto", "", None, None))
+        if head is None:
+            out.append(Result(row.path, "absent", UNFINISHED % row.path if timed_out(state, row)
+                              else "no clone; update-tools apply --budget 1800 clones it"))
+        elif head != row.sha:
+            out.append(Result(row.path, "behind the pin", "%s→%s at the next start" % (head[:7], row.sha[:7])))
+            behind += 1
+        if row.path in stuck:
+            out.append(Result(row.path, "stuck", stuck[row.path].get("reason", "")))
+            behind += 1
+        upstream = heads.get(row.url)
+        if upstream is None:
+            out.append(Result(row.path, "unknown", "upstream not reached"))
+            unknown += 1
+        elif upstream != row.sha:
+            hold = held.get(row.path, {})
+            if pol.kind == "auto" and hold.get("at") == upstream:
+                # apply leaves it until upstream moves again or --force
+                out.append(Result(row.path, "held", "%s→%s: %s" % (row.sha[:7], upstream[:7], hold.get("reason", ""))))
+            else:
+                kind = "behind" if pol.kind == "auto" else pol.kind
+                out.append(Result(row.path, kind, "%s→%s%s" % (row.sha[:7], upstream[:7],
+                                                              ": " + pol.reason if pol.reason else "")))
+                behind += pol.kind == "auto"
+        elif head == row.sha and row.path not in stuck:
+            out.append(Result(row.path, "current", row.sha[:7]))
+    return out + plugin_rows(state), (2 if unknown else 1 if behind else 0)
+
+
+LONG_RUN_STALE_HOURS = 36   # the banner turns DEGRADED past this (M7)
+PENDING_STALE_HOURS = 48    # and when a row has waited longer than this (M6)
+
+
+def summarize(root: Path, rows: list, policy: dict, state: dict) -> None:
+    """Which rows wait for a move, since when, and which will not move by themselves.
+
+    Each row is judged against the last known head of its upstream, so a run
+    that reached no upstream leaves every row as the last scan found it (M2).
+    A row waits when its clone is missing or off its pin, or when it is auto
+    and upstream has moved past a pin that is not held on this device."""
+    heads, holds, before = state.get("heads", {}), state.get("held", {}), state.get("pending", {})
+    pending, held, now = {}, [], time.time()
+    for row in rows:
+        kind = policy.get(row.path, Policy("auto", "", None, None)).kind
+        upstream = heads.get(row.url)
+        moved = bool(upstream) and upstream != row.sha
+        held_here = moved and holds.get(row.path, {}).get("at") == upstream
+        if moved and (kind != "auto" or held_here):
+            held.append(row.path)
+        if clone_head(root, row) != row.sha or (moved and kind == "auto" and not held_here):
+            pending[row.path] = before.get(row.path, now)
+    state["pending"], state["held_rows"] = pending, held
+    # A row gone from the manifest leaves no hold, timeout or stuck mark: a
+    # stuck one kept every start DEGRADED with nothing left to clear it.
+    listed = {row.path for row in rows}
+    for key in ("stuck", "held", "clone_timeouts"):
+        if key in state:
+            state[key] = {path: value for path, value in state[key].items() if path in listed}
+
+
+def ago(stamp) -> str:
+    hours = hours_since(stamp)
+    if hours is None:
+        return "never"
+    return "%d min ago" % max(0, round(hours * 60)) if hours < 1 else "%.0f h ago" % hours
+
+
+def degraded(state: dict) -> list:
+    """Why updates make the session DEGRADED; empty when they do not."""
+    reasons = []
+    long_run = hours_since(state.get("last_long_run") or state.get("last_long_scan"))
+    if long_run is None:
+        reasons.append("the daily long run has never run here")
+    elif long_run > LONG_RUN_STALE_HOURS:
+        reasons.append("the daily long run last ran %.0f h ago" % long_run)
+    old = sorted(Path(path).name for path, since in state.get("pending", {}).items()
+                 if hours_since(since) > PENDING_STALE_HOURS)
+    if old:
+        reasons.append("waiting over %d h: %s" % (PENDING_STALE_HOURS, ", ".join(old)))
+    if not state.get("last_plugins", {}).get("at"):
+        reasons.append("the plugins were never checked here")
+    scan = state.get("scan")
+    if scan and scan["total"] and scan["reached"] < SCAN_ENOUGH * scan["total"]:
+        reasons.append("the last scan reached %d of %d upstreams" % (scan["reached"], scan["total"]))
+    stuck = sorted(Path(path).name for path in state.get("stuck", {}))
+    if stuck:
+        reasons.append("stuck: " + ", ".join(stuck))
+    if state.get("unpushed", {}).get("why", "").startswith("NEEDS A PERSON"):
+        reasons.append("the pin commit needs a person: its line above says what to run")
+    return reasons
+
+
+def banner_lines(state: dict) -> list:
+    """What waits, what is held, how old each check is; then what the last run did."""
+    run = state.get("last_run")
+    if not run:
+        return ["updates: never run on this device; update-tools apply"]
+    pending = sorted(Path(path).name for path in state.get("pending", {}))
+    first = "%d pending (%s)" % (len(pending), ", ".join(pending)) if pending else "nothing pending"
+    lines = [("updates: %s, %d held; scanned %s; long run %s"
+              % (first, len(state.get("held_rows", [])), ago(state.get("last_scan")),
+                 ago(state.get("last_long_run") or state.get("last_long_scan"))))[:200]]
+    named = ["%s %s" % (Path(r["what"]).name, r["note"]) for r in run["results"]
+             if r["state"] in ("advanced", "followed", "cloned", "rolled back", "rollback failed", "stuck")]
+    if named:
+        lines.append("  " + "; ".join(named)[:200])
+    # Named, not counted: a missing clone is absent once in each phase of a run.
+    absent = sorted({Path(r["what"]).name for r in run["results"] if r["state"] == "absent"})
+    if absent:
+        lines.append(("  absent: " + ", ".join(absent))[:200])
+    launched = state.get("launched")
+    # >=: both are one-second stamps, and a start often launches in the second its run ended.
+    if launched and launched["at"] >= run["at"]:
+        lines.append(("  background run started %s (%s) for %s"
+                      % (local_clock(launched["at"]), launched["how"], ", ".join(launched["for"])))[:200])
+    if state.get("unpushed"):
+        # Whole: a NEEDS A PERSON reason ends in the command that restores the files.
+        lines.append("  pin commit unpushed: %d commit(s); %s"
+                     % (state["unpushed"]["count"], state["unpushed"]["why"]))
+    failed = state.get("last_plugins", {}).get("failed", {})
+    if failed:
+        lines.append("  %d plugin step%s failed: %s"
+                     % (len(failed), "" if len(failed) == 1 else "s", ", ".join(sorted(failed))))
+    reasons = degraded(state)
+    if reasons:
+        lines.append(("  degraded: " + "; ".join(reasons))[:300])
+    return lines
+
+
+def print_table(results: list) -> None:
+    for r in results:
+        print("%-44s %-14s %s" % (r.what[:44], r.state, r.note))
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--root", default=str(ROOT), help=argparse.SUPPRESS)
+    sub = parser.add_subparsers(dest="command")
+    sub.required = True
+    check = sub.add_parser("check")
+    check.add_argument("--json", action="store_true")
+    apply_ = sub.add_parser("apply")
+    apply_.add_argument("--budget", type=float, default=600.0)
+    apply_.add_argument("--force", action="store_true")
+    apply_.add_argument("--only", nargs="*", default=[])
+    apply_.add_argument("--no-plugins", action="store_true", help="skip the plugin step")
+    sub.add_parser("status")
+    sub.add_parser("banner")
+    sub.add_parser("launch")
+    sub.add_parser("install-daily")
+    sub.add_parser("uninstall-daily")
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+    if args.command.endswith("install-daily"):
+        return install_daily(args.command == "install-daily", root)
+    if args.command == "check":
+        results, code = run_check(root)
+        if args.json:
+            print(json.dumps({"rows": [r._asdict() for r in results], "exit": code}, indent=2))
+        elif results:
+            print_table(results)
+        else:
+            print("every clone at its pin, every pin at upstream")
+        return code
+    if args.command == "apply":
+        results, code = run_apply(root, args.budget, args.force, args.only, not args.no_plugins)
+        if results:
+            print_table(results)
+        else:
+            print("every clone at its pin")
+        return code
+    if args.command == "launch":
+        line = launch(root, load_state(root))
+        if line:
+            print(line)
+        return 0
+    state = load_state(root)
+    if args.command == "status":
+        run = state.get("last_run")
+        if not run:
+            print("never run on this device")
+        else:
+            print("last run %s in %ss" % (run["at"], run["seconds"]))
+            print_table([Result(**r) for r in run["results"]])
+            for path, hold in state.get("held", {}).items():
+                print("held  %-38s at %s since %s: %s" % (path, hold["at"][:7], hold["when"][:10], hold["reason"]))
+        return 0
+    holder = lock_holder(root / LOCK)
+    if holder:
+        print("updates: a run is running now (%s); its result follows it" % holder)
+    print("\n".join(banner_lines(state)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

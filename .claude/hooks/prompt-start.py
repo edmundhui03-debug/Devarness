@@ -20,7 +20,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-LIBRARY = ROOT / "Library" / "bin" / "library"
+LIBRARY = ROOT / "Harness" / "bin" / "library"
 GRILL = ("grill-first: before non-trivial work, ask every open question at once "
          "with a recommended answer (skill grill-first)")
 # The owner keeps the Karpathy coding card always on; the policy's always-on mode alone puts it nowhere.
@@ -65,7 +65,7 @@ def main():
     if not isinstance(prompt, str):
         return
     external = []
-    sys.path.insert(0, str(ROOT / 'Library'))
+    sys.path.insert(0, str(ROOT / 'Harness'))
     try:
         from vercel_find import discover, labels
         if labels(prompt):  # no curated label: the generic search repeats the same three

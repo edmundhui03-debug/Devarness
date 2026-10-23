@@ -1,0 +1,30 @@
+# books' runtime, Harness/.runtime/books/.venv, built by `books install` with uv.
+# Resolved 2026-09-25 on the Windows PC. DirectML on Windows; plain onnxruntime
+# elsewhere, where RapidOCR asks for CoreML on a Mac and falls back to the CPU.
+# Design: Setup/superpowers/specs/2026-09-25-books-as-markdown-design.md
+rapidocr==3.9.2
+pypdfium2==5.13.0
+pillow==12.3.0
+numpy==2.5.3
+opencv-python==5.0.0.93
+onnxruntime-directml==1.24.4; sys_platform == "win32"
+onnxruntime==1.24.4; sys_platform != "win32"
+antlr4-python3-runtime==4.9.3
+certifi==2026.7.22
+charset-normalizer==3.5.1
+colorama==0.4.6
+colorlog==6.12.0
+flatbuffers==25.12.19
+idna==3.20
+mpmath==1.3.0
+omegaconf==2.3.1
+packaging==26.3
+protobuf==7.36.2
+pyclipper==1.4.0
+pyyaml==6.0.3
+requests==2.34.2
+shapely==2.1.2
+six==1.17.0
+sympy==1.14.0
+tqdm==4.70.1
+urllib3==2.8.0

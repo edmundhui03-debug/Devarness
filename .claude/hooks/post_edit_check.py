@@ -20,12 +20,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ("Edit", "Write", "MultiEdit")
-CHECKERS = {".md": ("Library/bin/md-format", "check"), ".html": ("Library/bin/i18n", "check")}
+CHECKERS = {".md": ("Harness/bin/md-format", "check"), ".html": ("Harness/bin/i18n", "check")}
 # TieItUp findings use stdout; stderr or a failed subprocess means unverified.
-TIEITUP = "Library/bin/tieitup"
+TIEITUP = "Harness/bin/tieitup"
 CODE = {".py", ".sh", ".bash", ".c", ".h", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx"}
 SHEBANGS = ("python", "bash", "sh")
-LEFT_ALONE = ("Library/templates/", "/_review/shots/")
+LEFT_ALONE = ("Harness/templates/", "/_review/shots/")
 LINES = 12
 BOUND = 25
 
@@ -75,13 +75,13 @@ def is_code(path: Path):
 
 def code_repository(path: Path):
     """The repository tieitup runs in: dev's own for a file dev owns, or a separate
-    project's for a file inside one listed in Library/separate-projects.txt."""
+    project's for a file inside one listed in Harness/separate-projects.txt."""
     if ours(path):
         return ROOT
     try:
         real = path.resolve()
         relative = real.relative_to(ROOT.resolve()).as_posix()
-        listed = (ROOT / "Library/separate-projects.txt").read_text(encoding="utf-8").splitlines()
+        listed = (ROOT / "Harness/separate-projects.txt").read_text(encoding="utf-8").splitlines()
         code, top = git("rev-parse", "--show-toplevel", cwd=real.parent)
     except (OSError, ValueError, subprocess.SubprocessError):
         return None

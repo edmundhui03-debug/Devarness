@@ -80,6 +80,6 @@ they were available.
 
 ## Source and upgrades
 
-Pristine clone at `Library/markitdown/`, never edited. The command is an
+Pristine clone at `Harness/markitdown/`, never edited. The command is an
 isolated uv tool: `uv tool upgrade markitdown`. `md-pages` is ours, at
-`Library/bin/md-pages`, symlinked into `~/.local/bin`.
+`Harness/bin/md-pages`, symlinked into `~/.local/bin`.

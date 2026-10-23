@@ -67,13 +67,13 @@ class StartupTests(unittest.TestCase):
         self.base = Path(self.tmp.name).resolve()
         self.root = self.base / "workspace with spaces"
         self.hooks = self.root / ".claude/hooks"
-        self.bin = self.root / "Library/bin"
+        self.bin = self.root / "Harness/bin"
         self.hooks.mkdir(parents=True)
         self.bin.mkdir(parents=True)
         for name in ("session-start.sh", "session_start.py"):
             shutil.copy2(SOURCE / ".claude/hooks" / name, self.hooks / name)
         for name in ("codex-start", "claude-start", "start-check", "statusline"):
-            shutil.copy2(SOURCE / "Library/bin" / name, self.bin / name)
+            shutil.copy2(SOURCE / "Harness/bin" / name, self.bin / name)
         self.event = self.base / "events"
         self.env = dict({k: v for k, v in os.environ.items() if k != 'DEVARNESS_START_GATE_DONE'}, TEST_EVENTS=str(self.event))
         self.write(self.hooks / "preflight.sh", PREFLIGHT_OK)
@@ -649,9 +649,9 @@ class TieItUpBannerTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
-        (self.root / "Library").mkdir()
-        shutil.copy(SOURCE / "Library/tieitup-check.py", self.root / "Library/tieitup-check.py")
-        check = runpy.run_path(str(SOURCE / "Library/tieitup-check.py"))
+        (self.root / "Harness").mkdir()
+        shutil.copy(SOURCE / "Harness/tieitup-check.py", self.root / "Harness/tieitup-check.py")
+        check = runpy.run_path(str(SOURCE / "Harness/tieitup-check.py"))
         for rel in check["REQUIRED"]:
             path = self.root / rel
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -679,10 +679,10 @@ class TieItUpBannerTests(unittest.TestCase):
         self.assertIn("tieitup check", ctx)
 
     def test_a_missing_file_degrades_and_falls_back_to_ponytail(self):
-        (self.root / "Library/bin/tieitup").unlink()
+        (self.root / "Harness/bin/tieitup").unlink()
         row, degraded, ctx = self.report()
         self.assertIn("MISSING", row[0])
-        self.assertIn("missing Library/bin/tieitup", degraded[0])
+        self.assertIn("missing Harness/bin/tieitup", degraded[0])
         self.assertIn(".claude/skills/ponytail/SKILL.md", degraded[0])
         self.assertNotIn(".claude/skills/tieitup/SKILL.md", ctx)
         self.assertIn(".claude/skills/ponytail/SKILL.md", ctx)
@@ -691,7 +691,7 @@ class TieItUpBannerTests(unittest.TestCase):
 class LearningLabPlatformTests(unittest.TestCase):
     """learn-claude-code installs only on POSIX; elsewhere it is not applicable.
 
-    Library/setup-learn-claude.py refuses Windows (upstream imports fcntl) and
+    Harness/setup-learn-claude.py refuses Windows (upstream imports fcntl) and
     new-device reports the lab "n/a on Windows", so the preflight must not
     call it MISSING there. Each device grades its own platform: nothing here
     fakes os.name, which pathlib reads too.
@@ -703,8 +703,8 @@ class LearningLabPlatformTests(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
-        self.write("Library/repos.txt",
-                   "Library/learn-claude-code\thttps://example.invalid/l.git\t" + self.PIN + "\n")
+        self.write("Harness/repos.txt",
+                   "Harness/learn-claude-code\thttps://example.invalid/l.git\t" + self.PIN + "\n")
         for client in (".claude", ".agents"):
             self.write(client + "/skills/task-support/SKILL.md", "---\nname: task-support\n---\n")
 

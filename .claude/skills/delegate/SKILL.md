@@ -7,7 +7,7 @@ license: MIT
 # Delegation needs a bounded brief and verified evidence
 
 Paths are relative to this Devarness checkout. Run commands as
-`python3 Library/bin/<tool>` from its root. Keep client credentials and
+`python3 Harness/bin/<tool>` from its root. Keep client credentials and
 task records outside the shared release.
 
 ## Give independent reasoning to workers and deterministic work to scripts
@@ -53,7 +53,7 @@ usage telemetry; pause dependent work if that limit is reached.
 ## Verify the result before integrating it
 
 1. Compare observed usage with the budget; retain UNKNOWN if unavailable.
-2. Run `python3 Library/bin/md-format check <doc>` and
+2. Run `python3 Harness/bin/md-format check <doc>` and
    `python3 .claude/skills/delegate/check_refs.py <doc>` unpiped.
 3. Read the source behind at least three claims and every claim used for
    a release decision. A failed sample expands checking to that claim type.

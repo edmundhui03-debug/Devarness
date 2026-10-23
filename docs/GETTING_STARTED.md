@@ -5,6 +5,14 @@
 > Create your own repository from Devarness, then run Claude Code, Codex
 > and Pi from its root with shared project intent. Measure harness changes.
 
+## Contents
+
+- [Create your own repository and keep application files tracked](#create-your-own-repository-and-keep-application-files-tracked)
+- [Check the core before adding optional source capabilities](#check-the-core-before-adding-optional-source-capabilities)
+- [Launch each client from the same project root](#launch-each-client-from-the-same-project-root)
+- [Use TieItUp and Ponytail to keep changes small and review complete](#use-tieitup-and-ponytail-to-keep-changes-small-and-review-complete)
+- [Improve the harness by comparing one frozen task across candidates](#improve-the-harness-by-comparing-one-frozen-task-across-candidates)
+
 ## Create your own repository and keep application files tracked
 
 Install Python 3.9+, Git and, on Windows, Git Bash. Install
@@ -30,6 +38,11 @@ from the client instructions. `Projects/`, `PRDs and Specs/`, `Setup/` and
 
 ## Check the core before adding optional source capabilities
 
+Start with one small task in `docs/PROJECT.md`. Record its objective,
+acceptance check, current result and next action. The library supplies
+optional capabilities to the harness: select one only when this task
+needs it, and record the command and result before adding the next.
+
 These commands are PowerShell examples. On macOS/Linux use `python3`
 in place of `python`; run every command from the repository root.
 
@@ -37,12 +50,19 @@ in place of `python`; run every command from the repository root.
 python tools/bootstrap.py --check
 python tools/check.py --core-only
 python tools/session.py --check --text
+```
+
+The core is enough to begin. When a task needs the shared skill library,
+fetch the relevant sources explicitly. This example enables the existing
+coding and harness improvement skills; select only those you will use.
+
+```powershell
 python tools/bootstrap.py --fetch ponytail skills karpathy-skills superpowers harness2
 python tools/bootstrap.py --link-skills
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --require-hashes -r Library/library-requirements.txt
-.\.venv\Scripts\python.exe Library/bin/library refresh
-.\.venv\Scripts\python.exe Library/bin/library search "my project task"
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r Harness/library-requirements.txt
+.\.venv\Scripts\python.exe Harness/bin/library refresh
+.\.venv\Scripts\python.exe Harness/bin/library search "my project task"
 ```
 
 On macOS/Linux the last three commands use `.venv/bin/python`; no virtual
@@ -86,7 +106,7 @@ validation, recovery, security and the complete requested behavior.
 Run the checkout-local checker after edits and on the final diff:
 
 ```powershell
-python Library/bin/tieitup check
+python Harness/bin/tieitup check
 ```
 
 For final review, use the compact pstack adaptation at

@@ -10,7 +10,7 @@ license: MIT
 phrase. Not when asked. Before any non-trivial work, for every agent.
 
 This adapts Matt Pocock's `grilling` skill (MIT,
-`Library/skills/skills/productivity/grilling`) into a house rule. The technique
+`Harness/skills/skills/productivity/grilling`) into a house rule. The technique
 is his, unchanged; the *when* is ours.
 
 ## What to do

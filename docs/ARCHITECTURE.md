@@ -24,7 +24,7 @@ runs in bootstrap or CI. The upstream repository stays pinned.
 
 ## Optional integrations cannot silently change the core
 
-Notifications, dashboard bridges, scheduled updates, MCP servers,
+Notifications, scheduled updates, MCP servers,
 research tools, reverse tools and simulation runtimes are optional.
 The source is available without implying an installed integration.
 User configuration uses the Devarness namespace. No global launchers,

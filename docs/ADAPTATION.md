@@ -59,8 +59,7 @@ wording and removes a duplicate exclusion with unchanged semantics.
 
 Windows validation passed all 17 commands in `tools/check.py`, including
 13 portable controls and the deterministic tool suites: 253 tests,
-including 11 explicit skips. Dashboard masking
-tests passed separately: 46 Codex and 23 Claude tests. The local catalogue
+including 11 explicit skips. The local catalogue
 contains 126 entries with zero diagnostics. Optional full-catalogue and
 unavailable shell/runtime cases retain explicit test skips.
 

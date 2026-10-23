@@ -13,9 +13,8 @@ Follow [the new-project guide](docs/GETTING_STARTED.md) for Windows,
 macOS and Linux setup with Claude Code, Codex and Pi.
 
 Requires Python 3.9+ and Git. Windows shell tools need Git Bash;
-macOS and Linux can use Bash. Node.js is optional for JS tools and the
-dashboard. No API key, client login or paid model is required to run
-the core checks.
+macOS and Linux can use Bash. Node.js is optional for JS tools. No API key,
+client login or paid model is required to run the core checks.
 
 ```sh
 python3 tools/bootstrap.py --check
@@ -30,15 +29,20 @@ MCP registration, services or scheduled jobs.
 
 ## Fetch only the upstream capabilities you want
 
+Start with the core commands above and one small project task. Keep its
+objective, acceptance checks, result and next action in `docs/PROJECT.md`
+in your own private template copy. Add one library capability when that
+task needs it; verify the result before expanding the harness.
+
 ```sh
 python3 tools/bootstrap.py --list
 python3 tools/bootstrap.py --fetch ponytail skills karpathy-skills superpowers harness2
 python3 tools/bootstrap.py --link-skills
 python3 -m venv .venv
 # Activate .venv, then install the locked parser:
-python3 -m pip install --require-hashes -r Library/library-requirements.txt
-python3 Library/bin/library refresh
-python3 Library/bin/library search "the task"
+python3 -m pip install --require-hashes -r Harness/library-requirements.txt
+python3 Harness/bin/library refresh
+python3 Harness/bin/library search "the task"
 ```
 
 Fetch installs pinned source checkouts, without executing their code.
@@ -46,7 +50,7 @@ It never fetches a home-folder personal manifest. Skill links remain
 inside this checkout. Windows may require Developer Mode for symlinks;
 the link command reports missing link permissions without changing user
 settings. Specialist runtime installers
-under Library are opt-in; read their guide before invoking them.
+under Harness/ are opt-in; read their guide before invoking them.
 
 ## Claude Code leads while Codex and Pi share the same rules
 
@@ -56,8 +60,8 @@ under Library are opt-in; read their guide before invoking them.
 | Harness² and harness-step | Reference, propose, probe, compose, retain evidence |
 | AGENTS.md, .agents/, .codex/ | Optional Codex review and shared skills |
 | .pi/ | Optional Pi design and local discovery adapter |
-| Library/bin/ | Reusable tools, checkers and optional integrations |
-| Library/repos.txt | Public pinned upstream sources |
+| Harness/bin/ | Reusable tools, checkers and optional integrations |
+| Harness/repos.txt | Public pinned upstream sources |
 | tools/ | Neutral onboarding, session entry and release checks |
 
 Authenticate each client using its own user settings. Models and
@@ -97,6 +101,10 @@ See docs/ARCHITECTURE.md for integration boundaries, docs/TOOLS.md for
 the tool catalogue, docs/ADAPTATION.md for scope and verification, and
 THIRD_PARTY.md for attribution. Legacy device-completeness tests require
 a full optional installation and are separate from the portable core.
+
+The public harness's current work and verification are tracked in
+[docs/PLAN.md](docs/PLAN.md). Personal dashboards and their local state
+are excluded from this repository.
 
 The [TieItUp improvement report](docs/TIEITUP_IMPROVEMENT.md) records local
 timing, regression controls and the bounded onboarding experiment.

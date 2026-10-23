@@ -82,7 +82,7 @@ ALLOWED = {
                             "CFBundleShortVersionString"}),
     "installing on Windows": ("PowerShell", {"command": "winget install Obsidian.Obsidian"}),
     "reading the settings it writes into the vault": ("Bash", {"command": "cat .obsidian/app.json"}),
-    "the per-device settings folder": ("Bash", {"command": "ls ~/Library/Application\\ Support/obsidian"}),
+    "the per-device settings folder": ("Bash", {"command": "ls ~/Harness/Application\\ Support/obsidian"}),
     "the word on its own": ("Bash", {"command": "echo 'asar is an archive format'"}),
     "a word that merely contains it": ("Bash", {"command": "grep -rn basar ."}),
     "a longer extension": ("Bash", {"command": "ls notes.asarx"}),

@@ -22,7 +22,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-TASK = ROOT / "Library" / "bin" / "task-recall"
+TASK = ROOT / "Harness" / "bin" / "task-recall"
 # The gate is task-recall's, asked for with --named: it answers only when the prompt
 # NAMES a subject — two words said together and found together in one name. No
 # total and no count decides it here. A total let "can you fix the typo" reach 4.9

@@ -2,7 +2,7 @@
 #
 # This is the top row of cship's two-row statusline, NOT a shell prompt.
 # cship's `$starship_prompt` token shells out to `starship prompt`, and this is
-# the config that run reads, because statusline (Library/bin) sets
+# the config that run reads, because statusline (Harness/bin) sets
 # STARSHIP_CONFIG on the statusLine command.
 #
 # Kept here rather than in ~/.config/starship.toml deliberately: dev installs
@@ -13,7 +13,7 @@
 # and then restore the two keys below `$schema`, which the preset does not carry.
 # Glyphs need a Nerd Font. Ghostty supplies one by default; if you switch
 # terminals and see boxes, set the font to JetBrainsMono Nerd Font Mono
-# (already installed in ~/Library/Fonts).
+# (already installed in ~/Harness/Fonts).
 
 "$schema" = 'https://starship.rs/config-schema.json'
 

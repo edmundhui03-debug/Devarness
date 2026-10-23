@@ -21,7 +21,7 @@ turns with no project work need no filesystem exploration or retrofit.
 Review this turn's actual actions, tests, owner corrections and tool failures.
 Assess navigation, automated checks, review standards, steering-file load,
 tool economy and information access. This adapts Matt Pocock's categories in
-`Library/skills/skills/engineering/retro/SKILL.md`, relative to dev's root
+`Harness/skills/skills/engineering/retro/SKILL.md`, relative to dev's root
 (use this checkout's local commands); read that file as reference when a deeper
 session retrospective is warranted. Its explicit-only
 invocation setting stays unchanged; this adapter supplies automatic timing.

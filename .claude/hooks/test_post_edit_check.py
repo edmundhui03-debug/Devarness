@@ -43,13 +43,13 @@ class HookTests(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory(prefix="post-edit-")
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name) / "dev copy"
-        for relative in (".claude/hooks", "Library/bin", "Library/templates"):
+        for relative in (".claude/hooks", "Harness/bin", "Harness/templates"):
             (self.root / relative).mkdir(parents=True)
         (self.root / "CLAUDE.md").write_text("# router\n", encoding="utf-8")
         for name in ("md-format", "i18n"):
-            shutil.copy2(str(ROOT / "Library" / "bin" / name), str(self.root / "Library" / "bin" / name))
+            shutil.copy2(str(ROOT / "Harness" / "bin" / name), str(self.root / "Harness" / "bin" / name))
         for name in ("repos.txt", "separate-projects.txt"):
-            shutil.copy2(str(ROOT / "Library" / name), str(self.root / "Library" / name))
+            shutil.copy2(str(ROOT / "Harness" / name), str(self.root / "Harness" / name))
         shutil.copy2(str(HOOK), str(self.root / ".claude" / "hooks" / HOOK.name))
         self.hook = self.root / ".claude" / "hooks" / HOOK.name
         self.env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull,
@@ -102,7 +102,7 @@ class HookTests(unittest.TestCase):
         cases = {
             "ignored": self.write("ignored/note.md", BAD_MD),
             "nested repository": self.write("nested/note.md", BAD_MD),
-            "template": self.write("Library/templates/markdown-doc.md", BAD_MD),
+            "template": self.write("Harness/templates/markdown-doc.md", BAD_MD),
             "outside the root": Path(self.root.parent, "elsewhere.md"),
         }
         cases["outside the root"].write_text(BAD_MD, encoding="utf-8")
@@ -129,7 +129,7 @@ class HookTests(unittest.TestCase):
         # i18n on a device with no markitdown python prints "needs markitdown's
         # python at ..." and exits nonzero; without this it answered every HTML edit
         # on a fresh machine with a complaint about the machine.
-        broken = self.root / "Library" / "bin" / "md-format"
+        broken = self.root / "Harness" / "bin" / "md-format"
         broken.write_text("#!/usr/bin/env python3\n"
                           "import sys\n"
                           "print('md-format: needs something this device does not have', file=sys.stderr)\n"
@@ -182,7 +182,7 @@ class CodeCheckTests(unittest.TestCase):
 
     def setUp(self):
         HookTests.setUp(self)
-        (self.root / "Library/bin/tieitup").write_text(STUB, encoding="utf-8")
+        (self.root / "Harness/bin/tieitup").write_text(STUB, encoding="utf-8")
 
     def test_a_finding_in_a_code_file_is_reported_back(self):
         for name in ("Setup/tool.py", "Setup/run.sh", "Setup/fw.c", "Setup/fw.h", "Setup/page.ts", "Setup/app.jsx"):
@@ -205,7 +205,7 @@ class CodeCheckTests(unittest.TestCase):
         self.assertNotIn("a finding", text)
 
     def test_a_nonzero_checker_exit_is_unverified(self):
-        (self.root / "Library/bin/tieitup").write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
+        (self.root / "Harness/bin/tieitup").write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
         done = self.fire(self.write("Setup/tool.py", "x = 1\n"))
         self.assertEqual(done.returncode, 0)
         self.assertIn("exit 2", self.context(done))
@@ -227,14 +227,14 @@ class CodeCheckTests(unittest.TestCase):
         self.assertNotIn("private diagnostic", text)
 
     def test_an_extensionless_script_is_checked_by_its_shebang(self):
-        self.assertIsNotNone(self.context(self.fire(self.write("Library/bin/tool", "#!/usr/bin/env python3\nx = 1\n"))))
-        self.assertIsNotNone(self.context(self.fire(self.write("Library/bin/job", "#!/bin/bash\nx=1\n"))))
+        self.assertIsNotNone(self.context(self.fire(self.write("Harness/bin/tool", "#!/usr/bin/env python3\nx = 1\n"))))
+        self.assertIsNotNone(self.context(self.fire(self.write("Harness/bin/job", "#!/bin/bash\nx=1\n"))))
         done = self.fire(self.write("Setup/notes", "plain text with no shebang\n"))
         self.assertEqual((done.returncode, done.stdout), (0, ""))
 
     def test_code_in_a_separate_project_is_checked_in_that_repository(self):
         project = self.root / "Projects/WORK/EXAMPLE001_example-terminal"
-        (self.root / "Library/separate-projects.txt").write_text(
+        (self.root / "Harness/separate-projects.txt").write_text(
             "Projects/WORK/EXAMPLE001_example-terminal\n", encoding="utf-8")
         project.mkdir(parents=True)
         self.git("init", "-q", cwd=project)
@@ -250,7 +250,7 @@ class CodeCheckTests(unittest.TestCase):
         self.assertEqual((done.returncode, done.stdout), (0, ""))
 
     def test_no_command_means_no_check(self):
-        (self.root / "Library/bin/tieitup").unlink()
+        (self.root / "Harness/bin/tieitup").unlink()
         done = self.fire(self.write("Setup/tool.py", "x = 1\n"))
         self.assertEqual((done.returncode, done.stdout), (0, ""))
 

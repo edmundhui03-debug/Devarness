@@ -17,6 +17,10 @@ RULES = {
 }
 PRIVATE_ROOTS = {'Projects', 'Books', 'Working', 'Setup', 'PRDs and Specs'}
 PRIVATE_FILES = {'.env', 'auth.json', 'tokens.json', 'credentials.json', 'secrets.json', 'ntfy-topic', 'personal-repos.txt'}
+PRIVATE_DASHBOARD = ('Harness/dashboard/', 'Harness/bin/dashboard',
+                     'Harness/bin/taskboard', 'Harness/taskboard-zh-hk.json',
+                     'Library/dashboard/', 'Library/bin/dashboard',
+                     'Library/bin/taskboard', 'Library/taskboard-zh-hk.json')
 
 def scan_text(path, text, denied=()):
     findings = []
@@ -65,6 +69,9 @@ def scan_tree(root, denied=()):
         meta, raw_path = entry.split(b'\t', 1)
         mode, oid, stage = meta.decode().split()
         path = raw_path.decode()
+        if any(path == private_path or path.startswith(private_path.rstrip('/') + '/')
+               for private_path in PRIVATE_DASHBOARD):
+            findings.append({'path': path, 'rule': 'private-dashboard'})
         if mode == '160000':
             findings.append({'path': path, 'rule': 'nested-repository'})
             continue

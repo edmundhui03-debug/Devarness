@@ -17,17 +17,17 @@ PORTABLE_SUITES = (
     '.claude/hooks/test_guard_heredoc.py',
     '.claude/hooks/test_guard_vendor_code.py',
     '.claude/hooks/test_post_edit_check.py',
-    'Library/tests/test_line_endings.py',
-    'Library/tests/test_delegate_refs.py',
-    'Library/tests/test_library.py',
-    'Library/tests/test_library_eval.py',
-    'Library/tests/test_library_pick.py',
-    'Library/tests/test_md_status.py',
-    'Library/tests/test_i18n.py',
-    'Library/tests/test_publish_check.py',
-    'Library/tests/test_vercel_find.py',
-    'Library/tests/test_video_study.py',
-    'Library/tests/test_tieitup.py',
+    'Harness/tests/test_line_endings.py',
+    'Harness/tests/test_delegate_refs.py',
+    'Harness/tests/test_library.py',
+    'Harness/tests/test_library_eval.py',
+    'Harness/tests/test_library_pick.py',
+    'Harness/tests/test_md_status.py',
+    'Harness/tests/test_i18n.py',
+    'Harness/tests/test_publish_check.py',
+    'Harness/tests/test_vercel_find.py',
+    'Harness/tests/test_video_study.py',
+    'Harness/tests/test_tieitup.py',
 )
 
 def run_check(command, timeout):
@@ -81,7 +81,7 @@ def main():
         print('\nCHECK ' + ' '.join(command[1:]), flush=True)
         # A Windows full-suite run took 600.7s;
         # its per-call deadlines and performance assertions remain in place.
-        timeout = TIEITUP_TIMEOUT if command[-1] == 'Library/tests/test_tieitup.py' else DEFAULT_TIMEOUT
+        timeout = TIEITUP_TIMEOUT if command[-1] == 'Harness/tests/test_tieitup.py' else DEFAULT_TIMEOUT
         if not run_check(command, timeout):
             failures.append(' '.join(command[1:]))
     if failures:

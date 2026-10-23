@@ -26,7 +26,7 @@ def main():
         context = GUIDANCE
         index_path = ROOT / '.claude/hooks/library/index.json'
         if index_path.is_file():
-            spec = importlib.util.spec_from_file_location('devarness_library', ROOT / 'Library/library.py')
+            spec = importlib.util.spec_from_file_location('devarness_library', ROOT / 'Harness/library.py')
             library = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(library)
             try:
@@ -35,7 +35,7 @@ def main():
                 context += '\n' + '\n'.join(warnings)
                 context += '\n' + '\n'.join(p['entry']['id'] + ' - ' + p['entry']['path'] for p in picks)
             except library.CliError:
-                context += '\nLocal catalogue unavailable; run python3 Library/bin/library refresh.'
+                context += '\nLocal catalogue unavailable; run python3 Harness/bin/library refresh.'
         print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit',
                                                 'additionalContext': context}}))
         return 0

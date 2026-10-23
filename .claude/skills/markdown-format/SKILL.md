@@ -10,15 +10,15 @@ any of them and know within three lines what it says and whether it still
 applies. That is a house rule, not a per-request preference.
 
 Paths are relative to this Devarness checkout. From its root, run
-`python3 Library/bin/<tool>` to select this checkout explicitly.
+`python3 Harness/bin/<tool>` to select this checkout explicitly.
 
 ## The four steps
 
 ```bash
-cp Library/templates/markdown-doc.md mydoc.md   # the template is a worked example
+cp Harness/templates/markdown-doc.md mydoc.md   # the template is a worked example
 # ...write it...
-python3 Library/bin/md-format toc mydoc.md    # only above 150 lines
-python3 Library/bin/md-format check mydoc.md  # must exit 0
+python3 Harness/bin/md-format toc mydoc.md    # only above 150 lines
+python3 Harness/bin/md-format check mydoc.md  # must exit 0
 ```
 
 `md-format check` with no argument checks every tracked `.md` in dev. `md-format
@@ -28,7 +28,7 @@ repairs trailing whitespace and the final newline, nothing else; it will never
 rewrap your prose and never touches a line inside a fence, because those bytes
 may be a fixture or a tab-separated field. `md-format selftest` runs fixtures
 covering every rule, fired and not fired. Run it after changing
-`Library/bin/md-format`; each case is a defect found during the build, so a
+`Harness/bin/md-format`; each case is a defect found during the build, so a
 failure means one has come back.
 
 `md-format rewrap FILE` reflows plain prose paragraphs to 80 columns. It leaves
@@ -98,7 +98,7 @@ evidence. The next agent needs to know where your edge was.
 `md-format` skips what is not ours to reformat and says how many it skipped:
 vendored clones and the skills symlinked out of them, installed packs under
 `.agents/`, `md-pages` output in `datasheets/extracted/`, and KiCad's
-`.history/`. **Never reformat a vendored clone** — `Library/CLAUDE.md` forbids
+`.history/`. **Never reformat a vendored clone** — `Harness/CLAUDE.md` forbids
 it and an upstream `git pull` would undo it anyway.
 
 `SKILL.md` files keep upstream's YAML front matter as their contract, so the

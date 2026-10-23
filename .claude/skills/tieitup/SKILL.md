@@ -6,7 +6,7 @@ description: "Apply automatically to every coding task in dev and its projects: 
 # TieItUp: Ponytail first, then the books, checked by script
 
 Paths are relative to this Devarness checkout. From its root, run
-`python3 Library/bin/<tool>` to select this checkout explicitly.
+`python3 Harness/bin/<tool>` to select this checkout explicitly.
 The design and its evidence are `docs/ADAPTATION.md`.
 
 ## Load the layers in order
@@ -14,8 +14,8 @@ The design and its evidence are `docs/ADAPTATION.md`.
 1. The router's safety rules and the superpowers gates (TDD, debugging,
    verification) come first; nothing here overrides them.
 2. Ponytail: read `.claude/skills/ponytail/SKILL.md` and the two upstream skills
-   it names, `Library/ponytail/skills/ponytail/SKILL.md` and
-   `Library/ponytail/skills/ponytail-review/SKILL.md`. When Ponytail's rules
+   it names, `Harness/ponytail/skills/ponytail/SKILL.md` and
+   `Harness/ponytail/skills/ponytail-review/SKILL.md`. When Ponytail's rules
    are already in your context, as in a benchmark session, do not load them
    again. Its smallest complete change and its never-cut list win over every
    book rule below.
@@ -90,7 +90,7 @@ Use the current owner's scope and the router's verification rules. A past
 workspace's permission does not authorize a new user's experiment.
 
 - **narrow** or **missed**, at the end of each final review: apply at most
-  one. Write a failing test in `Library/tests/test_tieitup.py`, narrow the
+  one. Write a failing test in `Harness/tests/test_tieitup.py`, narrow the
   check or teach it the missed case, run the whole suite, `tieitup check`
   the change, and commit it by path apart from the task's own commit. A miss
   that needs a new check stays a proposal.
@@ -99,7 +99,7 @@ workspace's permission does not authorize a new user's experiment.
   the owner and name it in the hand-off.
 - **drift**, or a start banner reading `tieitup stale` because Ponytail's
   skills changed: before the first coding task, read
-  `git -C Library/ponytail diff <checked commit>..HEAD -- skills`, update the
+  `git -C Harness/ponytail diff <checked commit>..HEAD -- skills`, update the
   conflicts in `references/rules.md` and the counterpart table below where
   Ponytail moved, run the tests, then `tieitup rechecked` and commit by
   path; a rule whose own text must change goes to the owner. A Ponytail
@@ -109,7 +109,7 @@ workspace's permission does not authorize a new user's experiment.
   benchmark: record the drift and propose a bounded experiment through
   `harness-step`. Paid runs require this owner's explicit model, scope and
   budget authorization; record actual spend in the local task ledger.
-  `Library/tieitup-bench.py` is a legacy specialist runner: `probe`, `run`
+  `Harness/tieitup-bench.py` is a legacy specialist runner: `probe`, `run`
   and `auto` spend money, and `auto` has an inherited USD 5 allocation.
   Its time/cost heuristics do not grant permission or match every cap.
   Never launch it automatically or in the background on that basis. For

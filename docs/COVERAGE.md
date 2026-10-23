@@ -20,9 +20,9 @@ path coverage; it does not establish identical content or active runtimes.
 | Library commands | 30 | 30 | No missing command name |
 | Public source pins | 29 | 30 | Original 29 unchanged; Superpowers added |
 
-Reproduce the target inventory with `git ls-files Library/bin`,
+Reproduce the target inventory with `git ls-files Harness/bin`,
 `tools/skill-links.json` and `python3 tools/bootstrap.py --list`. Exact public
-commits live in `Library/repos.txt`. Upstream clones remain ignored and are
+commits live in `Harness/repos.txt`. Upstream clones remain ignored and are
 fetched explicitly; their code and licenses keep their original authorship.
 
 ## Karpathy and the document styles have instructions and executable checks
@@ -32,9 +32,9 @@ the relevant bodies rather than inferring useful content from filenames.
 
 | Capability | Retained source or adapter | Activation or check |
 | --- | --- | --- |
-| Karpathy | `Library/karpathy-skills` public pin; Claude/Codex shared links | Fetch `karpathy-skills`, link skills, verify client loading |
-| Markdown style | `.claude/skills/markdown-format/SKILL.md`; `Library/templates/markdown-doc.md` | `python3 Library/bin/md-format check FILE` |
-| Bilingual HTML | `.claude/skills/bilingual-page/SKILL.md`; HTML template | `bash Library/bin/i18n check FILE` with Beautiful Soup |
+| Karpathy | `Harness/karpathy-skills` public pin; Claude/Codex shared links | Fetch `karpathy-skills`, link skills, verify client loading |
+| Markdown style | `.claude/skills/markdown-format/SKILL.md`; `Harness/templates/markdown-doc.md` | `python3 Harness/bin/md-format check FILE` |
+| Bilingual HTML | `.claude/skills/bilingual-page/SKILL.md`; HTML template | `bash Harness/bin/i18n check FILE` with Beautiful Soup |
 | Technical diagrams | Archify adapter and public pin | Fetch `archify`; verify its runtime separately |
 | Coding simplicity | Ponytail adapter and public pin | Read full coding and actual-diff review skills |
 | TieItUp | 18 rules, Python/C packs, checker and tests | Changed-line check, whole diff and relevant tests |
@@ -49,7 +49,7 @@ or external application was exercised.
 ## The audit repairs content and portability gaps hidden by matching paths
 
 The Ponytail restoration link previously led to a generic placeholder.
-[Its guide](../Library/PONYTAIL.md) now gives local fetch, pin, clean-tree,
+[Its guide](../Harness/PONYTAIL.md) now gives local fetch, pin, clean-tree,
 skill-loading and real-diff verification steps. The Library's Claude/Codex
 entry notes and installation pointer now lead to the maintained procedure.
 The Karpathy, pstack and Harness² setup cards now describe their actual

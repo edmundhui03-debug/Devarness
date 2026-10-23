@@ -10,7 +10,7 @@ Cantonese on a toggle. That is a house rule, not a per-request feature. A page
 shipped English-only is unfinished.
 
 Paths are relative to this Devarness checkout. From its root, run
-`bash Library/bin/i18n` to select this checkout explicitly. Windows uses
+`bash Harness/bin/i18n` to select this checkout explicitly. Windows uses
 Git Bash. The launcher needs Python with Beautiful Soup installed; set
 `DEVARNESS_I18N_PYTHON` to that interpreter's executable path when needed.
 
@@ -21,17 +21,17 @@ clarity; apply its review criteria to the whole page either way.
 ## The four steps
 
 ```bash
-cp "Library/templates/bilingual-page.html" mypage.html
+cp "Harness/templates/bilingual-page.html" mypage.html
 # ...write the page in English...
-bash Library/bin/i18n extract mypage.html -o mypage.en.json
+bash Harness/bin/i18n extract mypage.html -o mypage.en.json
 # ...translate mypage.en.json -> mypage.zh.json...
-bash Library/bin/i18n inject mypage.html --zh mypage.zh.json
-bash Library/bin/i18n check mypage.html        # must say full coverage
+bash Harness/bin/i18n inject mypage.html --zh mypage.zh.json
+bash Harness/bin/i18n check mypage.html        # must say full coverage
 ```
 
 `i18n check` exits non-zero when anything is untranslated or the toggle is
 missing. Run it before you call the page done, and before publishing. After
-changing `Library/bin/i18n` itself, run `i18n selftest`: it builds a good
+changing `Harness/bin/i18n` itself, run `i18n selftest`: it builds a good
 page and one page per defect, and fails if `check` stops catching any of them.
 
 ## Rules that matter
@@ -106,6 +106,6 @@ belongs to, so the page can be updated in place later instead of forked.
 
 | Thing | Path |
 | --- | --- |
-| Template | `Library/templates/bilingual-page.html` |
-| Tool | `bash Library/bin/i18n`; no global launcher required |
-| Worked example | `Library/guides/pyrosim/PyroSim_7Day_Guide.html` |
+| Template | `Harness/templates/bilingual-page.html` |
+| Tool | `bash Harness/bin/i18n`; no global launcher required |
+| Worked example | `Harness/guides/pyrosim/PyroSim_7Day_Guide.html` |

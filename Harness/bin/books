@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""books — the book library as page-marked Markdown in Books/text/, never tracked or synced.
+
+  books install                         build Harness/.runtime/books from Harness/books-requirements.txt
+  books start [build options]           start a background build and return at once
+  books install-task | uninstall-task   the daily backstop DEVARNESS_books_build, 02:00 (Windows)
+  books build|status|check|page ...     Harness/books.py in the runtime; books build --help
+
+Design: Setup/superpowers/specs/2026-09-25-books-as-markdown-design.md
+"""
+import importlib.machinery
+import importlib.util
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+VENV = ROOT / "Harness" / ".runtime" / "books" / ".venv"
+PYTHON = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+ENGINE = ROOT / "Harness" / "books.py"
+REQUIREMENTS = ROOT / "Harness" / "books-requirements.txt"
+LOG = ROOT / ".claude" / "hooks" / "books.log"
+TASK = dict(task="DEVARNESS_books_build", arguments="build", hour=2, limit="PT20H",
+            description="books: convert new or changed library PDFs to Markdown in Books/text.")
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def run(argv: list) -> int:
+    """A child, killed with this process on Windows. On a terminal it shares it; otherwise it has no
+    window, and writes to this process's output or, under pythonw, which has none, to the log."""
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    if sys.stdout is not None and sys.stdout.isatty():
+        return tied(argv, env=env)
+    # Handed over explicitly: a console child of a console-less parent, as in a detached start or
+    # update-tools's pythonw, opens a console of its own and its output never arrives (2026-09-25).
+    if sys.stdout is not None:
+        return tied(argv, env=env, stdin=subprocess.DEVNULL, stdout=sys.stdout, stderr=sys.stderr,
+                    creationflags=NO_WINDOW)
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with LOG.open("a", encoding="utf-8") as log:
+        return tied(argv, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                    creationflags=NO_WINDOW)
+
+
+def tied(argv: list, **options) -> int:
+    """subprocess.call, except that on Windows the child is killed when this process ends: Task
+    Scheduler's End stops only the process it started, and left the build running (probe, 2026-09-25)."""
+    with subprocess.Popen(argv, **options) as child:
+        if os.name == "nt" and not kill_with_me(child):
+            print("books: this build is not tied to its launcher; ending the task will not stop it",
+                  file=sys.stderr)
+        try:
+            return child.wait()
+        except BaseException:
+            child.kill()
+            raise
+
+
+def kill_with_me(child) -> bool:
+    """Put child in a job whose handle this process holds until it ends; closing it kills the child."""
+    import ctypes
+
+    class Limits(ctypes.Structure):         # JOBOBJECT_EXTENDED_LIMIT_INFORMATION, flattened
+        _fields_ = [("times", ctypes.c_int64 * 2), ("flags", ctypes.c_uint32), ("sets", ctypes.c_size_t * 2),
+                    ("processes", ctypes.c_uint32), ("affinity", ctypes.c_size_t), ("classes", ctypes.c_uint32 * 2),
+                    ("io", ctypes.c_uint64 * 6), ("memory", ctypes.c_size_t * 4)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateJobObjectW.restype = ctypes.c_void_p
+    kernel.SetInformationJobObject.argtypes = (ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32)
+    kernel.AssignProcessToJobObject.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
+    job, limits = kernel.CreateJobObjectW(None, None), Limits(flags=0x2000)   # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    return bool(job and kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits))
+                and kernel.AssignProcessToJobObject(job, int(child._handle)))   # 9: the extended limits
+
+
+def install() -> int:
+    uv = shutil.which("uv")
+    if not uv:
+        print("books: uv is not on PATH")
+        return 2
+    if not PYTHON.exists():
+        code = run([uv, "venv", "--python", "3.12", str(VENV)])
+        if code:
+            return code
+    return run([uv, "pip", "install", "--python", str(PYTHON), "-r", str(REQUIREMENTS)])
+
+
+def engine(args: list) -> int:
+    if not PYTHON.exists():
+        # Only a build installs: status, check and page only read.
+        if args[0] != "build":
+            print("books: not installed; run books install")
+            return 1
+        if install():
+            return 2
+    return run([str(PYTHON), str(ENGINE), *args])
+
+
+def schtasks(verb: str) -> int:
+    """schtasks on DEVARNESS_books_build, windowless: under pythonw each call would flash a console."""
+    return subprocess.run(["schtasks", verb, "/TN", TASK["task"]], capture_output=True,
+                          creationflags=NO_WINDOW).returncode
+
+
+def start(args: list) -> int:
+    """A background build that outlives this session; returns at once."""
+    # On Windows it runs as the task, registered here where it is missing: a detached child of a
+    # session can die with it (LESSONS.md, "Long jobs run as scheduled tasks").
+    if os.name == "nt" and not args and (schtasks("/Query") == 0 or schedule(True) == 0):
+        ran = schtasks("/Run")
+        print("books: started %s" % TASK["task"] if ran == 0 else "books: %s would not start" % TASK["task"])
+        return ran
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    flags = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0
+    with LOG.open("a", encoding="utf-8") as log:
+        subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "build", *args],
+                         stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                         creationflags=flags, start_new_session=os.name != "nt")
+    print("books: started a detached build; its log is %s" % LOG)
+    return 0
+
+
+def schedule(install_task: bool) -> int:
+    """DEVARNESS_books_build through dev-check's task code, which update-tools's daily run uses too."""
+    loader = importlib.machinery.SourceFileLoader("dev_check", str(ROOT / "Harness" / "bin" / "dev-check"))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("dev_check", loader))
+    loader.exec_module(module)
+    return module.schedule(install_task, tool=str(Path(__file__).resolve()), **TASK)
+
+
+def main(argv=None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    command = argv[0] if argv else ""
+    if command == "install":
+        return install()
+    if command == "start":
+        return start(argv[1:])
+    if command in ("install-task", "uninstall-task"):
+        return schedule(command == "install-task")
+    if command in ("build", "status", "check", "page"):
+        return engine(argv)
+    print(__doc__)
+    return 0 if command in ("-h", "--help") else 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

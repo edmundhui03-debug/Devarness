@@ -16,6 +16,28 @@ def module(name):
     return loaded
 
 class ReleaseTests(unittest.TestCase):
+    def test_personal_dashboard_paths_are_rejected_from_the_release_tree(self):
+        scanner = module('release_check')
+        paths = ['Harness/dashboard/app/src/App.tsx', 'Harness/bin/dashboard',
+                 'Harness/bin/taskboard', 'Harness/taskboard-zh-hk.json',
+                 'Library/dashboard/app/src/App.tsx', 'Library/bin/dashboard',
+                 'Library/bin/taskboard', 'Library/taskboard-zh-hk.json']
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            subprocess.run(['git', 'init', '-q', folder], check=True)
+            for relative in paths:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('synthetic private feature', encoding='utf-8')
+            subprocess.run(['git', '-C', folder, 'add', '.'], check=True)
+            rejected = {item['path'] for item in scanner.scan_tree(root)
+                        if item['rule'] == 'private-dashboard'}
+            self.assertEqual(rejected, set(paths))
+
+    def test_unrelated_visualization_source_is_allowed(self):
+        scanner = module('release_check')
+        self.assertEqual(scanner.scan_text('app/dashboard.py', 'ordinary source'), [])
+
     def test_symlink_targets_are_scanned_before_first_commit(self):
         scanner = module('release_check')
         with tempfile.TemporaryDirectory() as folder:
@@ -96,12 +118,19 @@ class ReleaseTests(unittest.TestCase):
             self.assertTrue(scanner.scan_history(root))
 
 class BootstrapTests(unittest.TestCase):
+    def test_manifest_uses_the_harness_directory(self):
+        bootstrap = module('bootstrap')
+        row = 'Harness/example\thttps://github.com/example/tool.git\t' + 'a' * 40
+        self.assertEqual(bootstrap.parse_manifest(row)[0]['path'], 'Harness/example')
+        with self.assertRaises(ValueError):
+            bootstrap.parse_manifest(row.replace('Harness/', 'Library/'))
+
     def test_manifest_rejects_escaping_paths_and_authenticated_urls(self):
         bootstrap = module('bootstrap')
         with self.assertRaises(ValueError):
             bootstrap.parse_manifest('../escape\thttps://github.com/a/b.git\t' + 'a' * 40)
         with self.assertRaises(ValueError):
-            bootstrap.parse_manifest('Library/a\thttps://' + 'user:pass@github.com/a/b.git\t' + 'a' * 40)
+            bootstrap.parse_manifest('Harness/a\thttps://' + 'user:pass@github.com/a/b.git\t' + 'a' * 40)
 
     def test_check_has_no_home_or_network_side_effects(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -138,18 +167,18 @@ class HookTests(unittest.TestCase):
 
 class CatalogueTests(unittest.TestCase):
     def test_only_manifest_pins_are_optional_missing_sources(self):
-        spec = importlib.util.spec_from_file_location('catalogue', ROOT / 'Library/library.py')
+        spec = importlib.util.spec_from_file_location('catalogue', ROOT / 'Harness/library.py')
         library = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(library)
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            (root / 'Library').mkdir()
-            (root / 'Library/repos.txt').write_text(
-                'Library/example\thttps://github.com/example/tool.git\t' + 'a' * 40 + '\n', encoding='utf-8')
+            (root / 'Harness').mkdir()
+            (root / 'Harness/repos.txt').write_text(
+                'Harness/example\thttps://github.com/example/tool.git\t' + 'a' * 40 + '\n', encoding='utf-8')
             with self.assertRaises(library.Absent):
-                library._source_base(root, 'Library/example/skills', {}, {})
-            self.assertEqual(library._source_base(root, 'Library/typo/skills', {}, {}),
-                             root / 'Library/typo/skills')
+                library._source_base(root, 'Harness/example/skills', {}, {})
+            self.assertEqual(library._source_base(root, 'Harness/typo/skills', {}, {}),
+                             root / 'Harness/typo/skills')
 
 if __name__ == '__main__':
     unittest.main()

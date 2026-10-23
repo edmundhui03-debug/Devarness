@@ -27,7 +27,7 @@ Launching them from outside dev enters the root; launching inside it keeps the
 current subfolder. They forward client arguments unchanged.
 
 Codex hooks live in `.codex/hooks.json` and must pass Codex's `/hooks` trust
-review before they run; `Library/codex-hook-trust.py --check` reports one
+review before they run; `Harness/codex-hook-trust.py --check` reports one
 that has not. Codex runs hook commands through Windows PowerShell, so each
 starts from `python3`.
 

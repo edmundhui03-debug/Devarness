@@ -9,7 +9,7 @@
 ## Cache one file's traversal without changing rule coverage
 
 The reference is commit `5abfc111faa95231ff90ecaa5431b97429f41d80`.
-Profiling an audit of its `Library/bin/tieitup` found repeated AST traversal
+Profiling an audit of its `Harness/bin/tieitup` found repeated AST traversal
 in `Source.nodes`. The change retains the traversal per Source and returns
 a fresh filtered list for each query. All existing checks remain enabled;
 separate files and malformed Python retain their previous behavior.
@@ -33,7 +33,7 @@ The output hash was
 To repeat the comparison, save that commit's checker source, load each
 checker version separately and audit the same saved file, alternating order.
 Require identical output before interpreting timing. Run
-`python3 Library/tests/test_tieitup.py SourceTraversal` for the regression:
+`python3 Harness/tests/test_tieitup.py SourceTraversal` for the regression:
 the old code walks three times where the new code walks once. The test also
 checks ordered results, caller list mutation, separate files and invalid syntax.
 

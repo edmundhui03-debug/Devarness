@@ -1,0 +1,38 @@
+# Vendored upstream clones. bootstrap.sh reproduces these at the pinned commit.
+# They are not tracked in dev's own repository; INSTALL.md is the record of why.
+# Format: path<TAB>url<TAB>pinned-commit[<TAB>sparse dirs, space separated]
+# A fourth field makes the clone sparse: only those directories are checked
+# out, and only their blobs are fetched.
+# The owner's private clones (the book PDFs) are pinned the same way in
+# ~/.config/devarness/personal-repos.txt, never here (Harness/common.py pinned_clones).
+#
+Harness/reverse-skill	https://github.com/zhaoxuya520/reverse-skill.git	cab634bd855fc287f6e420c1f36fd1a6b9245960
+Harness/rea	https://github.com/morluto/rea.git	f6a58f10629614fb7a6970421218b73d41bce6a5
+Harness/docling	https://github.com/docling-project/docling.git	d01c9c0991920924cf17f6b8366079ac035ffc38
+Harness/playwright-cli	https://github.com/microsoft/playwright-cli.git	b1a5903c5b633b8c9f843ad7b629c2a78437040c
+Harness/ECC	https://github.com/affaan-m/ECC	30b68924ae9729159f44326aa3134b1d9d67c0e2
+Harness/claude-scholar	https://github.com/Galaxy-Dawn/claude-scholar.git	d394fb599ed9e6ea2212a9e6daa864345fe97a26
+Harness/codex-plugin-cc	https://github.com/openai/codex-plugin-cc.git	db52e28f4d9ded852ab3942cea316258ae4ef346
+Harness/cship	https://github.com/stephenleo/cship.git	c49ce1920166b109657342ce1a4daf31d2825b6d
+Harness/markitdown	https://github.com/microsoft/markitdown	4cc9fa17653d695d64fb9eee5b33d4de55ff84e8
+Harness/prompt-master	https://github.com/nidhinjs/prompt-master	a2ad174bf968b47ab11981b9dd5c84d4f14773ba
+Harness/skills	https://github.com/mattpocock/skills	5beb35b040e3de97e54fa9e386d7e42d15c295c2
+Harness/Understand-Anything	https://github.com/Egonex-AI/Understand-Anything.git	f2d0164f72fe678805c34245a6df36acededfebd
+Harness/diagram-design	https://github.com/cathrynlavery/diagram-design.git	f2f4d49ea8d632f17cf196ba26599277a93f767b
+Harness/learn-claude-code	https://github.com/shareAI-lab/learn-claude-code.git	ce8f9f186058939da54c9d6fead78dfb5d0fd6c3
+Harness/i-have-adhd	https://github.com/ayghri/i-have-adhd.git	24d22f783e57cb73c957848b588c6f651b6f9cd8
+Harness/pcb/KiCAD-MCP-Server	https://github.com/mixelpixx/KiCAD-MCP-Server	cbb59a6203997f5e916be7e0480d63fe5519134a
+Harness/pcb/kicad-happy	https://github.com/aklofas/kicad-happy	6a91aaaea124152b2923326c1cf77278e0999cd4
+Harness/pcb/pcb-designer-ai-agent	https://github.com/assalas/pcb-designer-ai-agent	fc8cfa69bebcb74f9949d20cd0a4f119fa87db40
+Harness/pcb/Konnect	https://github.com/mixelpixx/Konnect.git	9488e5f09717cb508cb25779dc16586d1f06f758
+Harness/archify	https://github.com/tt-a1i/archify.git	25cf37080fc8b1dbe758a4efc3935b55f3327083
+Harness/ponytail	https://github.com/DietrichGebert/ponytail	09c434ab73ca43761c5d8b0c5d341926c2fba710
+Harness/laya	https://github.com/NandhaKishorM/laya.git	ffc142012af63d015fa19f05f29f9c5ff329a2cc
+Harness/karpathy-skills	https://github.com/multica-ai/andrej-karpathy-skills.git	2c606141936f1eeef17fa3043a72095b4765b9c2
+Harness/anthropic-design	https://github.com/anthropics/skills.git	dbd4588f9e1033efb41dad4bef2f7947c8993d44	skills/canvas-design skills/theme-factory
+Harness/vercel-skills	https://github.com/vercel-labs/skills.git	13e4063a1cf913f5606d57d42ab83a86f5001e04
+Harness/harness2	https://github.com/google-research/harness2.git	1cfe254e8d25b15f37048c3730134686abe60335
+Harness/pcb/heypcb-mcp	https://github.com/HeyPCB/heypcb-mcp.git	a975edeb85cc335d2ec9298a844b6fbd49afff4a
+Harness/pstack	https://github.com/backnotprop/pstack.git	e44668c2aad92eacf4e84df47984121fefb11b82
+
+Harness/superpowers	https://github.com/obra/superpowers.git	7f043e5eaf3522dc19178c673b76328de9b0c355

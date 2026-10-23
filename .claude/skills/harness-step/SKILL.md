@@ -5,12 +5,12 @@ description: "Use for Peter, Aster and May when improving the agent harness itse
 
 # One harness step changes the harness only where a run shows why
 
-This merges Harness² (Google Research, `Library/harness2`, paper arXiv
+This merges Harness² (Google Research, `Harness/harness2`, paper arXiv
 2610.14224) with what dev already does well. Harness² adds what dev lacked:
 an edit is tested by re-running the same task before it is kept. Dev keeps
 what Harness² has no place for: the owner's approval, grill-first, checked
 findings, hook tests and the agent ledger. Paths are relative to dev's root;
-use this checkout's `Library/bin/` commands from its root. The design and its evidence are
+use this checkout's `Harness/bin/` commands from its root. The design and its evidence are
 `docs/ADAPTATION.md`.
 
 ## Why every edit needs a probe
@@ -38,7 +38,7 @@ use this checkout's `Library/bin/` commands from its root. The design and its ev
 | Tool guidance | Local prompt-hook context, skill text | AGENTS.md and manual local session check | Claude hook on prompts; Codex instructions/manual check |
 | Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>` links | Name and description always; body on demand |
 | Subagents | Agent types, `delegate` briefs | `codex exec` workers through `delegate` | Their own context; return text |
-| Scripts | `Library/bin/*`, a skill's `scripts/` | Same | Run on demand |
+| Scripts | `Harness/bin/*`, a skill's `scripts/` | Same | Run on demand |
 | Middleware | PostToolUse and UserPromptSubmit hooks | `.codex/hooks.json` is empty by default | Configured Claude hooks on matching calls |
 
 ## Put a fix in the cheapest part that can hold it
@@ -162,7 +162,7 @@ allows.
   runner itself does not push or commit to a branch.
 - The start check reports status instead of pulling (`DEVARNESS_START_GATE_DONE`).
   Other hooks run. Before checkout, `probe.py` links each git-ignored clone
-  in `Library/repos.txt`, `Library/.runtime` and the library index from the
+  in `Harness/repos.txt`, `Harness/.runtime` and the library index from the
   main checkout into the probe tree (junctions on Windows), so skill links
   into them come out as folder links; it removes the links before taking
   the run's diff, so they never enter it. It passes `--include-hook-events`,
@@ -176,7 +176,7 @@ allows.
   `--ref` is older than the clones, makes an edit depending on it
   untestable in that run: mark its verdict confounded. The clones are
   shared, not copied, so a probe that writes inside one changes the real
-  clone; check `git -C Library/<clone> status` after a run that might.
+  clone; check `git -C Harness/<clone> status` after a run that might.
 - `delivered` means the CLI finished with success and exit 0; it does not
   mean the task's acceptance check passed. Check that from the run's diff.
 - The ref is resolved to one commit and recorded in each summary. A label

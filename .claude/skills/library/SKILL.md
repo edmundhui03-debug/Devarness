@@ -6,7 +6,7 @@ description: "Find the dev tool, skill, command, agent brief, MCP server or guid
 # Read the picked entries, not the catalogue
 
 Paths are relative to this Devarness checkout. From its root, run
-`python3 Library/bin/<tool>` to select this checkout explicitly.
+`python3 Harness/bin/<tool>` to select this checkout explicitly.
 
 ## The picks arrive with the prompt in dev
 
@@ -42,7 +42,7 @@ This skill supplies the commands and result format.
 
 External lookup: `library find "<the task>"`. Its shared policy is in
 `CLAUDE.md`; default hooks use local discovery only. Installation, keyword
-locations and current task status are in `Library/setup/vercel-find-skills.md`.
+locations and current task status are in `Harness/setup/vercel-find-skills.md`.
 
 ```sh
 library search "the task in plain words" --project Projects/NAME --client claude
@@ -62,13 +62,13 @@ agent file is a brief, not a live registered agent type.
 library refresh --json     # rebuild the index from the manifests (isolated parser)
 library check --json       # well-formed, fresh and without diagnostics
 library coverage --json    # every skill, command, agent, MCP server and clone has an entry
-library eval-picks Library/tests/fixtures/library-picks.json   # frozen prompts, by their pass mark
+library eval-picks Harness/tests/fixtures/library-picks.json   # frozen prompts, by their pass mark
 ```
 
 Refresh reads allowlisted metadata offline; it downloads, installs and
 launches nothing. A stale index still gives picks, with a warning to run
 `library refresh`; a missing or corrupt one gives none. `coverage` and
 `eval-picks` are gates in `dev-check`. Fix an orphan by adding a source to
-`Library/library-sources.json`, never by hiding it; tune picks in the
+`Harness/library-sources.json`, never by hiding it; tune picks in the
 library, never in a frozen prompt set, and never add a test prompt as a
 trigger.

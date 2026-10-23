@@ -6,9 +6,9 @@ description: Review every new or edited house HTML page for diagram suitability 
 # Archify improves technical diagrams within house pages
 
 Paths are relative to this Devarness checkout. From its root, run
-`python3 Library/bin/<tool>` to select this checkout explicitly.
+`python3 Harness/bin/<tool>` to select this checkout explicitly.
 
-Read `Library/ARCHIFY.md` for the installation, bilingual integration and
+Read `Harness/ARCHIFY.md` for the installation, bilingual integration and
 acceptance contract. This adapter applies to every new or edited house HTML
 page, including reports without a diagram: first decide whether a diagram
 clarifies a mechanism. Record that decision in the task evidence, not as a badge
@@ -17,12 +17,12 @@ on the reader's page.
 ## Choose the renderer from the information being explained
 
 - For architecture, workflow, sequence, data-flow or lifecycle diagrams, read
-  `Library/archify/archify/SKILL.md`, one matching schema and one example.
+  `Harness/archify/archify/SKILL.md`, one matching schema and one example.
 - For other diagram types, use diagram-design and its house profile.
 - For prose, tables and plots, improve hierarchy, spacing, contrast, source
   traceability and responsive behavior without forcing a diagram into the page.
 
-Use `python3 Library/bin/archify` instead of upstream's bare Node invocation. It
+Use `python3 Harness/bin/archify` instead of upstream's bare Node invocation. It
 preserves the pin and disables optional update networking. `bilingual-page` owns
 all HTML shells, house branding and English/Hong Kong Cantonese completion. The
 router overrides overlapping upstream defaults; vendored code stays intact.

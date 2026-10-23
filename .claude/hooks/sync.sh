@@ -239,7 +239,7 @@ check_portability() {
       # deliberately NOT exempt.
       CLAUDE.md|*/CLAUDE.md|AGENTS.md|*/AGENTS.md) continue ;;
       # The checkers that look for machine paths spell out what they look for.
-      Library/publish-check.py|Library/tests/test_publish_check.py) continue ;;
+      Harness/publish-check.py|Harness/tests/test_publish_check.py) continue ;;
       .claude/hooks/guard_vendor_code.py|.claude/hooks/test_guard_vendor_code.py) continue ;;
     esac
     [ -f "$r/$f" ] || continue

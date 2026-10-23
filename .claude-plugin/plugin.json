@@ -26,8 +26,8 @@
     "./.claude/skills/prompt-master",
     "./.claude/skills/retro-last",
     "./.claude/skills/tieitup",
-    "./Library/shared-skills/browser-docs",
-    "./Library/shared-skills/pyrosim",
-    "./Library/task-support/task-support"
+    "./Harness/shared-skills/browser-docs",
+    "./Harness/shared-skills/pyrosim",
+    "./Harness/task-support/task-support"
   ]
 }

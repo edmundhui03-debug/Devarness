@@ -1,7 +1,7 @@
 """Run a command in a worktree with the main checkout's clones and runtime linked in.
 
 usage: linked_run.py WORKTREE CMD [ARGS...]
-e.g.   linked_run.py . python3 Library/bin/dev-check --only library-check
+e.g.   linked_run.py . python3 Harness/bin/dev-check --only library-check
 
 A worktree holds tracked files only, so dev-check there fails on missing or stale
 git-ignored state that says nothing about the branch. This moves the worktree's own

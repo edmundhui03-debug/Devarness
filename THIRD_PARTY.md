@@ -9,16 +9,16 @@
 
 ## Pinned sources keep their own terms
 
-Library/repos.txt names every upstream URL and commit. Fetch those
+Harness/repos.txt names every upstream URL and commit. Fetch those
 sources to inspect their original license before redistribution or
 use. Source availability is not a blanket redistribution grant.
 
 ## Retained notices cover the bundled adaptations
 
-- Archify adaptation: Library/ARCHIFY-LICENSE.txt.
-- pstack review guidance: Library/PSTACK-LICENSE.txt.
-- Task-support skill: Library/task-support/task-support/LICENSE.
-- Prompt Master adaptation: Library/PROMPT-MASTER-LICENSE.txt, from
+- Archify adaptation: Harness/ARCHIFY-LICENSE.txt.
+- pstack review guidance: Harness/PSTACK-LICENSE.txt.
+- Task-support skill: Harness/task-support/task-support/LICENSE.
+- Prompt Master adaptation: Harness/PROMPT-MASTER-LICENSE.txt, from
   nidhinjs/prompt-master at its public manifest pin.
 - Ponytail, Karpathy guidance, Superpowers, Matt Pocock skills,
   Harness² and other collections remain separate pinned sources.

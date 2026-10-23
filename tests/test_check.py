@@ -18,17 +18,17 @@ SUITES = (
     '.claude/hooks/test_guard_heredoc.py',
     '.claude/hooks/test_guard_vendor_code.py',
     '.claude/hooks/test_post_edit_check.py',
-    'Library/tests/test_line_endings.py',
-    'Library/tests/test_delegate_refs.py',
-    'Library/tests/test_library.py',
-    'Library/tests/test_library_eval.py',
-    'Library/tests/test_library_pick.py',
-    'Library/tests/test_md_status.py',
-    'Library/tests/test_i18n.py',
-    'Library/tests/test_publish_check.py',
-    'Library/tests/test_vercel_find.py',
-    'Library/tests/test_video_study.py',
-    'Library/tests/test_tieitup.py',
+    'Harness/tests/test_line_endings.py',
+    'Harness/tests/test_delegate_refs.py',
+    'Harness/tests/test_library.py',
+    'Harness/tests/test_library_eval.py',
+    'Harness/tests/test_library_pick.py',
+    'Harness/tests/test_md_status.py',
+    'Harness/tests/test_i18n.py',
+    'Harness/tests/test_publish_check.py',
+    'Harness/tests/test_vercel_find.py',
+    'Harness/tests/test_video_study.py',
+    'Harness/tests/test_tieitup.py',
 )
 
 
@@ -95,7 +95,7 @@ class CheckTests(unittest.TestCase):
     def test_selected_rerun_is_partial_and_uses_original_deadline(self):
         code, output, calls = self.invoke(['--only', 'test_tieitup'])
         self.assertEqual(code, 0, output)
-        self.assertEqual(calls, [(['Library/tests/test_tieitup.py'], 900)])
+        self.assertEqual(calls, [(['Harness/tests/test_tieitup.py'], 900)])
         self.assertIn('PARTIAL', output)
         self.assertNotIn('PASS: 18', output)
 

@@ -1,0 +1,644 @@
+#!/usr/bin/env bash
+# i18n — give a dev HTML page an English <-> Cantonese toggle.
+#
+# The dev house rule is that every page an agent produces is readable in both
+# English and Hong Kong Cantonese. This tool does the mechanical half so the
+# only human-shaped work left is the translation itself.
+#
+#   i18n extract page.html -o strings.json    tag every text element, dump the English
+#   i18n inject  page.html --zh zh.json       add the dictionary, the toggle, the script
+#   i18n check   page.html                    report coverage: tagged, translated, missing
+#   i18n check                                check every deliverable page in the workspace
+#   i18n selftest                             prove check fails bad pages and passes a good one
+#
+# extract is idempotent: a page already carrying data-i18n keys keeps them, so
+# re-running after an edit only adds keys for the new text.
+set -uo pipefail
+# The selected interpreter needs beautifulsoup4; installation is explicit.
+PY="${DEVARNESS_I18N_PYTHON:-python3}"
+exec "$PY" - "$@" <<'PYEOF'
+import sys, json, re, hashlib, os
+from bs4 import BeautifulSoup, NavigableString, Comment
+
+SKIP_TAGS = {"script", "style", "title", "meta", "link", "br", "hr", "head", "html"}
+# Elements whose text is decoration, not content.
+SKIP_CLASSES = set()
+
+def usage(code=0):
+    print(__doc__ or "", end="")
+    print("usage: i18n {extract|inject|check} page.html [-o out.json] [--zh zh.json]"
+          " | i18n {check|selftest}")
+    sys.exit(code)
+
+# Exempt, each for a reason the router states. The template is the
+# pre-translation starting point and is meant to carry no toggle; _review/
+# holds evidence and screenshot fixtures rather than pages; the Emergency
+# Button v0.1 review predates the rule and rewriting a delivered record to
+# satisfy a format risks changing what was delivered. A project's evidence/
+# folder under PRDs and Specs/ holds generated receipts and diagrams, not
+# pages (owner, 2026-10-16).
+EXEMPT = (
+    "Harness/templates/bilingual-page.html",
+    "/_review/",
+    "/evidence/",
+    "LoRaWAN_Emergency_Button_Review.html",
+)
+# Never pages of ours, wherever they sit: build output, runtimes, a vendor's
+# page saved into a datasheets/ folder as evidence, and the PCB Brother course
+# packs, which are the vendor's files kept byte for byte.
+GENERATED = ("node_modules/", "/.runtime/", "/datasheets/", "/PCB Brother/Materials/")
+# Pages that failed the rule when Research, DATASET and SAMPLE_FIRMWARE were imported into
+# the old workspace on 2026-09-21, each with the sha256 of its content then (CRLF read as LF).
+# The owner chose to keep them as history while unchanged: an edited page is
+# checked like any other, and a new page was never on the list.
+LEGACY = "Harness/i18n-legacy.txt"
+
+
+def legacy_pages(root):
+    try:
+        with open(os.path.join(root, LEGACY), encoding="utf-8") as fh:
+            rows = [line.rstrip("\n").split("\t") for line in fh
+                    if line.strip() and not line.startswith("#")]
+    except OSError:
+        return {}
+    return {row[0]: row[1] for row in rows if len(row) == 2}
+
+
+def content_hash(path):
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def record_paths(root, record):
+    """The paths a dev list names, one per line: Harness/repos.txt holds the vendored
+    clones and Harness/separate-projects.txt the owner's separate projects. Both were
+    copied into this file until 2026-09-17, when the copies had missed the rename
+    of Self Learning to Research and the cwc-workshops clone, and check reported
+    29 pages that were not the workspace's."""
+    try:
+        with open(os.path.join(root, record), encoding="utf-8") as fh:
+            return [line.split("\t")[0].strip() for line in fh
+                    if line.strip() and not line.startswith("#")]
+    except OSError:
+        return []
+
+
+def within(rel, roots):
+    return any(rel == r or rel.startswith(r + "/") for r in roots)
+
+
+def deliverable_pages():
+    """Every page the bilingual rule binds, from git rather than a walk."""
+    import subprocess
+    from pathlib import Path
+    root = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                          capture_output=True, text=True).stdout.strip()
+    if not root:
+        print("i18n check: not in a git repository; give the page to check")
+        return None, 0, 0
+    listed = subprocess.run(["git", "-C", root, "ls-files", "*.html"],
+                            capture_output=True, text=True).stdout.split("\n")
+    # A nested repo is invisible to the root listing, and an imported project
+    # holds pages too. md-format had this same blind spot until 2026-09-12; a
+    # workspace-wide check that cannot see a project is not one.
+    theirs = (record_paths(root, "Harness/repos.txt") + record_paths(root, "Harness/separate-projects.txt")
+              # the owner's personal clones (the book PDFs), listed per device, never in git
+              + record_paths(os.path.join(os.path.expanduser("~"), ".config", "dev"), "personal-repos.txt"))
+    for marker in list(Path(root).glob("*/.git")) + list(Path(root).glob("*/*/.git")):
+        if not marker.is_dir():
+            continue                      # a worktree; reported under its checkout
+        satellite = marker.parent
+        name = satellite.relative_to(root).as_posix()
+        # A <path>.partial is a clone update-tools has not finished:
+        # upstream's, like the clone it becomes.
+        if within(name, theirs) or name.endswith(".partial"):
+            continue
+        inner = subprocess.run(["git", "-C", str(satellite), "ls-files", "*.html"],
+                               capture_output=True, text=True).stdout.split("\n")
+        listed += [f"{name}/{r}" for r in inner if r]
+    legacy = legacy_pages(root)
+    pages, skipped, history = [], 0, 0
+    for rel in listed:
+        if not rel:
+            continue
+        if within(rel, theirs) or any(g in rel for g in GENERATED):
+            continue
+        if any(e in rel for e in EXEMPT):
+            skipped += 1
+            continue
+        path = os.path.join(root, rel)
+        if rel in legacy:
+            try:
+                if content_hash(path) == legacy[rel]:
+                    history += 1
+                    continue
+            except OSError:
+                pass                              # checked below, where it is reported
+        pages.append(path)
+    return pages, skipped, history
+
+
+def translated(zh):
+    """The keys whose Cantonese is a non-blank string. A key mapped to "" is still
+    English on the page, and a dictionary that is only a list of keys translates
+    nothing; until 2026-09-17 check counted both as full coverage."""
+    if not isinstance(zh, dict):
+        return set()
+    return {k for k, v in zh.items() if isinstance(v, str) and v.strip()}
+
+
+def check_workspace():
+    """`i18n check` with no page: the whole workspace, like md-format check."""
+    pages, skipped, history = deliverable_pages()
+    if pages is None:
+        return 2
+    failed = 0
+    for page in pages:
+        try:
+            soup = BeautifulSoup(open(page, encoding="utf-8").read(), "html.parser")
+        except OSError as exc:
+            print(f"{page}: unreadable ({exc})"); failed += 1; continue
+        except UnicodeDecodeError:
+            # not UTF-8. Reported like any other failing page: the scan must not
+            # abandon the pages after it, and an unhandled traceback also exits
+            # 1, which is indistinguishable from an ordinary verdict.
+            print(f"{page}: undecodable (not UTF-8)"); failed += 1; continue
+        keys = {el["data-i18n"] for el in soup.find_all(attrs={"data-i18n": True})}
+        box = soup.find(id="i18n-zh")
+        zh = {}
+        if box:
+            try: zh = json.loads(box.string or "{}")
+            except Exception: pass
+        miss = sorted(keys - translated(zh))
+        toggle = bool(soup.select_one(".page-lang"))
+        bad = bool(miss) or not toggle or not keys
+        if bad:
+            failed += 1
+            why = "no toggle" if not toggle else (
+                "nothing tagged" if not keys else f"{len(miss)} untranslated")
+            print(f"  {os.path.relpath(page)}: {why}")
+    total = len(pages)
+    print(f"\n{total} deliverable page{'' if total == 1 else 's'}, "
+          f"{failed} with problems, {skipped} exempt"
+          + (f", {history} unchanged since the 2026-09-21 import" if history else ""))
+    return 1 if failed else 0
+
+
+def key_for(text, used):
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower().strip())[:28].strip("-") or "t"
+    h = hashlib.sha1(text.strip().encode("utf-8")).hexdigest()[:6]
+    k = f"{slug}-{h}"
+    n = 2
+    while k in used:
+        k = f"{slug}-{h}-{n}"; n += 1
+    used.add(k)
+    return k
+
+def has_text(el):
+    """Direct non-whitespace text, ignoring comments."""
+    for c in el.children:
+        if isinstance(c, Comment):
+            continue
+        if isinstance(c, NavigableString) and c.strip():
+            return True
+    return False
+
+def tag_page(soup):
+    """Tag the OUTERMOST elements that carry text, never their descendants."""
+    used = set()
+    for el in soup.find_all(attrs={"data-i18n": True}):
+        used.add(el["data-i18n"])
+    strings = {}
+    body = soup.body or soup
+
+    def walk(el):
+        for child in list(el.children):
+            if isinstance(child, (NavigableString, Comment)):
+                continue
+            if child.name in SKIP_TAGS:
+                continue
+            # The toggle we inject is furniture, not content. Without this the
+            # second extract pass picks up its own EN/中文 buttons as strings.
+            cls = child.get("class") or []
+            if "page-lang" in cls or str(child.get("id", "")).startswith("i18n"):
+                continue
+            # Text that declares its own language is already written in it: a
+            # page carrying each language's version shows one by <html lang>.
+            if child.has_attr("lang"):
+                continue
+            if child.get("data-i18n"):
+                strings[child["data-i18n"]] = child.decode_contents().strip()
+                continue            # already tagged: do not descend, do not re-key
+            if has_text(child):
+                inner = child.decode_contents().strip()
+                if inner and re.search(r"[A-Za-z]", inner):
+                    k = key_for(child.get_text(" ", strip=True), used)
+                    child["data-i18n"] = k
+                    strings[k] = inner
+                    continue        # tagged: do not descend
+            walk(child)
+
+    walk(body)
+    return strings
+
+TOGGLE_CSS = """
+/* i18n language toggle */
+.page-lang{position:fixed;top:14px;right:14px;z-index:9999;display:flex;gap:0;
+  border:1px solid var(--line,#CBD1D8);border-radius:3px;overflow:hidden;
+  background:var(--surface,#fff);font-size:12px;line-height:1;
+  box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.page-lang button{appearance:none;border:0;background:transparent;cursor:pointer;
+  font:500 12px/1 var(--mono,ui-monospace,Menlo,monospace);letter-spacing:.04em;
+  padding:7px 11px;color:var(--muted,#616B77)}
+.page-lang button[aria-pressed="true"]{background:var(--copper,#9F4E1C);color:#fff}
+.page-lang button:focus-visible{outline:2px solid var(--probe,#1C6675);outline-offset:-2px}
+@media print{.page-lang{display:none}}
+@media (max-width:640px){.page-lang{top:8px;right:8px}}
+:root[lang="zh-HK"] body{font-family:"PingFang HK","Hiragino Sans CN","Noto Sans HK",
+  "Microsoft JhengHei",var(--sans,system-ui),sans-serif}
+:root[lang="zh-HK"] .prose,:root[lang="zh-HK"] .note,:root[lang="zh-HK"] .standfirst{
+  font-family:"PingFang HK","Noto Serif HK",var(--serif,Georgia),serif;line-height:1.8}
+"""
+
+TOGGLE_JS = """
+(function(){
+  var box=document.getElementById('i18n-zh'); if(!box) return;
+  var zh={}; try{ zh=JSON.parse(box.textContent)||{} }catch(e){ return }
+  var nodes=[].slice.call(document.querySelectorAll('[data-i18n]'));
+  var en={}; nodes.forEach(function(el){ en[el.getAttribute('data-i18n')]=el.innerHTML });
+  var titleEn=document.title, titleZh=zh['__title__']||titleEn;
+  var bEN=document.getElementById('page-lang-en'), bZH=document.getElementById('page-lang-zh');
+  function apply(lang, remember){
+    var zhOn = lang==='zh';
+    nodes.forEach(function(el){
+      var k=el.getAttribute('data-i18n');
+      var v = zhOn ? zh[k] : en[k];
+      if(v!=null && v!==el.innerHTML) el.innerHTML=v;
+    });
+    document.documentElement.setAttribute('lang', zhOn?'zh-HK':'en');
+    document.title = zhOn?titleZh:titleEn;
+    if(bEN) bEN.setAttribute('aria-pressed', String(!zhOn));
+    if(bZH) bZH.setAttribute('aria-pressed', String(zhOn));
+    // Only a click is remembered. A guess from the browser's language, once saved, would pass
+    // for a choice; and a saved "en" must not look like the default "en", or a reader who
+    // chose English on a Chinese browser loses it at every reload.
+    if(remember){ try{ localStorage.setItem('page-lang', lang) }catch(e){} }
+  }
+  var start='en', chosen=false;
+  try{ var s=localStorage.getItem('page-lang'); if(s==='zh'||s==='en'){ start=s; chosen=true } }catch(e){}
+  if(!chosen && /^(zh|yue)/i.test(navigator.language||'')) start='zh';
+  if(bEN) bEN.addEventListener('click',function(){apply('en',true)});
+  if(bZH) bZH.addEventListener('click',function(){apply('zh',true)});
+  apply(start,false);
+})();
+"""
+
+TOGGLE_HTML = ('<div class="page-lang" role="group" aria-label="Language / 語言">'
+               '<button id="page-lang-en" type="button" aria-pressed="true">EN</button>'
+               '<button id="page-lang-zh" type="button" aria-pressed="false">中文</button>'
+               '</div>')
+
+def inject(soup, zh):
+    body = soup.body or soup
+    for old in soup.select('.page-lang, #i18n-zh, #i18n-js, #i18n-css'):
+        old.decompose()
+    css = soup.new_tag("style", id="i18n-css"); css.string = TOGGLE_CSS
+    body.insert(0, css)
+    body.insert(1, BeautifulSoup(TOGGLE_HTML, "html.parser"))
+    data = soup.new_tag("script", id="i18n-zh"); data["type"] = "application/json"
+    data.string = json.dumps(zh, ensure_ascii=False, indent=0)
+    body.append(data)
+    js = soup.new_tag("script", id="i18n-js"); js.string = TOGGLE_JS
+    body.append(js)
+
+# The English page selftest translates: several outermost elements to tag, and
+# one string with markup inside it.
+SELFTEST_PAGE = """<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>i18n selftest</title></head>
+<body>
+<main>
+<h1>Pages are bilingual</h1>
+<p>Every page ships with a <strong>Cantonese</strong> toggle.</p>
+<ul><li>Extract the English</li><li>Inject the translation</li></ul>
+<div lang="zh-HK"><p>已經寫好嘅中文，提到 ISR</p></div>
+</main>
+</body>
+</html>
+"""
+
+def selftest():
+    """Prove check fails the pages it should fail and passes the page it should.
+
+    The good page is this tool's own extract and inject with every string
+    translated; each bad page is that page with one defect. Pages go through
+    `check page.html` and through the no-argument workspace check over a
+    throwaway git repository, because the two modes carry separate copies of
+    the rules. md-format selftest is the model.
+    """
+    import contextlib, io, shutil, subprocess, tempfile, traceback
+
+    def run(args, cwd=None):
+        """This tool's own main(), in-process: its exit code and all it printed."""
+        buf, argv, here, code = io.StringIO(), sys.argv, os.getcwd(), 0
+        try:
+            sys.argv = ["i18n"] + args
+            if cwd:
+                os.chdir(cwd)
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                main()
+        except SystemExit as exc:
+            code = exc.code if isinstance(exc.code, int) else int(exc.code is not None)
+        except Exception:
+            code = 1                              # what the command line exits with
+            buf.write(traceback.format_exc())
+        finally:
+            sys.argv = argv
+            os.chdir(here)
+        return code, buf.getvalue()
+
+    def write(path, text):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if isinstance(text, bytes):                   # the undecodable case
+            with open(path, "wb") as fh:
+                fh.write(text)
+            return path
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+        return path
+
+    def read(path):
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+
+    def git(*args):
+        done = subprocess.run(["git"] + list(args), capture_output=True, text=True)
+        if done.returncode:
+            raise RuntimeError("git %s: %s" % (" ".join(args), done.stderr))
+
+    def said(text):
+        """The verdict line check printed first, and the last detail after it."""
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        return " | ".join(lines[:1] + lines[1:][-1:]) or "nothing"
+
+    results = []
+
+    def report():
+        for label, ok, why in results:
+            # One line per case, whatever git or a traceback put in the reason.
+            print("  %s  %s%s" % ("ok  " if ok else "FAIL", label,
+                                  "" if ok else " -- " + " ".join(why.split())))
+        failed = sum(1 for _, ok, _ in results if not ok)
+        print("\n%d checks, %d failed" % (len(results), failed))
+        return 1 if failed else 0
+
+    tmp = tempfile.mkdtemp(prefix="i18n-selftest-")
+    at = lambda *parts: os.path.join(tmp, *parts)
+    # A git hook exports GIT_DIR, and a machine's own git configuration can
+    # ignore a page. Inherited, either stages the fixtures into someone else's
+    # repository or refuses them. check runs in-process, so the environment
+    # itself is set aside while the selftest runs, and put back after.
+    inherited = {k: v for k, v in os.environ.items() if k.startswith("GIT_")}
+    for k in inherited:
+        del os.environ[k]
+    os.environ.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+    try:
+        # The good page, by this tool's own hand: extract, translate all, inject.
+        good_path = write(at("good.html"), SELFTEST_PAGE)
+        extract_code, _ = run(["extract", good_path, "-o", at("strings.json")])
+        strings = json.loads(read(at("strings.json"))) if extract_code == 0 else {}
+        tagged = sorted(k for k in strings if k != "__title__")
+        zh = {k: "（粵）" + v for k, v in strings.items()}
+        inject_code, _ = run(["inject", good_path, "--zh",
+                              write(at("zh.json"), json.dumps(zh, ensure_ascii=False))])
+        built = extract_code == 0 and inject_code == 0 and bool(tagged)
+        results.append(("extract and inject build a fully translated page", built,
+                        "extract exited %d, inject exited %d, %d strings tagged"
+                        % (extract_code, inject_code, len(tagged))))
+        if not built:
+            return report()
+        # Text mode wrote \r\n on Windows, so every inject there rewrote the
+        # whole page and git warned that CRLF would be replaced (2026-09-18).
+        with open(good_path, "rb") as fh:
+            crlf = fh.read().count(b"\r\n")
+        results.append(("extract and inject keep the page's LF line endings", crlf == 0,
+                        "%d CRLF line endings after inject" % crlf))
+        untagged = not any("ISR" in v for v in strings.values())
+        results.append(("an element that declares its own lang is left untagged", untagged,
+                        "extract tagged text inside a lang element"))
+        good, n, dropped = read(good_path), len(tagged), tagged[0]
+
+        # Every bad page is the good page with one defect.
+        def edited(change):
+            soup = BeautifulSoup(good, "html.parser")
+            change(soup)
+            return str(soup)
+
+        def cut_short(soup):                      # the dictionary loses its closing brace
+            box = soup.find(id="i18n-zh")
+            box.string = box.string.rstrip()[:-1]
+
+        def keys_only(soup):                      # a dictionary that lists keys, no Cantonese
+            soup.find(id="i18n-zh").string = json.dumps(tagged)
+
+        def injected(name, dictionary, page):
+            path = write(at("built", name + ".html"), page)
+            words = write(at("built", name + ".json"), json.dumps(dictionary, ensure_ascii=False))
+            code, text = run(["inject", path, "--zh", words])
+            if code:
+                raise RuntimeError("inject exited %d: %s" % (code, said(text)))
+            return read(path)
+
+        pages = {}
+        for name, make in (
+                ("good", lambda: good),
+                ("no-toggle", lambda: edited(lambda soup: soup.select_one(".page-lang").decompose())),
+                # a translator who missed one string
+                ("untranslated", lambda: injected(
+                    "untranslated", {k: v for k, v in zh.items() if k != dropped}, good)),
+                ("no-dictionary", lambda: edited(lambda soup: soup.find(id="i18n-zh").decompose())),
+                ("broken-dictionary", lambda: edited(cut_short)),
+                # every key present, every translation an empty string
+                ("blank", lambda: injected("blank", {k: "" for k in zh}, good)),
+                ("key-list", lambda: edited(keys_only)),
+                # the toggle and dictionary added to English that extract never tagged
+                ("not-extracted", lambda: injected("not-extracted", zh, SELFTEST_PAGE)),
+                # the good page, tracked in git and then deleted
+                ("unreadable", lambda: good),
+                # a page saved in some other encoding: 0xff is not valid UTF-8
+                ("undecodable", lambda: good.encode("utf-8").replace(b"<title>", b"\xff<title>", 1))):
+            try:
+                pages[name] = make()
+            except Exception as exc:
+                pages[name] = exc
+
+        def page_check(name, page):
+            return run(["check", write(at("pages", name + ".html"), page)])
+
+        def workspace_check(name, page):
+            repo = at("repo-" + name)
+            git("init", "-q", repo)
+            path = write(os.path.join(repo, "page.html"), page)
+            git("-C", repo, "add", "page.html")
+            if name == "unreadable":
+                os.remove(path)
+            return run(["check"], cwd=repo)
+
+        empty = "%d tagged, 0 translated, %d missing, toggle=yes" % (n, n)
+        for label, name, mode, wanted, needle in (
+                # label, page, mode, exit wanted, what check must print
+                ("page check passes the extracted, fully translated page", "good", page_check, 0,
+                 "good.html: %d tagged, %d translated, 0 missing, toggle=yes" % (n, n)),
+                ("page check fails a page with no toggle", "no-toggle", page_check, 1,
+                 "no-toggle.html: %d tagged, %d translated, 0 missing, toggle=NO" % (n, n)),
+                ("page check fails a page with one untranslated string", "untranslated", page_check, 1,
+                 "untranslated.html: %d tagged, %d translated, 1 missing, toggle=yes\n  missing: %s"
+                 % (n, n - 1, dropped)),
+                ("page check fails a page with no dictionary", "no-dictionary", page_check, 1,
+                 "no-dictionary.html: " + empty),
+                ("page check fails a page with a broken dictionary", "broken-dictionary", page_check, 1,
+                 "broken-dictionary.html: " + empty),
+                ("page check fails a page whose translations are blank", "blank", page_check, 1,
+                 "blank.html: " + empty),
+                ("page check fails a page whose dictionary only lists its keys", "key-list",
+                 page_check, 1, "key-list.html: " + empty),
+                ("page check fails a page injected without extract", "not-extracted", page_check, 1,
+                 "not-extracted.html: 0 tagged, 0 translated, 0 missing, toggle=yes"),
+                ("workspace check passes the extracted, fully translated page", "good",
+                 workspace_check, 0, "1 deliverable page, 0 with problems"),
+                ("workspace check fails a page with no toggle", "no-toggle", workspace_check, 1,
+                 "page.html: no toggle"),
+                ("workspace check fails a page with one untranslated string", "untranslated",
+                 workspace_check, 1, "page.html: 1 untranslated"),
+                ("workspace check fails a page with no dictionary", "no-dictionary",
+                 workspace_check, 1, "page.html: %d untranslated" % n),
+                ("workspace check fails a page with a broken dictionary", "broken-dictionary",
+                 workspace_check, 1, "page.html: %d untranslated" % n),
+                ("workspace check fails a page whose translations are blank", "blank",
+                 workspace_check, 1, "page.html: %d untranslated" % n),
+                ("workspace check fails a page whose dictionary only lists its keys", "key-list",
+                 workspace_check, 1, "page.html: %d untranslated" % n),
+                ("workspace check fails a page injected without extract", "not-extracted",
+                 workspace_check, 1, "page.html: nothing tagged"),
+                ("workspace check fails a tracked page it cannot read", "unreadable",
+                 workspace_check, 1, "page.html: unreadable"),
+                ("page check fails a page that is not UTF-8", "undecodable", page_check, 1,
+                 "undecodable (not UTF-8)"),
+                ("workspace check fails a page that is not UTF-8", "undecodable",
+                 workspace_check, 1, "page.html: undecodable")):
+            try:
+                if isinstance(pages[name], Exception):
+                    raise pages[name]
+                code, text = mode(name, pages[name])
+                ok = code == wanted and needle in text
+                why = "exit %d, wanted %d and %r; check said: %s" % (code, wanted, needle, said(text))
+            except Exception as exc:
+                ok, why = False, "%s: %s" % (type(exc).__name__, exc)
+            results.append((label, ok, why))
+
+        # A page imported with Research, DATASET or SAMPLE_FIRMWARE is listed in
+        # Harness/i18n-legacy.txt with the hash of its content at the import. It is
+        # history while unchanged, whatever its line endings, and checked once
+        # anyone edits it.
+        def legacy_check(repo_name, page, recorded):
+            repo = at(repo_name)
+            git("init", "-q", repo)
+            write(os.path.join(repo, "page.html"), page)
+            git("-C", repo, "add", "page.html")
+            digest = hashlib.sha256(recorded.encode("utf-8")).hexdigest()
+            write(os.path.join(repo, "Harness", "i18n-legacy.txt"), "# fixture\npage.html\t%s\n" % digest)
+            return run(["check"], cwd=repo)
+
+        listed = pages["no-toggle"]
+        for number, (label, page, wanted, needle) in enumerate((
+                ("workspace check passes a listed page left as it was imported",
+                 listed, 0, "0 with problems"),
+                ("workspace check passes a listed page whose line endings changed",
+                 None if isinstance(listed, Exception) else listed.replace("\n", "\r\n").encode("utf-8"),
+                 0, "0 with problems"),
+                ("workspace check fails a listed page once it is edited",
+                 None if isinstance(listed, Exception) else listed + "\n<!-- edited -->\n",
+                 1, "page.html: no toggle"))):
+            try:
+                if isinstance(listed, Exception):
+                    raise listed
+                code, text = legacy_check("repo-legacy-%d" % number, page, listed)
+                ok = code == wanted and needle in text
+                why = "exit %d, wanted %d and %r; check said: %s" % (code, wanted, needle, said(text))
+            except Exception as exc:
+                ok, why = False, "%s: %s" % (type(exc).__name__, exc)
+            results.append((label, ok, why))
+        return report()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        for k in ("GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL"):
+            os.environ.pop(k, None)
+        os.environ.update(inherited)
+
+def main():
+    a = sys.argv[1:]
+    if not a or a[0] in ("-h", "--help"): usage()
+    cmd, a = a[0], a[1:]
+    if cmd == "check" and not a:
+        sys.exit(check_workspace())
+    if cmd == "selftest":
+        if a: usage(2)
+        sys.exit(selftest())
+    if not a: usage(2)
+    path, a = a[0], a[1:]
+    out = None; zhf = None
+    while a:
+        if a[0] in ("-o", "--out"): out = a[1]; a = a[2:]
+        elif a[0] == "--zh": zhf = a[1]; a = a[2:]
+        else: print(f"i18n: unknown option {a[0]}", file=sys.stderr); sys.exit(2)
+    if not os.path.isfile(path):
+        print(f"i18n: no such page: {path}", file=sys.stderr); sys.exit(2)
+
+    try:
+        html = open(path, encoding="utf-8").read()
+    except UnicodeDecodeError:
+        print(f"{path}: undecodable (not UTF-8)"); sys.exit(1)
+    soup = BeautifulSoup(html, "html.parser")
+
+    if cmd == "extract":
+        strings = tag_page(soup)
+        t = soup.find("title")
+        if t: strings["__title__"] = t.get_text(strip=True)
+        # newline="\n": in text mode Windows wrote every line ending as \r\n.
+        open(path, "w", encoding="utf-8", newline="\n").write(str(soup))
+        payload = json.dumps(strings, ensure_ascii=False, indent=1)
+        if out: open(out, "w", encoding="utf-8", newline="\n").write(payload)
+        else: print(payload)
+        print(f"i18n: tagged {len(strings)} strings in {os.path.basename(path)}", file=sys.stderr)
+
+    elif cmd == "inject":
+        if not zhf: print("i18n: inject needs --zh zh.json", file=sys.stderr); sys.exit(2)
+        zh = json.load(open(zhf, encoding="utf-8"))
+        keys = {el["data-i18n"] for el in soup.find_all(attrs={"data-i18n": True})}
+        missing = sorted(keys - translated(zh))
+        inject(soup, zh)
+        open(path, "w", encoding="utf-8", newline="\n").write(str(soup))
+        print(f"i18n: injected {len(translated(zh))} translations into {os.path.basename(path)}"
+              + (f", {len(missing)} keys still English" if missing else ", full coverage"), file=sys.stderr)
+        if missing:
+            for k in missing[:10]: print(f"  missing: {k}", file=sys.stderr)
+
+    elif cmd == "check":
+        keys = {el["data-i18n"] for el in soup.find_all(attrs={"data-i18n": True})}
+        box = soup.find(id="i18n-zh")
+        zh = {}
+        if box:
+            try: zh = json.loads(box.string or "{}")
+            except Exception: pass
+        done = translated(zh)
+        have = len(keys & done); miss = sorted(keys - done)
+        print(f"{os.path.basename(path)}: {len(keys)} tagged, {have} translated, {len(miss)} missing"
+              f", toggle={'yes' if soup.select_one('.page-lang') else 'NO'}")
+        for k in miss[:15]: print(f"  missing: {k}")
+        if not keys: print("  nothing tagged: run i18n extract before inject")
+        sys.exit(1 if (miss or not keys or not soup.select_one('.page-lang')) else 0)
+    else:
+        usage(2)
+
+main()
+PYEOF

@@ -55,15 +55,15 @@ If extra review cannot run, report the gap and complete the checks you can.
 
 ## The upstream source stays separate from the house adaptation
 
-The pin is in `Library/repos.txt`; the intake and rollback record is
-`Library/setup/pstack-review.md`. Source evidence:
+The pin is in `Harness/repos.txt`; the intake and rollback record is
+`Harness/setup/pstack-review.md`. Source evidence:
 
-- `Library/pstack/skills/interrogate/SKILL.md:23`, intent before review.
-- `Library/pstack/skills/interrogate/references/rubric.md:3`, relevant lenses.
-- `Library/pstack/skills/interrogate/references/lead-judgment.md:19`, reject
+- `Harness/pstack/skills/interrogate/SKILL.md:23`, intent before review.
+- `Harness/pstack/skills/interrogate/references/rubric.md:3`, relevant lenses.
+- `Harness/pstack/skills/interrogate/references/lead-judgment.md:19`, reject
   preferences without a concrete problem.
-- `Library/pstack/skills/blast-radius/SKILL.md:35`, indirect contracts.
+- `Harness/pstack/skills/blast-radius/SKILL.md:35`, indirect contracts.
 
 Attribution: pstack, copyright 2026 Lauren Tan, MIT. The retained notice is
-`Library/PSTACK-LICENSE.txt`. Raw pstack skills remain library-only; this
+`Harness/PSTACK-LICENSE.txt`. Raw pstack skills remain library-only; this
 reference installs no upstream model rules, tooling, hooks or services.

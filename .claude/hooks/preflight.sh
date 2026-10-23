@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && { pwd -W 2>/dev/null || pwd; })"
 # script appears to hang when it is in fact doing exactly what a hook needs.
 cat > /dev/null
 # fnm's default alias lives in a different place per platform; check both.
-FNM_DEFAULT="$HOME/Library/Application Support/fnm/aliases/default"
+FNM_DEFAULT="$HOME/Harness/Application Support/fnm/aliases/default"
 [ -d "$FNM_DEFAULT" ] || FNM_DEFAULT="${XDG_DATA_HOME:-$HOME/.local/share}/fnm/aliases/default"
 
 # Socket presence, never `docker info` -- that blocks for seconds when the
@@ -64,7 +64,7 @@ PROMPT_MASTER="absent"
 PAGE_SKILL="absent"
 if command -v i18n >/dev/null 2>&1; then
   PAGE_SKILL="ready"
-  [ -f "$ROOT/Library/templates/bilingual-page.html" ] || PAGE_SKILL="no template"
+  [ -f "$ROOT/Harness/templates/bilingual-page.html" ] || PAGE_SKILL="no template"
   [ -f "$ROOT/.claude/skills/bilingual-page/SKILL.md" ] || PAGE_SKILL="no skill"
 fi
 
@@ -74,7 +74,7 @@ fi
 MD_SKILL="absent"
 if command -v md-format >/dev/null 2>&1; then
   MD_SKILL="ready"
-  [ -f "$ROOT/Library/templates/markdown-doc.md" ] || MD_SKILL="no template"
+  [ -f "$ROOT/Harness/templates/markdown-doc.md" ] || MD_SKILL="no template"
   [ -f "$ROOT/.claude/skills/markdown-format/SKILL.md" ] || MD_SKILL="no skill"
 fi
 

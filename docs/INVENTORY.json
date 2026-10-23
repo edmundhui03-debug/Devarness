@@ -2,6 +2,121 @@
   "schema": 1,
   "files": [
     {
+      "path": ".agents/skills/archify",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/bilingual-page",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/browser-docs",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/delegate",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/diagram-design",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/grill-first",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/grill-me",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/grilling",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/harness-step",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/karpathy-guidelines",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/library",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/library-intake",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/markdown-format",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/markitdown",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/ponytail",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/prompt-master",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/pyrosim",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/retro",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/retro-last",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/task-support",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/tieitup",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".agents/skills/writing-for-agents",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".claude-plugin/plugin.json",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
       "path": ".claude/hooks/.ua/.understandignore",
       "origin": "adapted harness source",
       "mode": "100644"
@@ -19,7 +134,7 @@
     {
       "path": ".claude/hooks/guard-heredoc.sh",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/guard-vendor-code.sh",
@@ -34,12 +149,12 @@
     {
       "path": ".claude/hooks/guard_heredoc.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/guard_vendor_code.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/notify-stop.sh",
@@ -114,32 +229,32 @@
     {
       "path": ".claude/hooks/test_guard_git_amend.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/test_guard_heredoc.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/test_guard_vendor_code.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/test_post_edit_check.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/test_prompt_start.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/test_prompt_task_recall.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/hooks/test_startup.py",
@@ -149,6 +264,11 @@
     {
       "path": ".claude/hooks/test_sync.py",
       "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": ".claude/settings.json",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
@@ -162,6 +282,11 @@
       "mode": "100644"
     },
     {
+      "path": ".claude/skills/browser-docs",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
       "path": ".claude/skills/delegate/SKILL.md",
       "origin": "adapted harness source",
       "mode": "100644"
@@ -169,12 +294,12 @@
     {
       "path": ".claude/skills/delegate/briefs.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/skills/delegate/check_refs.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/skills/delegate/spend.py",
@@ -182,9 +307,24 @@
       "mode": "100644"
     },
     {
+      "path": ".claude/skills/diagram-design",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
       "path": ".claude/skills/grill-first/SKILL.md",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": ".claude/skills/grill-me",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".claude/skills/grilling",
+      "origin": "Devarness integration",
+      "mode": "120000"
     },
     {
       "path": ".claude/skills/harness-step/SKILL.md",
@@ -209,7 +349,7 @@
     {
       "path": ".claude/skills/harness-step/scripts/probe.py",
       "origin": "adapted harness source",
-      "mode": "100644"
+      "mode": "100755"
     },
     {
       "path": ".claude/skills/harness-step/scripts/test_helpers.py",
@@ -220,6 +360,11 @@
       "path": ".claude/skills/harness-step/scripts/test_probe.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": ".claude/skills/karpathy-guidelines",
+      "origin": "Devarness integration",
+      "mode": "120000"
     },
     {
       "path": ".claude/skills/library-intake/SKILL.md",
@@ -262,9 +407,24 @@
       "mode": "100644"
     },
     {
+      "path": ".claude/skills/pyrosim",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".claude/skills/retro",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
       "path": ".claude/skills/retro-last/SKILL.md",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": ".claude/skills/task-support",
+      "origin": "Devarness integration",
+      "mode": "120000"
     },
     {
       "path": ".claude/skills/tieitup/SKILL.md",
@@ -297,8 +457,38 @@
       "mode": "100644"
     },
     {
+      "path": ".claude/skills/writing-for-agents",
+      "origin": "Devarness integration",
+      "mode": "120000"
+    },
+    {
+      "path": ".codex/config.toml",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": ".codex/hooks.json",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
       "path": ".gitattributes",
       "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/portable.yml",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": ".gitignore",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": ".pi/APPEND_SYSTEM.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
@@ -307,1328 +497,1193 @@
       "mode": "100644"
     },
     {
-      "path": "Library/ARCHIFY-LICENSE.txt",
+      "path": ".pi/settings.json",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "AGENTS.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "CLAUDE.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/AGENTS.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/AGENT_LEARNING_TOOLS.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/ARCHIFY-LICENSE.txt",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/PSTACK-LICENSE.txt",
+      "path": "Harness/ARCHIFY.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/CLAUDE.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/CODEX.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/INSTALL.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/KNOWLEDGE_TOOLS.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/PONYTAIL.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/PROMPT-MASTER-LICENSE.txt",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/PSTACK-LICENSE.txt",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/archify-audit.py",
-      "origin": "adapted harness source",
+      "path": "Harness/SCHOLAR.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Library/bin/agent-memory",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/archify",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/books",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/browser",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/claude-start",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/codex-start",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/dashboard",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/dev-check",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/diagram",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/fds-setup",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/i18n",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/laya-service",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/learn-claude",
-      "origin": "adapted harness source",
-      "mode": "100755"
-    },
-    {
-      "path": "Library/bin/library",
-      "origin": "adapted harness source",
+      "path": "Harness/SHARED_BROWSER_DOCS.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Library/bin/md-format",
+      "path": "Harness/archify-audit.py",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/md-pages",
+      "path": "Harness/bin/agent-memory",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/new-device",
+      "path": "Harness/bin/archify",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/ngspice-setup",
+      "path": "Harness/bin/books",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/notify",
+      "path": "Harness/bin/browser",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/ocr",
+      "path": "Harness/bin/claude-start",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/rea",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/bin/reverse",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/bin/start-check",
+      "path": "Harness/bin/codex-start",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/statusline",
+      "path": "Harness/bin/dev-check",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/task-recall",
+      "path": "Harness/bin/diagram",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/taskboard",
+      "path": "Harness/bin/fds-setup",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/tieitup",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/bin/understand",
+      "path": "Harness/bin/i18n",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/update-tools",
+      "path": "Harness/bin/laya-service",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/bin/video-study",
+      "path": "Harness/bin/learn-claude",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/books-requirements.txt",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/books.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/browser-docs-node/package-lock.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/browser-docs-node/package.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/browser-docs-requirements.txt",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/codex-hook-trust.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/codex-setup.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/codex-skill-profile.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/common.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/AGENTS.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/BRAND.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/DESIGN.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/.npmrc",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/.oxlintrc.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/index.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/package-lock.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/package.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/scripts/check-licences.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/App.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/App.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/api.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/board.test.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/board.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/claudeBoard.test.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/claudeBoard.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/codexBoard.test.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/codexBoard.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/Chip.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/ClaudePanel.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/ClaudePanel.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/DocPanel.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/DocPanel.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/PeekPanel.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/QuestionsPanel.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/QuestionsPanel.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/Sidebar.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/ThreadPanel.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/ThreadPanel.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/TopBar.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/components/ViewTabs.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/format.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/i18n/en.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/i18n/i18n.test.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/i18n/index.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/i18n/zh-HK.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/main.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/AgentsPage.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/ClaudePage.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/ClaudePage.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/CodexPage.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/CodexPage.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/TaskboardPage.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/TaskboardPage.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/TasksPage.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/pages/TasksPage.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/router.test.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/router.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/runs.test.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/runs.tsx",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/tasksBoard.test.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/tasksBoard.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/test-fakes.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/test-setup.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/theme.css",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/useClaude.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/useCodex.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/useDashboard.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/src/useTasks.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/tsconfig.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/app/vite.config.ts",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/codex-bridge.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/index.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/agents.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/claude.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/codex.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/markers.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/mask.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/questions.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/server.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/dashboard/server/tasks.mjs",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/learn-claude-code.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/managed-agents.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/.gitignore",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/PyroSim_7Day_Guide.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/README.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/cases/day6_broken.fds",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/cases/iso9705_room.fds",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/cases/iso9705_room_20cm.fds",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/cases/iso9705_template.fds",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/app.js",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/build.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/en.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/page.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/ask.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/calc.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day1.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day2.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day3.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day4.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day5.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day6.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/day7.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/errors.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/glossary.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/rail.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/reference.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/sources.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/parts/start.html",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/style.css",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/translate.js",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/site/zh.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tests/benchmark_chart_load.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tests/benchmark_read_devc.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tests/conftest.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tests/test_fds_to_dataset.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tests/test_make_charts.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tests/test_make_scenarios.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tools/fds_to_dataset.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/guides/pyrosim/tools/make_scenarios.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/knowledge-tools-sync.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/library-eval.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/library-policy.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/library-profile.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/library-requirements.txt",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/library-sources.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/library.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/names-audit.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/ocr-convert.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/ponytail-check.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/profiles/house.md",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/publish-check.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/repos.txt",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/runtime-locks/vercel-skills/package-lock.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/runtime-locks/vercel-skills/package.json",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/scholar-sync.sh",
+      "path": "Harness/bin/library",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/setup-browser-docs.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/setup-laya.py",
-      "origin": "adapted harness source",
-      "mode": "100644"
-    },
-    {
-      "path": "Library/setup-learn-claude.py",
+      "path": "Harness/bin/md-format",
       "origin": "adapted harness source",
       "mode": "100755"
     },
     {
-      "path": "Library/setup-library.py",
+      "path": "Harness/bin/md-pages",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/new-device",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/ngspice-setup",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/notify",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/ocr",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/rea",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/reverse",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/start-check",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/statusline",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/task-recall",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/tieitup",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/understand",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/update-tools",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bin/video-study",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/books-requirements.txt",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/books.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/bootstrap.sh",
+      "origin": "Devarness integration",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/browser-docs-node/package-lock.json",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/browser-docs-node/package.json",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/browser-docs-requirements.txt",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/codex-hook-trust.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/codex-setup.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/codex-skill-profile.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/common.py",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/finish-github-setup.sh",
+      "origin": "Devarness integration",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/guides/learn-claude-code.md",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/managed-agents.md",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/.gitignore",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/PyroSim_7Day_Guide.html",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/README.md",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/cases/day6_broken.fds",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/cases/iso9705_room.fds",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/cases/iso9705_room_20cm.fds",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/cases/iso9705_template.fds",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/app.js",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/build.py",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/en.json",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/page.html",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/parts/ask.html",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/parts/calc.html",
+      "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/guides/pyrosim/site/parts/day1.html",
+      "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup-prompt-master.py",
+      "path": "Harness/guides/pyrosim/site/parts/day2.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup-reverse.py",
+      "path": "Harness/guides/pyrosim/site/parts/day3.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup-task-support.py",
+      "path": "Harness/guides/pyrosim/site/parts/day4.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup-vercel-skills.py",
+      "path": "Harness/guides/pyrosim/site/parts/day5.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup/mcp/kicad-mcp.windows-py311.lock",
+      "path": "Harness/guides/pyrosim/site/parts/day6.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup/rea/package-lock.json",
+      "path": "Harness/guides/pyrosim/site/parts/day7.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup/rea/package.json",
+      "path": "Harness/guides/pyrosim/site/parts/errors.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/setup/reverse-downloads.json",
+      "path": "Harness/guides/pyrosim/site/parts/glossary.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/shared-skills/browser-docs/SKILL.md",
+      "path": "Harness/guides/pyrosim/site/parts/rail.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/shared-skills/pyrosim/SKILL.md",
+      "path": "Harness/guides/pyrosim/site/parts/reference.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/task-support/task-support/LICENSE",
+      "path": "Harness/guides/pyrosim/site/parts/sources.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/task-support/task-support/SKILL.md",
+      "path": "Harness/guides/pyrosim/site/parts/start.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/task-support/task-support/agents/openai.yaml",
+      "path": "Harness/guides/pyrosim/site/style.css",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/taskboard-zh-hk.json",
+      "path": "Harness/guides/pyrosim/site/translate.js",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/templates/bilingual-page.html",
+      "path": "Harness/guides/pyrosim/site/zh.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/templates/markdown-doc.md",
+      "path": "Harness/guides/pyrosim/tests/benchmark_chart_load.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/fixtures/fake-codex.mjs",
+      "path": "Harness/guides/pyrosim/tests/benchmark_read_devc.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/fixtures/fake-md-format.cjs",
+      "path": "Harness/guides/pyrosim/tests/conftest.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/fixtures/library-picks.json",
+      "path": "Harness/guides/pyrosim/tests/test_fds_to_dataset.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/fixtures/library-queries.json",
+      "path": "Harness/guides/pyrosim/tests/test_make_charts.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/prds-reader.browser.js",
+      "path": "Harness/guides/pyrosim/tests/test_make_scenarios.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_agent_memory.py",
+      "path": "Harness/guides/pyrosim/tools/fds_to_dataset.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_archify.py",
+      "path": "Harness/guides/pyrosim/tools/make_scenarios.py",
       "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/i18n-legacy.txt",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_books.py",
+      "path": "Harness/knowledge-tools-sync.py",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/laya-eval/decisions.jsonl",
+      "origin": "Devarness integration",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/library-eval.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_bootstrap_clone.py",
+      "path": "Harness/library-policy.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_clone_guard.py",
+      "path": "Harness/library-profile.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_codex_hook_trust.py",
+      "path": "Harness/library-requirements.txt",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_codex_setup.py",
+      "path": "Harness/library-sources.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_compaction_ceiling.py",
+      "path": "Harness/library.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dashboard.py",
+      "path": "Harness/names-audit.py",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/ocr-convert.py",
+      "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/ponytail-check.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_dashboard_bridge.py",
+      "path": "Harness/profiles/house.md",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/publish-check.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_dashboard_claude.mjs",
+      "path": "Harness/repos.txt",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dashboard_codex.mjs",
+      "path": "Harness/runtime-locks/vercel-skills/package-lock.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dashboard_page.mjs",
+      "path": "Harness/runtime-locks/vercel-skills/package.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dashboard_server.mjs",
+      "path": "Harness/scholar-sync.sh",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/separate-projects.txt",
+      "origin": "Devarness integration",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/setup-browser-docs.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup-laya.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup-learn-claude.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup-library.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup-prompt-master.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup-reverse.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup-task-support.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_dashboard_tasks.mjs",
+      "path": "Harness/setup-vercel-skills.py",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/setup/LIBRARY_SETUP.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/README.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/anthropic-design-canvas-design.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/anthropic-design-theme-factory.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dashboard_tasks.py",
+      "path": "Harness/setup/harness2.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/karpathy-skills.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/library.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/mcp/heypcb.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/mcp/kicad-mcp.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/mcp/kicad-mcp.windows-py311.lock",
       "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/mcp/konnect.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/mcp/laya.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/mcp/rea.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/pocock-writing-for-agents.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/pstack-review.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/rea-source.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_delegate_refs.py",
+      "path": "Harness/setup/rea/package-lock.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dev_check.py",
+      "path": "Harness/setup/rea/package.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_dev_discovery.mjs",
+      "path": "Harness/setup/reverse-downloads.json",
       "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/reverse-skill-source.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/vercel-find-review.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "Harness/setup/vercel-find-skills.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_everywhere.py",
+      "path": "Harness/shared-skills/browser-docs/SKILL.md",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_fds_setup.py",
+      "path": "Harness/shared-skills/pyrosim/SKILL.md",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_i18n.py",
+      "path": "Harness/task-support/task-support/LICENSE",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_knowledge_tools_link.py",
+      "path": "Harness/task-support/task-support/SKILL.md",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_laya_service.py",
+      "path": "Harness/task-support/task-support/agents/openai.yaml",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_library.py",
+      "path": "Harness/templates/bilingual-page.html",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_library_coverage.py",
+      "path": "Harness/templates/markdown-doc.md",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_library_eval.py",
+      "path": "Harness/tests/fixtures/library-picks.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_library_launcher.py",
+      "path": "Harness/tests/fixtures/library-queries.json",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_library_pick.py",
+      "path": "Harness/tests/prds-reader.browser.js",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_library_profile.py",
+      "path": "Harness/tests/test_agent_memory.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_line_endings.py",
+      "path": "Harness/tests/test_archify.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_md_status.py",
+      "path": "Harness/tests/test_books.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_names_audit.py",
+      "path": "Harness/tests/test_bootstrap_clone.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_new_device.py",
+      "path": "Harness/tests/test_clone_guard.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_codex_hook_trust.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_codex_setup.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_ngspice_setup.py",
+      "path": "Harness/tests/test_compaction_ceiling.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_delegate_refs.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_dev_check.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_notify.py",
+      "path": "Harness/tests/test_dev_discovery.mjs",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_pinned_clone.py",
+      "path": "Harness/tests/test_everywhere.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_ponytail.py",
+      "path": "Harness/tests/test_fds_setup.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_i18n.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_preflight_claims.py",
+      "path": "Harness/tests/test_knowledge_tools_link.py",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_laya_service.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_library.py",
+      "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_publish_check.py",
+      "path": "Harness/tests/test_library_coverage.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_retro_last.py",
+      "path": "Harness/tests/test_library_eval.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_reverse.py",
+      "path": "Harness/tests/test_library_launcher.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_scholar_sync.py",
+      "path": "Harness/tests/test_library_pick.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_separate_projects.py",
+      "path": "Harness/tests/test_library_profile.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_line_endings.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_setup_learn_claude.py",
+      "path": "Harness/tests/test_md_status.py",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_names_audit.py",
+      "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_new_device.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_setup_library.py",
+      "path": "Harness/tests/test_ngspice_setup.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_notify.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_pinned_clone.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_task_recall.py",
+      "path": "Harness/tests/test_ponytail.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_taskboard.py",
+      "path": "Harness/tests/test_preflight_claims.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_tieitup.py",
+      "path": "Harness/tests/test_publish_check.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_tieitup_bench.py",
+      "path": "Harness/tests/test_retro_last.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_reverse.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tests/test_scholar_sync.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_tieitup_skill.py",
+      "path": "Harness/tests/test_separate_projects.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_update_tools.py",
+      "path": "Harness/tests/test_setup_learn_claude.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_usb.py",
+      "path": "Harness/tests/test_setup_library.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_task_recall.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tests/test_vercel_find.py",
+      "path": "Harness/tests/test_tieitup.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tests/test_video_study.py",
+      "path": "Harness/tests/test_tieitup_bench.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tieitup-bench-tasks.py",
+      "path": "Harness/tests/test_tieitup_skill.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tests/test_update_tools.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/tieitup-bench.py",
+      "path": "Harness/tests/test_usb.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/tieitup-check.py",
+      "path": "Harness/tests/test_vercel_find.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/updates.txt",
+      "path": "Harness/tests/test_video_study.py",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/usb/README.txt",
+      "path": "Harness/tieitup-bench-tasks.py",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/tieitup-bench.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/tieitup-check.py",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/usb/install.sh",
+      "path": "Harness/updates.txt",
       "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/usb/pack.sh",
+      "path": "Harness/usb/README.txt",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "Harness/usb/install.sh",
+      "origin": "adapted harness source",
+      "mode": "100755"
     },
     {
-      "path": "Library/vercel-find-keywords.json",
+      "path": "Harness/usb/pack.sh",
       "origin": "adapted harness source",
+      "mode": "100755"
+    },
+    {
+      "path": "Harness/vercel-find-keywords.json",
+      "origin": "adapted harness source",
       "mode": "100644"
     },
     {
-      "path": "Library/vercel_find.py",
+      "path": "Harness/vercel_find.py",
       "origin": "adapted harness source",
+      "mode": "100644"
+    },
+    {
+      "path": "LESSONS.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "LICENSE",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "README.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "THIRD_PARTY.md",
+      "origin": "Devarness integration",
       "mode": "100644"
     },
     {
       "path": "cship.toml",
       "origin": "adapted harness source",
       "mode": "100644"
+    },
+    {
+      "path": "docs/ADAPTATION.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/COVERAGE.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/GETTING_STARTED.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/INVENTORY.json",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/PLAN.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/TIEITUP_IMPROVEMENT.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/TOOLS.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/VERIFICATION.md",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_check.py",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_check_process.py",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "tests/test_core.py",
+      "origin": "Devarness integration",
+      "mode": "100644"
+    },
+    {
+      "path": "tools/bootstrap.py",
+      "origin": "Devarness integration",
+      "mode": "100755"
+    },
+    {
+      "path": "tools/check.py",
+      "origin": "Devarness integration",
+      "mode": "100755"
+    },
+    {
+      "path": "tools/release_check.py",
+      "origin": "Devarness integration",
+      "mode": "100755"
+    },
+    {
+      "path": "tools/session.py",
+      "origin": "Devarness integration",
+      "mode": "100755"
+    },
+    {
+      "path": "tools/skill-links.json",
+      "origin": "Devarness integration",
+      "mode": "100644"
     }
   ],
   "skill_links": {
     ".agents/skills/archify": "../../.claude/skills/archify",
     ".agents/skills/bilingual-page": "../../.claude/skills/bilingual-page",
-    ".agents/skills/browser-docs": "../../Library/shared-skills/browser-docs",
+    ".agents/skills/browser-docs": "../../Harness/shared-skills/browser-docs",
     ".agents/skills/delegate": "../../.claude/skills/delegate",
-    ".agents/skills/diagram-design": "../../Library/diagram-design/skills/diagram-design",
+    ".agents/skills/diagram-design": "../../Harness/diagram-design/skills/diagram-design",
     ".agents/skills/grill-first": "../../.claude/skills/grill-first",
-    ".agents/skills/grill-me": "../../Library/skills/skills/productivity/grill-me",
-    ".agents/skills/grilling": "../../Library/skills/skills/productivity/grilling",
+    ".agents/skills/grill-me": "../../Harness/skills/skills/productivity/grill-me",
+    ".agents/skills/grilling": "../../Harness/skills/skills/productivity/grilling",
     ".agents/skills/harness-step": "../../.claude/skills/harness-step",
-    ".agents/skills/karpathy-guidelines": "../../Library/karpathy-skills/skills/karpathy-guidelines",
+    ".agents/skills/karpathy-guidelines": "../../Harness/karpathy-skills/skills/karpathy-guidelines",
     ".agents/skills/library": "../../.claude/skills/library",
     ".agents/skills/library-intake": "../../.claude/skills/library-intake",
     ".agents/skills/markdown-format": "../../.claude/skills/markdown-format",
     ".agents/skills/markitdown": "../../.claude/skills/markitdown",
     ".agents/skills/ponytail": "../../.claude/skills/ponytail",
     ".agents/skills/prompt-master": "../../.claude/skills/prompt-master",
-    ".agents/skills/pyrosim": "../../Library/shared-skills/pyrosim",
-    ".agents/skills/retro": "../../Library/skills/skills/engineering/retro",
+    ".agents/skills/pyrosim": "../../Harness/shared-skills/pyrosim",
+    ".agents/skills/retro": "../../Harness/skills/skills/engineering/retro",
     ".agents/skills/retro-last": "../../.claude/skills/retro-last",
-    ".agents/skills/task-support": "../../Library/task-support/task-support",
+    ".agents/skills/task-support": "../../Harness/task-support/task-support",
     ".agents/skills/tieitup": "../../.claude/skills/tieitup",
-    ".agents/skills/writing-for-agents": "../../Library/skills/skills/productivity/writing-for-agents",
-    ".claude/skills/browser-docs": "../../Library/shared-skills/browser-docs",
-    ".claude/skills/diagram-design": "../../Library/diagram-design/skills/diagram-design",
-    ".claude/skills/grill-me": "../../Library/skills/skills/productivity/grill-me",
-    ".claude/skills/grilling": "../../Library/skills/skills/productivity/grilling",
-    ".claude/skills/karpathy-guidelines": "../../Library/karpathy-skills/skills/karpathy-guidelines",
-    ".claude/skills/pyrosim": "../../Library/shared-skills/pyrosim",
-    ".claude/skills/retro": "../../Library/skills/skills/engineering/retro",
-    ".claude/skills/task-support": "../../Library/task-support/task-support",
-    ".claude/skills/writing-for-agents": "../../Library/skills/skills/productivity/writing-for-agents"
+    ".agents/skills/writing-for-agents": "../../Harness/skills/skills/productivity/writing-for-agents",
+    ".claude/skills/browser-docs": "../../Harness/shared-skills/browser-docs",
+    ".claude/skills/diagram-design": "../../Harness/diagram-design/skills/diagram-design",
+    ".claude/skills/grill-me": "../../Harness/skills/skills/productivity/grill-me",
+    ".claude/skills/grilling": "../../Harness/skills/skills/productivity/grilling",
+    ".claude/skills/karpathy-guidelines": "../../Harness/karpathy-skills/skills/karpathy-guidelines",
+    ".claude/skills/pyrosim": "../../Harness/shared-skills/pyrosim",
+    ".claude/skills/retro": "../../Harness/skills/skills/engineering/retro",
+    ".claude/skills/task-support": "../../Harness/task-support/task-support",
+    ".claude/skills/writing-for-agents": "../../Harness/skills/skills/productivity/writing-for-agents"
   },
-  "history": "fresh repository; no source history"
+  "history": "Current source inventory; earlier Git history is retained by owner decision."
 }

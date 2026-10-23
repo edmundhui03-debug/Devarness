@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[4]  # .claude/skills/harness-step/script
 # Automatic approval patterns; these do not remove other tools or provide a sandbox.
 DEFAULT_TOOLS = "Read,Grep,Glob,Edit,Write,Skill,Bash(md-format:*),Bash(git status:*),Bash(git diff:*)"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-# Git-ignored state a dev session reads besides the clones Library/repos.txt names.
-RUNTIME_DIRS = ("Library/.runtime",)
+# Git-ignored state a dev session reads besides the clones Harness/repos.txt names.
+RUNTIME_DIRS = ("Harness/.runtime",)
 # Copied, never linked: a library refresh in the tree must write its own index, not main's.
 SEEDED_FILES = (".claude/hooks/library/index.json",)
 # The start banner: "START COMPLETE — DEGRADED; ..." and rows "  name<pad>state<pad>note".
@@ -118,7 +118,7 @@ def link_clones(tree: Path) -> list:
     right and no subprocess; the clones are shared, never copied.
     """
     main = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir")).parent
-    repos = main / "Library" / "repos.txt"
+    repos = main / "Harness" / "repos.txt"
     listed = [row.split("\t")[0] for row in repos.read_text(encoding="utf-8").splitlines()
               if row.strip() and not row.startswith("#")] if repos.is_file() else []
     linked = []

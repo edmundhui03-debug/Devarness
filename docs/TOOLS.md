@@ -1,9 +1,9 @@
-# The Library preserves reusable tools behind explicit setup
+# Harness preserves reusable tools behind explicit setup
 
 > **2026-10-21** · Aster · `current`
 >
 > The table lists the exported command surface. Python commands accept
-> `python3 Library/bin/NAME`; shell commands run through Bash. Their source
+> `python3 Harness/bin/NAME`; shell commands run through Bash. Their source
 > and regression tests are included, while optional runtimes and accounts
 > require deliberate local installation.
 
@@ -25,7 +25,6 @@ repository does not execute its code or register it with a client.
 | browser | Pinned shared Playwright CLI. Use --agent peter/aster/may to isolate sessions. |
 | claude-start | Checkout-local launcher; inspect source and --help. |
 | codex-start | Checkout-local launcher; inspect source and --help. |
-| dashboard | dashboard — write the snapshot the developer's dashboard reads.  |
 | dev-check | dev-check — run every dev checker and both test trees, and print one table.  |
 | diagram | dev diagram helpers using an isolated Python; source clone remains unchanged. |
 | fds-setup | Install pinned NIST FDS + Smokeview in the ignored dev runtime, then prove it.  |
@@ -44,7 +43,6 @@ repository does not execute its code or register it with a client.
 | start-check | Checkout-local launcher; inspect source and --help. |
 | statusline | Explicit configs keep the dev display consistent even in nested repositories. |
 | task-recall | task-recall — name a task and get what is done, what is open, and the next step.  |
-| taskboard | taskboard — start the Codex Taskboard in its safe shape, on demand.  |
 | tieitup | tieitup: TieItUp's changed-line check, its whole-file jobs and its record.  |
 | understand | Run the pinned local Understand-Anything helpers. No model or commit hooks. |
 | update-tools | update-tools — keep every device on the pinned tools, and advance the pins.  |
@@ -53,8 +51,8 @@ repository does not execute its code or register it with a client.
 ## Optional integrations retain platform requirements
 
 Python core checks target Windows, macOS and Linux. Shell launchers
-require Bash; Windows uses Git Bash. The dashboard requires Node.js
-and its own npm dependencies. OCR and document conversion use isolated
+require Bash; Windows uses Git Bash. Optional JavaScript integrations
+require Node.js and their own npm dependencies. OCR and conversion use isolated
 Python runtimes. PyroSim and its licensed simulator are Windows-only;
 reverse tools, EDA applications, provider CLIs and MCP services require
 their documented prerequisites and authorized targets. Native skill
@@ -66,7 +64,7 @@ references and optional integration checks, not part of portable core
 readiness. Do not run global installers or migration tools until their
 effects match your intended local setup.
 
-The bilingual checker is a Bash launcher. Run `bash Library/bin/i18n` with
+The bilingual checker is a Bash launcher. Run `bash Harness/bin/i18n` with
 a Python interpreter that has Beautiful Soup; select its executable with
 `DEVARNESS_I18N_PYTHON` if `python3` on PATH is unsuitable. The bootstrap
 does not install that dependency. Markdown checks use Python directly.
@@ -77,7 +75,7 @@ For example, from Git Bash on Windows, create an isolated HTML environment:
 python -m venv .venv-html
 .venv-html/Scripts/python.exe -m pip install beautifulsoup4
 export DEVARNESS_I18N_PYTHON="$PWD/.venv-html/Scripts/python.exe"
-bash Library/bin/i18n selftest
+bash Harness/bin/i18n selftest
 ```
 
 On macOS/Linux use `python3` for the first command and

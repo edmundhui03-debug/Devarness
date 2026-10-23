@@ -79,39 +79,39 @@ as support.
 
 | ID | Rule | Owner |
 | --- | --- | --- |
-| A-06 | Give each block one task: list what the code does (validate, parse, apply), then separate the tasks into their own functions or at least their own paragraphs. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:53` |
-| A-07 | Extract a function only for a distinct subproblem or real reuse; never add pass-through helpers that only forward a call, since each new function costs the reader a jump. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:54` |
-| A-19 | Delete any comment that only restates the line beside it (`i += 1  # increment i`); a comment must add what the code cannot say. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:37` |
-| A-21 | Write deferred work as `shortcut: <the limit>, <when to upgrade>`, never a bare TODO, and never as an excuse to leave bad code in place. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:42` |
-| A-27 | Write no code the need does not demand: skip features nobody needs, use the standard library first (`set(items)`, not a hand-written `unique()`), and delete what your change leaves unused. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:15` |
-| A-28 | Shrink the requirement to the case you have (30 Texas stores need no date-line math), never below what the user asked; mark the cut `shortcut: <limit>, <when to upgrade>`. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:27` |
-| A-30 | Leave code that already reads easily alone, even if it is not perfectly decomposed; ask whether it is easy to understand before restructuring it. | karpathy-guidelines, `Library/karpathy-skills/skills/karpathy-guidelines/SKILL.md:41` |
-| A-M3 | Review a change in the whole function it lands in, not only as a diff, and insert new checks so they do not add a nesting level. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:21` |
-| B-01 | Never split or cap a function by line count alone; split by job, and give a function past 200 lines extra scrutiny, one past 500 the most. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:54` |
+| A-06 | Give each block one task: list what the code does (validate, parse, apply), then separate the tasks into their own functions or at least their own paragraphs. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:53` |
+| A-07 | Extract a function only for a distinct subproblem or real reuse; never add pass-through helpers that only forward a call, since each new function costs the reader a jump. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:54` |
+| A-19 | Delete any comment that only restates the line beside it (`i += 1  # increment i`); a comment must add what the code cannot say. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:37` |
+| A-21 | Write deferred work as `shortcut: <the limit>, <when to upgrade>`, never a bare TODO, and never as an excuse to leave bad code in place. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:42` |
+| A-27 | Write no code the need does not demand: skip features nobody needs, use the standard library first (`set(items)`, not a hand-written `unique()`), and delete what your change leaves unused. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:15` |
+| A-28 | Shrink the requirement to the case you have (30 Texas stores need no date-line math), never below what the user asked; mark the cut `shortcut: <limit>, <when to upgrade>`. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:27` |
+| A-30 | Leave code that already reads easily alone, even if it is not perfectly decomposed; ask whether it is easy to understand before restructuring it. | karpathy-guidelines, `Harness/karpathy-skills/skills/karpathy-guidelines/SKILL.md:41` |
+| A-M3 | Review a change in the whole function it lands in, not only as a diff, and insert new checks so they do not add a nesting level. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:21` |
+| B-01 | Never split or cap a function by line count alone; split by job, and give a function past 200 lines extra scrutiny, one past 500 the most. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:54` |
 | B-11 | Never mix restructuring and behavior change in one step: a refactor keeps observable behavior and adds no feature, and feature work adds code without restructuring. | superpowers' test-driven-development |
-| B-12 | Treat a smell's size measure (lines, fields, parameters) as a prompt to look, never as a finding; report it only with the concrete harm it does here. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:59` |
-| B-13 | Never add a block that repeats code already in the repo or diff: call it, or extract it once; for near-copies, extract the shared part and keep what differs apart. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:52` |
-| B-15 | Put new code beside the data it uses most; flag a diff making the same small edit in many files for one reason: that knowledge belongs in one place. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:38` |
-| B-18 | Delete what was built for someday: unused parameters, hooks, idle abstract classes, and a function or class used only by tests, unless it helps them check real behavior. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:47` |
+| B-12 | Treat a smell's size measure (lines, fields, parameters) as a prompt to look, never as a finding; report it only with the concrete harm it does here. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:59` |
+| B-13 | Never add a block that repeats code already in the repo or diff: call it, or extract it once; for near-copies, extract the shared part and keep what differs apart. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:52` |
+| B-15 | Put new code beside the data it uses most; flag a diff making the same small edit in many files for one reason: that knowledge belongs in one place. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:38` |
+| B-18 | Delete what was built for someday: unused parameters, hooks, idle abstract classes, and a function or class used only by tests, unless it helps them check real behavior. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:47` |
 | B-24 | Keep the code under test identical in test and production runs; choose substitute behavior at the seam's enabling point, never with test-only branches inside that code. | superpowers' test-driven-development |
-| B-25 | Start a sensing fake as the simplest recorder of the calls it receives, such as a list of their arguments, and grow it only when a test needs more. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:32` |
-| B-27 | Before using any method of an untested legacy system, check whether a test covers it, and write one first if none does. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:41` |
-| B-29 | Before moving or extracting code, make sure a test runs each branch you will rewrite, with inputs whose result changes if a value is truncated or converted. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:42` |
-| B-M1 | Mark where outside data enters as a safe-zone boundary and validate everything crossing it, sanitizing at more than one layer when the data needs it. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:44` |
-| B-M4 | When shipped code meets a fatal error, let the user save their work before it stops; never ship a debug check that halts and loses their data. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:44` |
-| B-M5 | When two functions do the same job by different algorithms, keep the clearer one and replace the other's algorithm with it. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:48` |
-| C-02 | Make a failing test pass with the smallest change, even a hard-coded value, before working toward the real solution. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:34` |
-| C-03 | Give a component one entry point that performs the steps a client would otherwise have to know and call in the right order. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:35` |
-| C-09 | Add an adapter or wrapper only when an existing, working component's interface does not match what a current caller needs. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:35` |
-| C-14 | Store new config or data in a format that already exists—the project's own, or one the standard library parses such as JSON, INI or CSV—instead of inventing a syntax. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:29` |
-| C-15 | Before adopting a more complex IPC technique, prove with a prototype and a benchmark that every simpler technique fails. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:25` |
-| C-16 | Before adding an option, ask whether the feature can be dropped, the behaviour changed without an option, or made a separate program; each option multiplies the test matrix. | Ponytail, `Library/ponytail/skills/ponytail/SKILL.md:27` |
+| B-25 | Start a sensing fake as the simplest recorder of the calls it receives, such as a list of their arguments, and grow it only when a test needs more. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:32` |
+| B-27 | Before using any method of an untested legacy system, check whether a test covers it, and write one first if none does. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:41` |
+| B-29 | Before moving or extracting code, make sure a test runs each branch you will rewrite, with inputs whose result changes if a value is truncated or converted. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:42` |
+| B-M1 | Mark where outside data enters as a safe-zone boundary and validate everything crossing it, sanitizing at more than one layer when the data needs it. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:44` |
+| B-M4 | When shipped code meets a fatal error, let the user save their work before it stops; never ship a debug check that halts and loses their data. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:44` |
+| B-M5 | When two functions do the same job by different algorithms, keep the clearer one and replace the other's algorithm with it. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:48` |
+| C-02 | Make a failing test pass with the smallest change, even a hard-coded value, before working toward the real solution. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:34` |
+| C-03 | Give a component one entry point that performs the steps a client would otherwise have to know and call in the right order. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:35` |
+| C-09 | Add an adapter or wrapper only when an existing, working component's interface does not match what a current caller needs. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:35` |
+| C-14 | Store new config or data in a format that already exists—the project's own, or one the standard library parses such as JSON, INI or CSV—instead of inventing a syntax. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:29` |
+| C-15 | Before adopting a more complex IPC technique, prove with a prototype and a benchmark that every simpler technique fails. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:25` |
+| C-16 | Before adding an option, ask whether the feature can be dropped, the behaviour changed without an option, or made a separate program; each option multiplies the test matrix. | Ponytail, `Harness/ponytail/skills/ponytail/SKILL.md:27` |
 | C-23 | Write new code only when an automated test is failing: add a test, watch it fail, make a small change, run all tests, then refactor. | superpowers' test-driven-development |
 | C-24 | Predict each test's expected value before the code exists; never read it off the program's own answer. | superpowers' test-driven-development |
 | C-25 | Write the test against the interface you wish existed, then work backwards to make the implementation fit it. | superpowers' test-driven-development |
 | C-26 | Before building on an unfamiliar library or API, write a small learning test that exercises only that API to confirm your understanding of it. | superpowers' test-driven-development |
-| C-27 | When a stray idea arrives mid-task, add it to the to-do list and return to the current test instead of chasing it. | karpathy-guidelines, `Library/karpathy-skills/skills/karpathy-guidelines/SKILL.md:49` |
-| C-M1 | Do not add concurrency or extra processes for speed before the design has minimized global complexity; that is premature optimization. | Ponytail, `Library/ponytail/skills/ponytail-review/SKILL.md:44` |
+| C-27 | When a stray idea arrives mid-task, add it to the to-do list and return to the current test instead of chasing it. | karpathy-guidelines, `Harness/karpathy-skills/skills/karpathy-guidelines/SKILL.md:49` |
+| C-M1 | Do not add concurrency or extra processes for speed before the design has minimized global complexity; that is premature optimization. | Ponytail, `Harness/ponytail/skills/ponytail-review/SKILL.md:44` |
 | D-28 | Write a small test first, run it and watch it fail, then write the code; never commit code with a known-failing test to a shared repository. | superpowers' test-driven-development |
 | D-29 | When a test that checks a correct condition fails, fix the code that fails it; never edit or weaken the test to make it pass. | superpowers' test-driven-development |
 
@@ -134,7 +134,7 @@ as support.
 - A-09 vs B-12 (and the A-05/B-01 resolutions): A-09 keeps a fixed 3-parameter
   ceiling, while B-12 says a size measure is a prompt, never a finding, which is
   why A-05's 20-line ceiling was rejected. 38 of dev's 585 Python functions take
-  more than three parameters (e.g. Library/bin/dev-check:228). Resolution: drop
+  more than three parameters (e.g. Harness/bin/dev-check:228). Resolution: drop
   the ceiling from the rule; a fourth parameter only prompts a look for an
   option nobody asked for or a mixed job.
 - D-22 vs house lesson LESSONS.md:86-88 (not a pair of accepted ids): D-22's
@@ -143,7 +143,7 @@ as support.
   broke the Mac's 3.9 (practice-of-programming.md:185-190). D-22 also omits the
   encoding LESSONS.md:227 requires. Resolution: fold it into D-20 using the
   house idiom open(path, 'w', encoding='utf-8', newline='\n')
-  (Library/bin/i18n:387) or write_bytes.
+  (Harness/bin/i18n:387) or write_bytes.
 - B-M3 vs D-01: D-01 carries checked errors in status enums, while B-M3's
   resolution demands a default branch for any value from another module. In
   SAMPLE_FIRMWARE, the detector firmware's sys_app.c:983 switches with no default on the
@@ -178,7 +178,7 @@ as support.
 
 Ponytail never cuts validation at trust boundaries, error handling that prevents
 data loss, security, accessibility, hardware calibration or anything the user
-asked for (`Library/ponytail/skills/ponytail/SKILL.md:44`). Wherever TieItUp
+asked for (`Harness/ponytail/skills/ponytail/SKILL.md:44`). Wherever TieItUp
 states one of these rules, it carries this wording.
 
 - A-15: 'return an empty list' can turn a failed read into an empty result that
@@ -187,7 +187,7 @@ states one of these rules, it carries this wording.
 - A-28 (cite-only, but in the set): 'shrink the requirement to the case you
   have' can be read as permission to drop validation of outside input or
   time-zone handling, and ponytail-review's own sample bug is a time-zone error
-  (Library/ponytail/skills/ponytail-review/SKILL.md:85-92). A shrink never goes
+  (Harness/ponytail/skills/ponytail-review/SKILL.md:85-92). A shrink never goes
   below Ponytail SKILL.md:44 and is always marked shortcut:.
 - B-M3 (together with karpathy-guidelines/SKILL.md:30, 'no error handling for
   impossible scenarios'): in firmware, a value read from flash, a LoRa downlink
@@ -278,8 +278,7 @@ only on the owner's word.
 - 17. A-13: raise Name or raise Name() with no arguments (exempt bare raise,
   StopIteration, NotImplementedError, SystemExit, KeyboardInterrupt), and JS
   throw new Error() with no argument. FP: custom sentinel exceptions used for
-  control flow; dev's only 2 hits (Library/bin/dashboard:262 and :347, Busy) are
-  exactly that.
+  control flow need their callers checked before reporting a missing message.
 - 18. B-10: a one-letter name bound at module level, or a one-letter def or
   class (exempt _, TypeVar names and loop variables). FP: maths or physics
   constants in a simulation script.
@@ -324,7 +323,7 @@ only on the owner's word.
   empty.
 - 39. A-09: more than three parameters in Python (not counting self, cls, *args,
   **kwargs), four or more in JS or C. FP: 38 of dev's 585 functions (e.g.
-  Library/bin/dev-check:228 run with 4, daily_task_xml with 7). Report only as a
+  Harness/bin/dev-check:228 run with 4, daily_task_xml with 7). Report only as a
   prompt under B-12, never as a finding.
 - 40. B-M3 (checker-proposed): a match with no wildcard case, a switch with no
   default, or a Bash case with no *) arm. FP: C enum switches under -Wall, where
