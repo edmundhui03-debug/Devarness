@@ -70,6 +70,20 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertIn('PASS: 20 portable check commands', output)
 
+    def test_unicode_child_output_survives_a_legacy_console(self):
+        raw = io.BytesIO()
+        console = io.TextIOWrapper(raw, encoding='cp1252', errors='strict')
+        self.addCleanup(console.close)
+        result = subprocess.CompletedProcess([], 0, 'updated \u2192 \u5de5\u5177\n', '')
+        with mock.patch.object(sys, 'argv', ['check.py', '--only', 'test_update_tools']), \
+                mock.patch.object(runner.subprocess, 'check_output', return_value=b''), \
+                mock.patch.object(runner.subprocess, 'run', return_value=result), \
+                contextlib.redirect_stdout(console), contextlib.redirect_stderr(console):
+            code = runner.main()
+        console.flush()
+        self.assertEqual(code, 0)
+        self.assertIn('updated \u2192 \u5de5\u5177', raw.getvalue().decode('utf-8'))
+
     def test_timeout_reports_partial_bytes_and_runs_later_checks(self):
         fault = subprocess.TimeoutExpired(['synthetic'], 600,
                                           output=b'partial-out\xff', stderr=b'partial-err')

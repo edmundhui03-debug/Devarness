@@ -56,6 +56,10 @@ def run_check(command, timeout):
 
 
 def main():
+    # Child logs are UTF-8; use the same encoding on legacy Windows consoles.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--core-only', action='store_true')

@@ -136,7 +136,7 @@ clones and past hosted artifacts remain outside current-source removal.
 
 ## Legacy onboarding shares the core and updater cleanup stays bounded
 
-`fixed` · all 20 portable acceptance commands pass locally
+`fixed` · local acceptance and the legacy-console regression are verified
 
 The reference at 9069c7e reproduces 33 failures and one skip in 38 legacy
 new-device tests. The checker parses launcher and MCP loops removed from the
@@ -173,13 +173,20 @@ No paid model experiment or model-quality improvement is claimed. Full
 optional-install readiness remains outside the core report. This maintenance
 adds no service, dashboard, dependency or global setup; history is retained.
 
-Final local acceptance passes all 20 default commands: 35 core controls,
+Local acceptance at 55f059b passes all 20 default commands: 35 core controls,
 10 portable onboarding controls, 140 updater tests and the remaining
 deterministic tools. TieItUp passes 80 tests with one optional skip. The
 staged privacy check is clean; inventory matches 328 files and 31 skill
 links. Changed Markdown and staged TieItUp checks pass. The existing
 [workflow](https://github.com/edmundhui03-debug/Devarness/actions/workflows/portable.yml)
 records Linux, macOS and Windows acceptance for the published commit.
+
+Hosted Windows acceptance at 55f059b exposed a parent-console encoding bug:
+captured UTF-8 output could not be printed through CP1252. A strict legacy
+console control reproduces the exception, then passes after the runner
+configures its output streams as UTF-8 (`tools/check.py:59`). All 36 core
+tests pass. Existing failure statuses, command deadlines and the 20-command
+list remain covered; hosted acceptance reruns on the corrected commit.
 
 ## Further expansion waits for a concrete task and evidence
 
