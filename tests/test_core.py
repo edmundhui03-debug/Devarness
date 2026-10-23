@@ -1,11 +1,14 @@
 """Portable core controls use synthetic data, never a real user profile."""
 import importlib.util
 import json
+import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -118,6 +121,33 @@ class ReleaseTests(unittest.TestCase):
             self.assertTrue(scanner.scan_history(root))
 
 class BootstrapTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows Git file-link regression')
+    def test_link_skills_repairs_file_links_to_skill_directories(self):
+        bootstrap = module('bootstrap')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            source = root / 'Harness/example'
+            relative = '.agents/skills/example'
+            link = '../../Harness/example'
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            try:
+                path.symlink_to(os.path.normpath(link), target_is_directory=False)
+            except OSError as error:
+                self.skipTest('Native symlinks unavailable: ' + str(error))
+            self.assertFalse(path.lstat().st_file_attributes & stat.FILE_ATTRIBUTE_DIRECTORY)
+            source.mkdir(parents=True)
+            (source / 'SKILL.md').write_text('synthetic skill', encoding='utf-8')
+            (root / 'tools').mkdir()
+            (root / 'tools/skill-links.json').write_text(
+                json.dumps({'links': {relative: link}}), encoding='utf-8')
+            with patch.object(bootstrap, 'ROOT', root):
+                bootstrap.link_skills()
+                bootstrap.link_skills()
+            self.assertTrue(path.is_dir())
+            self.assertEqual(path.resolve(), source)
+            self.assertEqual((path / 'SKILL.md').read_text(encoding='utf-8'), 'synthetic skill')
+
     def test_manifest_uses_the_harness_directory(self):
         bootstrap = module('bootstrap')
         row = 'Harness/example\thttps://github.com/example/tool.git\t' + 'a' * 40

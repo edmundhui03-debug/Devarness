@@ -6,6 +6,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from urllib.parse import urlsplit
@@ -103,7 +104,11 @@ def link_skills():
         if path.is_symlink():
             if path.resolve() != source:
                 raise ValueError('Existing skill points elsewhere: ' + relative)
-            if path.is_dir():
+            # Git may create a Windows file link before its directory target exists.
+            # Stat through that link raises access denied; inspect the link itself.
+            windows_file_link = (os.name == 'nt' and not (
+                path.lstat().st_file_attributes & stat.FILE_ATTRIBUTE_DIRECTORY))
+            if not windows_file_link and path.is_dir():
                 continue
             # Windows reparse targets need native separators even though the
             # tracked link metadata is portable POSIX text.
