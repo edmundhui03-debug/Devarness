@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 TOOL = Path(__file__).resolve().parents[1] / "bin" / "i18n"
 BASH = (str(Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe")
@@ -323,34 +324,6 @@ class WorkspaceCheckTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("vendor-manual.html", done.stdout)
 
-    def test_personal_exclusions_are_opt_in_and_namespaced(self):
-        with tempfile.TemporaryDirectory(prefix="i18n-config-") as tmp:
-            root = Path(tmp) / "repo"
-            root.mkdir()
-            home = Path(tmp) / "home"
-            page = root / "example-project" / "page.html"
-            page.parent.mkdir()
-            page.write_text("<p>A page with no toggle.</p>\n", encoding="utf-8")
-            subprocess.run(["git", "init", "-q", str(root)], capture_output=True, check=True)
-            subprocess.run(["git", "-C", str(root), "add", "."], capture_output=True, check=True)
-            for namespace in ("dev", "devarness"):
-                config = home / ".config" / namespace
-                config.mkdir(parents=True)
-                (config / "personal-repos.txt").write_text("example-project\n", encoding="utf-8")
-            env = dict(I18N_ENV, HOME=str(home), USERPROFILE=str(home),
-                       DEVARNESS_ALLOW_PERSONAL_REPOS="0")
-            for enabled, expected in (("0", 1), ("1", 0)):
-                env["DEVARNESS_ALLOW_PERSONAL_REPOS"] = enabled
-                done = subprocess.run([BASH, str(TOOL), "check"], cwd=root,
-                                      capture_output=True, text=True, encoding="utf-8",
-                                      timeout=120, env=env)
-                self.assertEqual(done.returncode, expected, done.stdout + done.stderr)
-            (home / ".config" / "devarness" / "personal-repos.txt").unlink()
-            done = subprocess.run([BASH, str(TOOL), "check"], cwd=root,
-                                  capture_output=True, text=True, encoding="utf-8",
-                                  timeout=120, env=env)
-            self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-
     def test_all_source_pages_require_a_toggle(self):
         with tempfile.TemporaryDirectory(prefix="i18n-pages-") as tmp:
             subprocess.run(["git", "init", "-q", tmp], capture_output=True, check=True)
@@ -391,6 +364,50 @@ class LegacyListTests(unittest.TestCase):
         rows = [line.split("\t") for line in listed.read_text(encoding="utf-8").splitlines()
                 if line.strip() and not line.startswith("#")]
         self.assertEqual(rows, [], "the portable export must not inherit private project exemptions")
+
+
+class PersonalDiscoveryTests(unittest.TestCase):
+    def test_personal_exclusions_are_opt_in_and_namespaced(self):
+        # Load the shipped enumeration functions without the optional HTML parser
+        # or the CLI entry point. Discovery itself needs only the standard library.
+        source = TOOL.read_text(encoding="utf-8").split("<<'PYEOF'\n", 1)[1].rsplit("\nPYEOF", 1)[0]
+        tree = ast.parse(source)
+        tree.body = [node for node in tree.body
+                     if isinstance(node, (ast.FunctionDef, ast.Assign, ast.Import))
+                     or isinstance(node, ast.ImportFrom) and node.module != "bs4"]
+        namespace = {}
+        exec(compile(tree, str(TOOL), "exec"), namespace)
+        with tempfile.TemporaryDirectory(prefix="i18n-config-") as tmp:
+            root = Path(tmp) / "repo"
+            root.mkdir()
+            home = Path(tmp) / "home"
+            page = root / "example-project" / "page.html"
+            page.parent.mkdir()
+            page.write_text("<p>A page with no toggle.</p>\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(root)], capture_output=True, check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], capture_output=True, check=True)
+            for name in ("dev", "devarness"):
+                config = home / ".config" / name
+                config.mkdir(parents=True)
+                (config / "personal-repos.txt").write_text("example-project\n", encoding="utf-8")
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                with patch.dict(os.environ, HOME=str(home), USERPROFILE=str(home)):
+                    for enabled in (None, "0"):
+                        if enabled is None:
+                            os.environ.pop("DEVARNESS_ALLOW_PERSONAL_REPOS", None)
+                        else:
+                            os.environ["DEVARNESS_ALLOW_PERSONAL_REPOS"] = enabled
+                        self.assertEqual([Path(p).resolve() for p in namespace["deliverable_pages"]()[0]],
+                                         [page.resolve()])
+                    os.environ["DEVARNESS_ALLOW_PERSONAL_REPOS"] = "1"
+                    self.assertEqual(namespace["deliverable_pages"]()[0], [])
+                    (home / ".config" / "devarness" / "personal-repos.txt").unlink()
+                    self.assertEqual([Path(p).resolve() for p in namespace["deliverable_pages"]()[0]],
+                                     [page.resolve()])
+            finally:
+                os.chdir(previous)
 
 
 if __name__ == "__main__":

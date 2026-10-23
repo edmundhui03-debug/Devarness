@@ -121,6 +121,8 @@ workspace's clone list hides an authored page without opt-in. It passes after
 the repair, verifies explicit Devarness opt-in, and rejects the unrelated
 namespace even when opted in. Ordinary authored pages still require a toggle;
 saved vendor datasheets remain exempt under the existing general rule.
+The discovery control exercises the shipped enumeration function directly
+without the optional HTML parser, so minimal CI still verifies these boundaries.
 
 Runtime-state controls reject forced staging of the memo, updater lock and
 updater logs; each failed before its corresponding repair. The existing
