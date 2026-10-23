@@ -53,7 +53,7 @@ def tearDownModule():
 
 
 def git(*args, cwd=None):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8",
                           timeout=60, env=ENV)
 
 
@@ -348,7 +348,7 @@ class DailyRunTests(unittest.TestCase):
         marker = self.home / "existing-profile"
         marker.write_text("unchanged", encoding="utf-8")
         done = subprocess.run([sys.executable, str(ROOT / "tools/bootstrap.py"), "--json"],
-                              capture_output=True, text=True, timeout=20,
+                              capture_output=True, text=True, encoding="utf-8", timeout=20,
                               env=dict(ENV, HOME=str(self.home), USERPROFILE=str(self.home)))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertTrue(json.loads(done.stdout)["core_ready"])
@@ -1110,7 +1110,7 @@ class ApplyTests(unittest.TestCase):
         # CLI on this PC would otherwise run for minutes inside every apply.
         extra = ["--no-plugins"] if args and args[0] == "apply" else []
         done = subprocess.run([sys.executable, str(TOOL), "--root", str(self.fx.dev), *args, *extra],
-                              capture_output=True, text=True, timeout=300,
+                              capture_output=True, text=True, encoding="utf-8", timeout=300,
                               env=dict(ENV, DEVARNESS_UPDATE_PLUGIN_REGISTRY=str(self.registry)))
         return done.returncode, done.stdout + done.stderr
 
@@ -1226,7 +1226,9 @@ class ApplyTests(unittest.TestCase):
         (self.fx.dev / "stray.txt").write_text("not for the commit\n", encoding="utf-8")
         rc, out = self.run_tool("apply", "--force")
         self.assertEqual(rc, 0, out)
-        subject = git("log", "-1", "--format=%s", cwd=self.fx.dev).stdout.strip()
+        # Git emits UTF-8 even when the parent defaults to a legacy code page.
+        with mock.patch.object(subprocess, "_text_encoding", return_value="cp1252", create=True):
+            subject = git("log", "-1", "--format=%s", cwd=self.fx.dev).stdout.strip()
         self.assertEqual(subject, "update-tools: a %s→%s" % (old[:7], new[:7]))
         files = git("show", "--stat", "--format=", "HEAD", cwd=self.fx.dev).stdout
         self.assertIn("repos.txt", files)
@@ -1321,7 +1323,7 @@ class ApplyTests(unittest.TestCase):
         (second.dev / "Harness" / "repos.txt").write_bytes((self.fx.dev / "Harness" / "repos.txt").read_bytes())
         newest = self.fx.push_commit("a", "third")     # upstream moved again; B must not take it
         done = subprocess.run([sys.executable, str(TOOL), "--root", str(second.dev), "apply", "--budget", "30", "--no-plugins"],
-                              capture_output=True, text=True, timeout=120, env=ENV)
+                              capture_output=True, text=True, encoding="utf-8", timeout=120, env=ENV)
         self.assertIn("followed", done.stdout)
         self.assertEqual(git("rev-parse", "HEAD", cwd=second.dev / "Harness" / "a").stdout.strip(), new)
 
@@ -1388,7 +1390,8 @@ class ApplyTests(unittest.TestCase):
         self.assertIn("never run", out)
         self.run_tool("apply", "--force")
         git("remote", "set-url", "origin", "https://127.0.0.1:9/none.git", cwd=self.fx.dev / "Harness" / "a")
-        rc, out = self.run_tool("banner")
+        with mock.patch.object(subprocess, "_text_encoding", return_value="cp1252", create=True):
+            rc, out = self.run_tool("banner")
         self.assertEqual(rc, 0)
         self.assertIn("nothing pending", out)
         self.assertIn("a %s→%s" % (old[:7], new[:7]), out)
@@ -2152,13 +2155,13 @@ class PromptMasterInstallerTests(unittest.TestCase):
             (dev / ".claude" / "skills").mkdir(parents=True)
             script = ROOT / "Harness" / "setup-prompt-master.py"
             env = dict(ENV, DEVARNESS_ROOT=str(dev))
-            done = subprocess.run([sys.executable, str(script), "--install"], capture_output=True, text=True, env=env, timeout=60)
+            done = subprocess.run([sys.executable, str(script), "--install"], capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
             self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
             self.assertEqual((dev / ".claude" / "skills" / "prompt-master" / "references" / "a.md").read_text(encoding="utf-8"), "ref\n")
-            done = subprocess.run([sys.executable, str(script), "--check"], capture_output=True, text=True, env=env, timeout=60)
+            done = subprocess.run([sys.executable, str(script), "--check"], capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
             self.assertEqual(done.returncode, 0)
             (src / "SKILL.md").write_text("two\n", encoding="utf-8")
-            done = subprocess.run([sys.executable, str(script), "--check"], capture_output=True, text=True, env=env, timeout=60)
+            done = subprocess.run([sys.executable, str(script), "--check"], capture_output=True, text=True, encoding="utf-8", env=env, timeout=60)
             self.assertEqual(done.returncode, 1)
             self.assertIn("SKILL.md", done.stdout)
 

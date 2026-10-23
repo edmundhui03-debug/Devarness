@@ -188,6 +188,16 @@ configures its output streams as UTF-8 (`tools/check.py:59`). All 36 core
 tests pass. Existing failure statuses, command deadlines and the 20-command
 list remain covered; hosted acceptance reruns on the corrected commit.
 
+The next Windows run exposes two fixture decoding failures: Git subjects
+and updater banners are UTF-8, while test capture defaults to CP1252.
+All seven text captures in the updater tests now name UTF-8 explicitly.
+The two affected tests force the legacy default around their real reads;
+both fail before the fixture repair and pass afterward, retaining exact
+Unicode assertions, deadlines and disposable homes. The patch permits an
+absent private encoding helper on Python 3.9; that runtime was not executed.
+Production updater behavior is unchanged by this fixture-only follow-up.
+Final acceptance remains the default 20-command hosted workflow.
+
 ## Further expansion waits for a concrete task and evidence
 
 `open` · next action: start one small project task with the core commands
