@@ -201,7 +201,7 @@ Final acceptance remains the default 20-command hosted workflow.
 
 ## A fresh public clone must finish the documented setup
 
-`partial` · fresh-clone setup and all 20 checks pass; public verification next
+`fixed` · fresh public setup and all 20 checks verified at source commit 3306810
 
 Test an anonymous public clone in a path with spaces, with a new Python
 environment and disposable home. Preserve the core-first boundary: no
@@ -243,6 +243,20 @@ history scans have zero findings; the inventory matches all 328 tracked
 files. Existing optional/platform-specific skips remain explicit in the
 runner output. No client login or optional runtime readiness is claimed.
 
+A second anonymous public clone verifies published source commit 3306810
+using the documented Windows clone flags, a path with spaces and another
+empty home and virtual environment. Its 38 core tests pass before parser
+installation. Both source-fetch runs, both link runs, locked parser install,
+refresh, search, catalogue check, session checks, legacy core check and
+prompt-hook JSON pass. Every fetched HEAD equals its manifest commit;
+the final Git tree is clean. All six hosted jobs pass the default 20 commands
+at that exact source commit: Linux, macOS and Windows on both public branches
+([main acceptance](https://github.com/edmundhui03-debug/Devarness/actions/runs/40048976892),
+[verification acceptance](https://github.com/edmundhui03-debug/Devarness/actions/runs/40048976370)).
+This result-record follow-up changes documentation only; the runtime source
+remains identical to the tested commit. Continue with one small project task;
+additional client integrations still need their own explicit setup and checks.
+
 - [x] Run the documented core bootstrap, acceptance and session commands
   before installing optional parser dependencies or source capabilities.
 - [x] Fetch the five documented coding sources at their public pins;
@@ -251,7 +265,7 @@ runner output. No client login or optional runtime readiness is claimed.
   its regression controls and actual setup command against the same task.
 - [x] Complete the default portable checks; review the diff, privacy and
   inventory; prepare only reusable source and this result record.
-- [ ] Verify the published commit through another fresh clone and hosted
+- [x] Verify the published commit through another fresh clone and hosted
   Linux, macOS and Windows checks; report optional runtime limits explicitly.
 
 ## Further expansion waits for a concrete task and evidence
