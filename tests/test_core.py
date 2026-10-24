@@ -225,6 +225,51 @@ class ReleaseTests(unittest.TestCase):
             self.assertTrue(scanner.scan_history(root))
 
 class BootstrapTests(unittest.TestCase):
+    def test_existing_fetch_requires_a_clean_complete_worktree(self):
+        bootstrap = module('bootstrap')
+        env = {key: value for key, value in os.environ.items()
+               if not key.upper().startswith('GIT_')}
+        env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            source = root / 'upstream'
+
+            def git(*args):
+                return subprocess.run(['git', *args], check=True, env=env,
+                    capture_output=True, text=True, encoding='utf-8', timeout=30)
+
+            git('init', '-q', str(source))
+            (source / 'SKILL.md').write_text('synthetic source\n', encoding='utf-8')
+            git('-C', str(source), 'add', 'SKILL.md')
+            git('-C', str(source), '-c', 'user.name=Fixture', '-c',
+                'user.email=test@example.invalid', 'commit', '-qm', 'control')
+            pin = git('-C', str(source), 'rev-parse', 'HEAD').stdout.strip()
+            for state in ('clean', 'untracked', 'modified', 'no-checkout', 'off-pin'):
+                with self.subTest(state=state):
+                    destination = root / 'Harness' / state
+                    args = ['clone', '--no-checkout'] if state == 'no-checkout' else ['clone']
+                    git(*args, str(source), str(destination))
+                    skill = destination / 'SKILL.md'
+                    if state == 'modified':
+                        skill.write_text('local edit\n', encoding='utf-8')
+                    if state == 'untracked':
+                        (destination / 'local.txt').write_text('keep\n', encoding='utf-8')
+                    before = skill.read_bytes() if skill.exists() else None
+                    entry = {'path': 'Harness/' + state,
+                             'url': 'https://github.com/example/tool.git',
+                             'pin': '0' * 40 if state == 'off-pin' else pin,
+                             'sparse': []}
+                    with patch.object(bootstrap, 'ROOT', root):
+                        if state in ('modified', 'no-checkout', 'off-pin'):
+                            expected = 'off-pin' if state == 'off-pin' else 'local changes|incomplete checkout'
+                            with self.assertRaisesRegex(ValueError, expected):
+                                bootstrap.fetch(entry)
+                        else:
+                            bootstrap.fetch(entry)
+                    self.assertEqual(skill.read_bytes() if skill.exists() else None, before)
+                    if state == 'untracked':
+                        self.assertEqual((destination / 'local.txt').read_text(encoding='utf-8'), 'keep\n')
+
     @unittest.skipUnless(sys.platform == 'win32', 'Windows Git file-link regression')
     def test_link_skills_repairs_file_links_to_skill_directories(self):
         bootstrap = module('bootstrap')
@@ -300,6 +345,25 @@ class HookTests(unittest.TestCase):
         self.assertIn('CLAUDE.md', context)
 
 class CatalogueTests(unittest.TestCase):
+    def test_unfetched_skill_is_optional_with_windows_link_placeholders(self):
+        spec = importlib.util.spec_from_file_location('catalogue', ROOT / 'Harness/library.py')
+        library = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(library)
+        sources = json.loads((ROOT / 'Harness/library-sources.json').read_text(encoding='utf-8'))
+        source = next(item for item in sources
+                      if item['owner_ref'] == 'CLAUDE.md|Other editorial diagrams')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'Harness').mkdir()
+            (root / 'Harness/repos.txt').write_text(
+                'Harness/diagram-design\thttps://github.com/example/tool.git\t' + 'a' * 40 + '\n',
+                encoding='utf-8')
+            placeholder = root / '.claude/skills/diagram-design'
+            placeholder.parent.mkdir(parents=True)
+            placeholder.write_text('../../Harness/diagram-design/skills/diagram-design', encoding='utf-8')
+            with self.assertRaises(library.Absent):
+                library._source_base(root, source['root'], {}, {})
+
     def test_only_manifest_pins_are_optional_missing_sources(self):
         spec = importlib.util.spec_from_file_location('catalogue', ROOT / 'Harness/library.py')
         library = importlib.util.module_from_spec(spec)

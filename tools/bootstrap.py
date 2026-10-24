@@ -75,6 +75,11 @@ def fetch(entry):
         head = subprocess.check_output(['git', '-C', str(destination), 'rev-parse', 'HEAD'], text=True).strip()
         if head != entry['pin']:
             raise ValueError('Existing source is off-pin; review it first: ' + entry['path'])
+        changes = subprocess.check_output(
+            ['git', '-C', str(destination), 'status', '--porcelain', '--untracked-files=no'],
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        if changes:
+            raise ValueError('Existing source has local changes or an incomplete checkout; review it first: ' + entry['path'])
         print('Pinned source already present:', entry['path'])
         return
     destination.parent.mkdir(parents=True, exist_ok=True)

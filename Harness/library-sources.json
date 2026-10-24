@@ -101,7 +101,7 @@
   {
     "collection": "dev",
     "kind": "skill",
-    "root": ".claude/skills/diagram-design",
+    "root": "Harness/diagram-design/skills/diagram-design",
     "pattern": "SKILL.md",
     "owner_ref": "CLAUDE.md|Other editorial diagrams",
     "scope": ".",

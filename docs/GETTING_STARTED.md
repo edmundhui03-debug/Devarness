@@ -55,6 +55,8 @@ python tools/session.py --check --text
 The core is enough to begin. When a task needs the shared skill library,
 fetch the relevant sources explicitly. This example enables the existing
 coding and harness improvement skills; select only those you will use.
+Fetch refuses an existing source that is off-pin, modified or incompletely
+checked out. Inspect that source before retrying; setup never resets it.
 
 ```powershell
 python tools/bootstrap.py --fetch ponytail skills karpathy-skills superpowers harness2

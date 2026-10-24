@@ -35,4 +35,4 @@ Harness/harness2	https://github.com/google-research/harness2.git	1cfe254e8d25b15
 Harness/pcb/heypcb-mcp	https://github.com/HeyPCB/heypcb-mcp.git	a975edeb85cc335d2ec9298a844b6fbd49afff4a
 Harness/pstack	https://github.com/backnotprop/pstack.git	e44668c2aad92eacf4e84df47984121fefb11b82
 
-Harness/superpowers	https://github.com/obra/superpowers.git	7f043e5eaf3522dc19178c673b76328de9b0c355
+Harness/superpowers	https://github.com/obra/superpowers.git	bb92a77741419a4ab5f06e711a283343f1ada0c3

@@ -1,6 +1,6 @@
 # Devarness starts with a small core and tracks verified changes
 
-> **2026-10-23** · Aster · `current`
+> **2026-10-24** · Aster · `current`
 >
 > Start with the portable core, add library capabilities for a demonstrated
 > task, and record the checks before expanding. The public source now omits
@@ -15,6 +15,7 @@
 - [Verification distinguishes the core from optional capabilities](#verification-distinguishes-the-core-from-optional-capabilities)
 - [The privacy follow-up removes inherited project and device records](#the-privacy-follow-up-removes-inherited-project-and-device-records)
 - [Legacy onboarding shares the core and updater cleanup stays bounded](#legacy-onboarding-shares-the-core-and-updater-cleanup-stays-bounded)
+- [A fresh public clone must finish the documented setup](#a-fresh-public-clone-must-finish-the-documented-setup)
 - [Further expansion waits for a concrete task and evidence](#further-expansion-waits-for-a-concrete-task-and-evidence)
 
 ## One task record carries the objective, checks and next action
@@ -197,6 +198,61 @@ Unicode assertions, deadlines and disposable homes. The patch permits an
 absent private encoding helper on Python 3.9; that runtime was not executed.
 Production updater behavior is unchanged by this fixture-only follow-up.
 Final acceptance remains the default 20-command hosted workflow.
+
+## A fresh public clone must finish the documented setup
+
+`partial` · fresh-clone setup and all 20 checks pass; public verification next
+
+Test an anonymous public clone in a path with spaces, with a new Python
+environment and disposable home. Preserve the core-first boundary: no
+client login, paid model call, service or global configuration is needed.
+The owner authorizes fixes for reproduced setup failures and a normal
+public update; earlier Git history remains intact.
+
+A synthetic Git clone stopped at `--no-checkout` reproduces misleading
+fetch success at the exact pin with `SKILL.md` absent. The baseline
+existing-source path checks HEAD alone (`tools/bootstrap.py:75`). INV checks
+tracked changes before reporting success; candidate DOM only documents
+the interrupted state. INV's five-state regression rejects missing and
+modified tracked files while accepting clean or untracked-only sources
+and retaining the off-pin refusal. Both bad states fail before the repair
+and pass afterward; local file contents stay unchanged. Keep the small
+script guard and its guide note. No reset, recovery framework or new
+dependency is added; no model-quality or speed improvement is claimed.
+
+Actual optional setup finds two metadata faults. With Windows text link
+placeholders and diagram-design unfetched, catalogue refresh exits 1.
+Pointing that source directly into its pinned Harness directory lets the
+existing optional-source resolver handle it; its control fails before
+the correction and passes afterward. No new link resolver is needed.
+Repeated fetch also rejects superpowers because its recorded object is an
+annotated tag. The manifest now names the tag's existing commit bb92a777;
+the checked-out source version stays the same. All five fetched pins are
+verified as commit objects. Repeated fetch passes; catalogue refresh returns
+122 entries and zero diagnostics. Search, catalogue check, session and prompt
+hook JSON pass. Both skill-link runs succeed, with 29 of 31 links readable;
+the two remaining links require the unfetched optional diagram source.
+
+The untouched public clone passes bootstrap and the three-command core
+acceptance in 227.62 seconds before parser installation: 36 core tests and
+the retained-history scan pass. Its fresh virtual environment initially has
+only pip. The repaired clone passes all 20 portable commands, including
+38 core tests, 10 portable onboarding tests, 140 updater tests in 485.278
+seconds and 80 TieItUp tests in 116.994 seconds. Current-tree and retained
+history scans have zero findings; the inventory matches all 328 tracked
+files. Existing optional/platform-specific skips remain explicit in the
+runner output. No client login or optional runtime readiness is claimed.
+
+- [x] Run the documented core bootstrap, acceptance and session commands
+  before installing optional parser dependencies or source capabilities.
+- [x] Fetch the five documented coding sources at their public pins;
+  link skills twice, install the locked parser, refresh and search discovery.
+- [x] Reproduce any failure, keep the smallest supported repair, and verify
+  its regression controls and actual setup command against the same task.
+- [x] Complete the default portable checks; review the diff, privacy and
+  inventory; prepare only reusable source and this result record.
+- [ ] Verify the published commit through another fresh clone and hosted
+  Linux, macOS and Windows checks; report optional runtime limits explicitly.
 
 ## Further expansion waits for a concrete task and evidence
 
