@@ -340,6 +340,15 @@ their hosted results are retained in the
 Keep the core small and add further integration changes only for a reproduced
 failure or a concrete project need.
 
+A second fresh public clone verifies published source commit 8f7a10b with
+the documented Windows clone flags and skill-link repair. Claude startup,
+Codex project configuration and resources, Pi offline RPC and native event
+dispatch all pass again; the clone's tracked tree remains clean. All six
+hosted jobs pass the default 20 commands at that source commit:
+[main acceptance](https://github.com/edmundhui03-debug/Devarness/actions/runs/40278463538)
+and [verification acceptance](https://github.com/edmundhui03-debug/Devarness/actions/runs/40278463497).
+This follow-up records the results only; its runtime source matches 8f7a10b.
+
 ## Further expansion waits for a concrete task and evidence
 
 `open` · next action: start one small project task with the core commands
