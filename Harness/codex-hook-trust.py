@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""A dev Codex hook that Codex does not trust never runs; check it, or trust it.
+"""Check or explicitly record trust for this checkout's Codex hooks.
 
     python3 Harness/codex-hook-trust.py --check          # 0 all trusted, 1 not, 2 error, 3 no Codex here
                                                          # (or Codex never asked to trust this folder)
     python3 Harness/codex-hook-trust.py --trust          # show what would be trusted, write nothing
-    python3 Harness/codex-hook-trust.py --trust --yes    # on the owner's word: trust them, as /hooks does
+    python3 Harness/codex-hook-trust.py --trust --yes    # explicitly trust the displayed hooks, as /hooks does
 
-Editing .codex/hooks.json drops Codex's trust in the changed hook, and Codex
-then skips it silently: Aster's turn-end alert never ran from 2026-10-03 to
-2026-10-07. This asks Codex itself, through the app-server methods that
+Editing .codex/hooks.json can invalidate trust and prevent a hook from running.
+This asks Codex itself, through the app-server methods that
 `codex app-server generate-json-schema` documents: hooks/list gives each
 hook's key, command, currentHash, trustStatus and enabled; --trust --yes
 upserts hooks.state.<key>.trusted_hash = currentHash with config/batchWrite,
@@ -135,8 +134,9 @@ def main(argv=None):
         print("codex-hook-trust: Codex has never run for this user (no %s); nothing to check" % home)
         return NO_CODEX
     deadline = time.monotonic() + float(os.environ.get("DEVARNESS_HOOK_TRUST_DEADLINE", "45"))
-    server = AppServer(command, root, deadline)
+    server = None
     try:
+        server = AppServer(command, root, deadline)
         server.call("initialize", {"clientInfo": {"name": "codex-start-hook-trust", "version": "1"}})
         server.notify("initialized")
         hooks, notes = listed_hooks(server, root)
@@ -159,7 +159,8 @@ def main(argv=None):
         print("codex-hook-trust: ERROR %s" % error)
         return ERROR
     finally:
-        server.close()
+        if server is not None:
+            server.close()
 
     want = expected(root)
     for hook in hooks:

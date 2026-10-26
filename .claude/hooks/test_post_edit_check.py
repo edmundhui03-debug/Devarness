@@ -7,6 +7,7 @@ and stays silent on everything else. Each test builds a stand-in dev with the
 real checkers copied in, because md-format decides "ours" by walking up to a folder
 holding CLAUDE.md and .claude/.
 """
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -21,7 +22,7 @@ from unittest import mock
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 HOOK = HERE / "post_edit_check.py"
-I18N_PYTHON = Path.home() / ".local" / "share" / "uv" / "tools" / "markitdown" / "bin" / "python"
+I18N_AVAILABLE = shutil.which("bash") and importlib.util.find_spec("bs4") is not None
 
 GOOD_MD = """# The heading states a claim
 
@@ -53,7 +54,7 @@ class HookTests(unittest.TestCase):
         shutil.copy2(str(HOOK), str(self.root / ".claude" / "hooks" / HOOK.name))
         self.hook = self.root / ".claude" / "hooks" / HOOK.name
         self.env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull,
-                        PYTHONIOENCODING="utf-8")
+                        PYTHONIOENCODING="utf-8", DEVARNESS_I18N_PYTHON=sys.executable)
         self.git("init", "-q")
         (self.root / ".gitignore").write_text("/ignored/\n", encoding="utf-8")
 
@@ -125,17 +126,40 @@ class HookTests(unittest.TestCase):
         done = self.fire(txt)
         self.assertEqual((done.returncode, done.stdout), (0, ""))
 
-    def test_a_checker_that_cannot_run_says_nothing_about_the_document(self):
-        # i18n on a device with no markitdown python prints "needs markitdown's
-        # python at ..." and exits nonzero; without this it answered every HTML edit
-        # on a fresh machine with a complaint about the machine.
-        broken = self.root / "Harness" / "bin" / "md-format"
-        broken.write_text("#!/usr/bin/env python3\n"
-                          "import sys\n"
-                          "print('md-format: needs something this device does not have', file=sys.stderr)\n"
-                          "sys.exit(1)\n", encoding="utf-8")
-        done = self.fire(self.write("Setup/note.md", BAD_MD))
-        self.assertEqual((done.returncode, done.stdout), (0, ""), done.stderr)
+    def test_missing_checker_dependency_is_unverified_without_copying_stderr(self):
+        for checker, filename in (("md-format", "note.md"), ("i18n", "page.html")):
+            for names_page in (False, True):
+                with self.subTest(checker=checker, names_page=names_page):
+                    diagnostic = "private checker diagnostic" + (" " + filename if names_page else "")
+                    self.write("Harness/bin/" + checker, "#!/usr/bin/env python3\n"
+                               "import sys\n"
+                               "print(%r, file=sys.stderr)\n" % diagnostic
+                               + "import devarness_test_missing_dependency\n")
+                    done = self.fire(self.write("Setup/" + filename, "sample document\n"))
+                    text = self.context(done)
+                    self.assertIsNotNone(text, "checker failure was silently dropped")
+                    self.assertIn("UNVERIFIED", text)
+                    self.assertIn("exit 1", text)
+                    self.assertIn(checker + " check", text)
+                    self.assertIn(filename, text)
+                    self.assertNotIn("private checker diagnostic", text)
+                    self.assertNotIn("Traceback", text)
+                    self.assertLessEqual(len(text.splitlines()), 2)
+                    self.assertEqual(done.stderr, "")
+
+    def test_a_successful_html_checker_produces_no_output(self):
+        self.write("Harness/bin/i18n", "#!/usr/bin/env python3\nprint('page.html: clean')\n")
+        done = self.fire(self.write("Setup/page.html", "<h1>Example</h1>\n"))
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, "", ""))
+
+    def test_document_checker_stderr_does_not_hide_stdout_findings(self):
+        self.write("Harness/bin/i18n", "#!/usr/bin/env python3\nimport sys\n"
+                   "print('page.html: toggle=NO')\n"
+                   "print('private checker diagnostic', file=sys.stderr)\n")
+        text = self.context(self.fire(self.write("Setup/page.html", "<h1>Example</h1>\n")))
+        self.assertIn("UNVERIFIED", text)
+        self.assertIn("toggle=NO", text)
+        self.assertNotIn("private checker diagnostic", text)
 
     def test_input_it_cannot_read_never_fails_the_edit(self):
         for raw in ("", "not json", json.dumps({"tool_name": "Edit"}), json.dumps({"tool_name": "Edit", "tool_input": {}})):
@@ -154,13 +178,15 @@ class HookTests(unittest.TestCase):
         self.assertLessEqual(len(text.splitlines()), 16)
         self.assertIn("more", text)
 
-    @unittest.skipUnless(I18N_PYTHON.exists(), "i18n needs markitdown's python")
+    @unittest.skipUnless(I18N_AVAILABLE, "i18n requires Bash and beautifulsoup4")
     def test_an_html_page_without_the_toggle_is_reported_back(self):
         path = self.write("Setup/page.html", "<!doctype html><html><head><title>Page</title></head>"
                           "<body><h1>Only English</h1><p>No toggle, no dictionary.</p></body></html>\n")
         text = self.context(self.fire(path))
         self.assertIsNotNone(text, "the hook stayed silent on a page with no toggle")
         self.assertIn("i18n check", text)
+        self.assertIn("toggle=NO", text)
+        self.assertNotIn("UNVERIFIED", text)
 
 
 # A stand-in for tieitup: one finding naming the file and the folder it ran in, or

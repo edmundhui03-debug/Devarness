@@ -1,6 +1,6 @@
 # Start a private project with shared rules and measured improvements
 
-> **2026-10-22** · Aster · `current`
+> **2026-10-26** · Aster · `current`
 >
 > Create your own repository from Devarness, then run Claude Code, Codex
 > and Pi from its root with shared project intent. Measure harness changes.
@@ -80,6 +80,18 @@ separately if desired; its source checkout is not plugin activation.
 Run `claude`, `codex` or `pi` from this root in separate terminals.
 Read `docs/PROJECT.md`; keep credentials in each client's user configuration.
 
+Claude hooks and Pi discovery both launch `python3`. Before starting either,
+run `python3 --version` in the terminal you will use; on Windows also check
+it in Git Bash. A successful core check with `python` does not verify this
+separate command. Make Python 3.9+ available as `python3`, or deliberately
+adjust the local client commands before proceeding (`.claude/settings.json:10`,
+`.pi/extensions/dev-discovery.ts:10`). Claude can exit successfully even
+when a startup hook fails; inspect its hook diagnostics for READY.
+
+Run `python tools/bootstrap.py --link-skills` to repair the checkout's skill
+links before checking loaded skills. This also works without fetching optional
+sources; unavailable source skills remain absent (`tools/bootstrap.py:100`).
+
 - **Claude Code:** trust this project only after reviewing its instructions
   and hooks. Read `CLAUDE.md` and verify the local startup check succeeds.
 - **Codex:** read `AGENTS.md`, use the checkout's `.agents/skills/` links,
@@ -87,9 +99,7 @@ Read `docs/PROJECT.md`; keep credentials in each client's user configuration.
   Hooks ship inactive (`.codex/hooks.json:1`); configuring and trusting
   hooks in Codex is a separate step (`README.md:64`).
 - **Pi:** review and trust the project extension and read
-  `.pi/APPEND_SYSTEM.md`. Its discovery extension launches literal
-  `python3`, so that executable must work on PATH even if you used
-  `python` above (`.pi/extensions/dev-discovery.ts:10`). Pi discovers project
+  `.pi/APPEND_SYSTEM.md`. Pi discovers project
   `.agents/skills/`; use `/skill:name` and `/reload` after edits. Verify startup
   diagnostics ([Pi skills](https://pi.dev/docs/latest/skills)).
 

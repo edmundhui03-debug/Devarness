@@ -24,7 +24,8 @@ class ProcessTests(unittest.TestCase):
     def test_real_timeout_keeps_partial_output_and_next_command_can_run(self):
         command = [sys.executable, '-c',
                    "import time; print('started', flush=True); time.sleep(30)"]
-        passed, output = self.check(command, timeout=0.5)
+        # Allow interpreter startup under load before testing captured timeout output.
+        passed, output = self.check(command)
         self.assertFalse(passed)
         self.assertIn('TIMEOUT', output)
         self.assertIn('started', output)

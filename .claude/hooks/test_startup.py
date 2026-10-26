@@ -450,7 +450,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_the_start_check_runs_at_session_start(self):
         commands = [h["command"] for group in self.settings()["hooks"]["SessionStart"] for h in group["hooks"]]
-        self.assertEqual(commands, ['"$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start.sh'])
+        self.assertEqual(commands, ['python3 "$CLAUDE_PROJECT_DIR/tools/session.py" --hook'])
 
     def test_codex_hooks_start_from_python3(self):
         # Codex runs hook commands through Windows PowerShell, which cannot start

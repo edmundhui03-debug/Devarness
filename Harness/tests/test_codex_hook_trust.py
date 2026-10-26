@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""codex-hook-trust: a dev Codex hook that Codex does not trust never runs.
+"""codex-hook-trust checks trust before project hooks are used.
 
 Run: python3 Harness/tests/test_codex_hook_trust.py
 
-Aster's turn-end phone alert sat untrusted from 2026-10-03 to 2026-10-07,
-and her session-start check ran on a stale trust: editing .codex/hooks.json
-drops Codex's trust, and nothing checked. These tests drive the checker
+Changing hook content can invalidate trust. These tests drive the checker
 against a fake `codex app-server` that answers the documented hooks/list and
 config/batchWrite methods, so no real Codex runs and nothing is trusted here.
 """
@@ -122,6 +120,14 @@ class HookTrustTests(unittest.TestCase):
     def test_a_device_without_codex_is_not_applicable(self):
         rc, out = self.run_tool([], "--check", codex=self.root / "no-codex-here.exe")
         self.assertEqual(rc, 3, out)
+
+    def test_an_existing_codex_that_cannot_launch_is_an_error(self):
+        executable = self.root / "unlaunchable codex.exe"
+        executable.write_text("not an executable", encoding="utf-8")
+        rc, out = self.run_tool([], "--check", codex=executable)
+        self.assertEqual(rc, 2, out)
+        self.assertIn("codex-hook-trust: ERROR", out)
+        self.assertNotIn("Traceback", out)
 
     def test_trust_writes_the_exact_hash_for_dev_hooks_only_and_backs_up(self):
         other = {"eventName": "stop", "key": "elsewhere:stop:0:0", "trustStatus": "untrusted", "enabled": True,

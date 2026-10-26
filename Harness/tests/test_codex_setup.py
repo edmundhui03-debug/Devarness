@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""codex-setup gives Codex the superpowers commit that Claude installed.
+"""codex-setup gives Codex the superpowers revision registered by Claude.
 
 Run: python3 Harness/tests/test_codex_setup.py
 
-Codex installs a marketplace's plugin with git, and Claude's plugin cache
-became a plain copy on 2026-09-24, so Codex stayed on superpowers 6.3.0 while
-Claude ran 6.4.1. codex-setup now adds superpowers' upstream at the commit
-Claude's plugin registry records.
+Codex receives a Git marketplace pinned to the registered upstream revision
+instead of depending on the layout of Claude's plugin cache.
 """
 import importlib.machinery
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -26,6 +27,27 @@ def load():
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
     return module
+
+
+class CliTests(unittest.TestCase):
+    def test_help_and_unknown_options_exit_before_setup(self):
+        with tempfile.TemporaryDirectory(prefix="codex-setup-cli-") as folder:
+            root = Path(folder)
+            registry = root / ".claude/plugins/installed_plugins.json"
+            registry.parent.mkdir(parents=True)
+            registry.write_text('{"plugins": {}}', encoding="utf-8")
+            env = dict(os.environ, HOME=folder, USERPROFILE=folder, PATH="")
+            before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+            for option, expected in (("--help", 0), ("--unknown-option", 2)):
+                with self.subTest(option=option):
+                    done = subprocess.run([sys.executable, str(TOOL), option], cwd=folder,
+                                          env=env, capture_output=True, text=True, timeout=10)
+                    self.assertEqual(done.returncode, expected, done.stdout + done.stderr)
+                    self.assertIn("usage:", done.stdout + done.stderr)
+                    self.assertNotIn("plugin registry", done.stdout + done.stderr)
+                    self.assertEqual(
+                        {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()},
+                        before)
 
 
 class ClaudeCommitTests(unittest.TestCase):
@@ -57,10 +79,9 @@ class SkillTests(unittest.TestCase):
     def setUp(self):
         self.mod = load()
 
-    def test_only_the_pocock_skills_the_owner_kept_are_linked(self):
-        # Owner decision 2026-10-07: the plugin is off; grill-me, grilling and
-        # retro stay, because grill-first and retro-last build on them; and
-        # 2026-10-15: writing-for-agents, which retro loads first.
+    def test_only_the_shared_pocock_skills_are_linked(self):
+        # These shared skills support grill-first, retro-last and retro's
+        # writing-for-agents guide.
         self.assertEqual(self.mod.POCOCK, ("productivity/grill-me", "productivity/grilling",
                                            "engineering/retro", "productivity/writing-for-agents"))
         if not (ROOT / "Harness/skills/skills").is_dir():
@@ -79,6 +100,22 @@ class SkillTests(unittest.TestCase):
         link.assert_any_call(ROOT / ".claude/skills/library",
                              ROOT / ".agents/skills/library")
         self.assertFalse(any('ecc@ecc' in call.args[0] for call in run.call_args_list))
+
+    def test_marketplace_add_failure_preserves_the_existing_registration(self):
+        failure = Mock(returncode=1, stdout="", stderr="temporary connection failure")
+        success = Mock(returncode=0, stdout="", stderr="")
+        exit_message = None
+        with patch.object(self.mod, "claude_commit", return_value="fixture-pin"), \
+                patch.object(self.mod.subprocess, "run", side_effect=[failure, success, success, success]) as run, \
+                patch.object(self.mod, "link"):
+            try:
+                self.mod.main()
+            except SystemExit as error:
+                exit_message = str(error)
+        self.assertEqual([call.args[0][1:4] for call in run.call_args_list],
+                         [["plugin", "marketplace", "add"]])
+        self.assertIsNotNone(exit_message)
+        self.assertIn("temporary connection failure", exit_message)
 
     def test_no_skill_is_linked_into_research(self):
         self.assertFalse(hasattr(self.mod, "scholar_links"))

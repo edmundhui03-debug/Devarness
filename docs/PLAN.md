@@ -1,6 +1,6 @@
 # Devarness starts with a small core and tracks verified changes
 
-> **2026-10-24** · Aster · `current`
+> **2026-10-26** · Aster · `current`
 >
 > Start with the portable core, add library capabilities for a demonstrated
 > task, and record the checks before expanding. The public source now omits
@@ -16,6 +16,7 @@
 - [The privacy follow-up removes inherited project and device records](#the-privacy-follow-up-removes-inherited-project-and-device-records)
 - [Legacy onboarding shares the core and updater cleanup stays bounded](#legacy-onboarding-shares-the-core-and-updater-cleanup-stays-bounded)
 - [A fresh public clone must finish the documented setup](#a-fresh-public-clone-must-finish-the-documented-setup)
+- [Native client checks verify the Devarness environment first](#native-client-checks-verify-the-devarness-environment-first)
 - [Further expansion waits for a concrete task and evidence](#further-expansion-waits-for-a-concrete-task-and-evidence)
 
 ## One task record carries the objective, checks and next action
@@ -267,6 +268,77 @@ additional client integrations still need their own explicit setup and checks.
   inventory; prepare only reusable source and this result record.
 - [x] Verify the published commit through another fresh clone and hosted
   Linux, macOS and Windows checks; report optional runtime limits explicitly.
+
+## Native client checks verify the Devarness environment first
+
+`fixed` · native client checks and final portable acceptance pass
+
+The reference is public commit 683a5bb. A new public clone in a path with
+spaces uses disposable client configuration, no copied credentials and no
+model turns.
+Claude Code 2.1.292 loads the real SessionStart hook and validates its READY
+context. Codex CLI 0.163.0 starts its app-server with strict configuration,
+loads the project compaction limit of 300000, lists skills without errors,
+and starts an ephemeral thread. Its empty hook list is intentional.
+Pi 1.3.0 answers offline RPC state and command requests. Its native resource
+loader loads the project extension, APPEND_SYSTEM and AGENTS.md, and its
+event dispatcher accepts the shared hidden discovery guidance. These
+checks verify startup and resource loading, not provider authentication or
+paid inference (`tools/session.py:48`, `.codex/hooks.json:1`,
+`.pi/extensions/dev-discovery.ts:5`).
+
+Codex also lists global user and system skills on this Windows device. The
+16 repository-scoped skill paths were verified against the new clone;
+complete OS-account isolation is untested. Optional plugin installations
+and authenticated model behavior are outside these checks.
+
+The Python-only Windows control starts the core with Python 3.12 but fails
+Claude's actual hook with command-not-found; Claude itself still exits 0.
+The getting-started guide now checks the literal python3 prerequisite for
+both hook clients and repairs skill links before checking loaded resources.
+No automatic installation or client configuration rewrite is introduced.
+
+Frozen failure controls compare the reference with the smallest script
+repairs. A documentation-only candidate cannot correct lost checker status,
+destructive marketplace recovery or an uncaught process-launch failure.
+The retained changes report document-checker failures as UNVERIFIED without
+copying raw stderr, preserve an existing marketplace on any add failure,
+and return the hook helper's documented error status when its server cannot
+launch. Genuine marketplace source conflicts now require explicit resolution;
+setup does not remove registrations automatically. No model-quality or speed
+claim is made. Raw client logs and review reports remain ignored.
+
+A help invocation exposed another setup boundary: the optional Codex setup
+helper ignored arguments and entered installation. It now parses arguments
+before reading the plugin registry; isolated controls verify help exits 0,
+unknown options exit 2 and neither changes the disposable home. Touched
+helper comments also replace inherited account anecdotes with generic
+rationale. Public/legal attribution is retained.
+
+Independent review found that the HTML test could accept an UNVERIFIED
+checker result as a document finding. It now requires the actual missing
+toggle diagnostic and rejects UNVERIFIED. A synthetic checker failure
+passes the old assertion and fails the strengthened one. All 21 post-edit
+tests pass with Bash and Beautiful Soup available, without skips. The
+Codex specialist suites run 25 tests with one absent optional-source skip;
+the three legacy settings assertions and the Pi event-adapter check pass.
+
+The first full portable run exposed a 0.5-second test deadline that could
+expire before Python printed its startup marker. The real timeout test now
+uses its existing five-second helper allowance; production deadlines stay
+unchanged. A delayed-start control reproduces the missing marker at 0.5
+seconds and preserves it at five seconds, while both runs still report
+TIMEOUT. All 38 core tests pass on the rerun (`tests/test_check_process.py:20`).
+
+The final frozen candidate passes all 20 commands in `python tools/check.py`,
+including the current-tree and retained-history scans, 140 updater tests in
+565.391 seconds and 80 TieItUp tests in 165.888 seconds. Existing optional
+source skips remain explicit; no production timeout was extended. Both
+public branches run the same portable Linux, macOS and Windows matrix;
+their hosted results are retained in the
+[portable workflow](https://github.com/edmundhui03-debug/Devarness/actions/workflows/portable.yml).
+Keep the core small and add further integration changes only for a reproduced
+failure or a concrete project need.
 
 ## Further expansion waits for a concrete task and evidence
 

@@ -27,9 +27,8 @@ for p in ("~/.claude/settings.json",
 def on(short):
     return any(name.split("@")[0] == short and val for name, val in enabled.items())
 
-# Off by the owner's choice on 2026-10-07, so neither is listed: the n8n
-# skills were removed and Matt Pocock's plugin is off, its three kept skills
-# linked from Harness/skills. A plugin listed here degrades the banner when off.
+# Optional Pocock skills are linked from Harness/skills, not required as a
+# plugin. A plugin listed here degrades the legacy banner when disabled.
 PLUGINS = [
     ("superpowers",       "process gates"),
     ("codex",             "codex from claude"),

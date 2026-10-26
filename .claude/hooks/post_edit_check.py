@@ -144,20 +144,23 @@ def report(path: Path):
         return "%s %s: no answer within %ds" % (launcher, verb, BOUND)
     except OSError as error:
         return "%s %s could not run: %s" % (launcher, verb, error)
-    output = (done.stdout + done.stderr).strip()
-    problems = done.returncode != 0 or (path.suffix.lower() == ".html" and "toggle=NO" in output)
+    output = done.stdout.strip()
+    status = None
+    if done.stderr.strip() or (done.returncode and path.name not in output):
+        reason = "exit %d" % done.returncode if done.returncode else "checker wrote to stderr"
+        status = "UNVERIFIED (%s); rerun the checker and inspect stderr locally" % reason
+    problems = status or done.returncode != 0 or (path.suffix.lower() == ".html" and "toggle=NO" in output)
     if not problems:
         return None
     if path.name not in output:
-        # The checker failed about itself, not about this file — i18n on a
-        # device with no markitdown python says "needs markitdown's python at
-        # ...", which would otherwise answer every HTML edit on a new machine.
-        return None
+        return "%s %s on %s: %s" % (launcher, verb, path.name, status) if status else None
     lines = [line for line in output.splitlines() if line.strip()]
     shown = lines[:LINES]
     if len(lines) > LINES:
         shown.append("... %d more lines; run `%s %s %s`" % (len(lines) - LINES, launcher, verb,
                                                             path.relative_to(ROOT.resolve())))
+    if status:
+        shown.insert(0, status)
     return "%s %s on %s:\n%s" % (launcher, verb, path.name, "\n".join(shown))
 
 

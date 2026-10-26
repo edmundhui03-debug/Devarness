@@ -5,7 +5,10 @@ Uses superpowers' upstream at the commit Claude installed and four skills
 from the pinned Matt Pocock clone at Harness/skills. ECC stays library-only.
 Run after bootstrap/tools installation on each machine. Never overwrites a
 different skill, changes model settings, or reconciles Git.
+Marketplace add failures stop setup without removing existing registrations.
+Resolve source conflicts explicitly before rerunning setup.
 """
+import argparse
 import json
 import os
 from pathlib import Path
@@ -16,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 POCOCK = ("productivity/grill-me", "productivity/grilling", "engineering/retro",
           "productivity/writing-for-agents")
 REGISTRY = Path.home() / ".claude/plugins/installed_plugins.json"
+ERROR_DETAIL_LIMIT = 300
 
 
 def registered(key):
@@ -45,9 +49,7 @@ def link(source, destination):
 
 
 def main():
-    # Codex installs a marketplace's plugin with git, and Claude's plugin cache
-    # has been a plain copy since 2026-09-24, so Codex takes superpowers from
-    # its upstream at the commit Claude installed: one version for both.
+    # Use the same upstream revision for Claude and Codex.
     superpowers = ["https://github.com/obra/superpowers.git",
                    "--ref", claude_commit("superpowers@claude-plugins-official")]
     failed = []
@@ -57,28 +59,21 @@ def main():
         added = subprocess.run([codex, "plugin", "marketplace", "add", *source, "--json"],
                                capture_output=True, text=True, encoding="utf-8", errors="replace")
         if added.returncode != 0:
-            # Codex refuses a marketplace "already added from a different
-            # source", which a moved path or a new Claude commit is: drop the
-            # stale entry and add the current one (update-tools runs this daily).
-            marketplace = selector.split("@", 1)[1]
-            subprocess.run([codex, "plugin", "marketplace", "remove", marketplace, "--json"],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
-            subprocess.run([codex, "plugin", "marketplace", "add", *source, "--json"], check=True)
+            # An add failure does not establish that an existing source is stale.
+            raise SystemExit("codex-setup: could not add marketplace for %s: %s" % (
+                selector, (added.stderr or added.stdout).strip()[-ERROR_DETAIL_LIMIT:]))
         added = subprocess.run([codex, "plugin", "add", selector, "--json"],
                                capture_output=True, text=True, encoding="utf-8", errors="replace")
         if added.returncode != 0:
             # The copy Codex already installed stays in use; finish the rest,
             # then exit non-zero so update-tools names what failed.
-            failed.append("could not add %s: %s" % (selector, (added.stderr or added.stdout).strip()[-300:]))
+            failed.append("could not add %s: %s" % (selector, (added.stderr or added.stdout).strip()[-ERROR_DETAIL_LIMIT:]))
     utilities = ("markitdown", "prompt-master", "bilingual-page", "grill-first", "delegate", "retro-last",
                  "library-intake", "library")
     for name in utilities:
         link(ROOT / ".claude/skills" / name, ROOT / ".agents/skills" / name)
-    # Matt Pocock's skills from the pristine clone at Harness/skills, pinned in
-    # repos.txt: the three the owner kept on by default on 2026-10-07, which
-    # grill-first and retro-last build on, and writing-for-agents, which retro
-    # loads first (owner, 2026-10-15). The plugin itself is off for Claude, and
-    # Claude reaches the same four through .claude/skills links.
+    # Shared Pocock skills support grill-first and retro-last; retro also
+    # loads writing-for-agents. Both clients use the same pinned source.
     pocock = ROOT / "Harness/skills/skills"
     for skill in POCOCK:
         link(pocock / skill, ROOT / ".agents/skills" / Path(skill).name)
@@ -91,4 +86,5 @@ def main():
 
 
 if __name__ == "__main__":
+    argparse.ArgumentParser(description=__doc__).parse_args()
     main()
