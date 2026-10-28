@@ -18,6 +18,8 @@ SUITES = (
     '.claude/hooks/test_guard_heredoc.py',
     '.claude/hooks/test_guard_vendor_code.py',
     '.claude/hooks/test_post_edit_check.py',
+    'Harness/tests/test_codex_setup.py',
+    'Harness/tests/test_codex_hook_trust.py',
     'Harness/tests/test_line_endings.py',
     'Harness/tests/test_new_device.py',
     'Harness/tests/test_update_tools.py',
@@ -35,12 +37,14 @@ SUITES = (
 
 
 class CheckTests(unittest.TestCase):
-    def invoke(self, args=(), first=None):
+    def invoke(self, args=(), first=None, failing_suite=None):
         output = io.StringIO()
         calls = []
 
         def execute(command, **kwargs):
             calls.append((command[1:], kwargs['timeout']))
+            if command[-1] == failing_suite:
+                return subprocess.CompletedProcess(command, 1, '', 'client regression')
             if len(calls) == 1 and first is not None:
                 if isinstance(first, Exception):
                     raise first
@@ -68,7 +72,18 @@ class CheckTests(unittest.TestCase):
                      for path in SUITES]
         self.assertEqual(calls, expected)
         self.assertEqual(code, 0, output)
-        self.assertIn('PASS: 20 portable check commands', output)
+        self.assertIn('PASS: 22 portable check commands', output)
+
+    def test_each_codex_regression_suite_blocks_default_acceptance(self):
+        for suite in ('Harness/tests/test_codex_setup.py', 'Harness/tests/test_codex_hook_trust.py'):
+            with self.subTest(suite=suite):
+                code, output, calls = self.invoke(failing_suite=suite)
+                self.assertEqual(code, 1, output)
+                self.assertEqual(len(calls), 22)
+                self.assertIn(suite, output)
+                self.assertIn('client regression', output)
+                self.assertIn('FAILED:', output)
+                self.assertNotIn('PASS: 22', output)
 
     def test_unicode_child_output_survives_a_legacy_console(self):
         raw = io.BytesIO()
@@ -89,7 +104,7 @@ class CheckTests(unittest.TestCase):
                                           output=b'partial-out\xff', stderr=b'partial-err')
         code, output, calls = self.invoke(first=fault)
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(calls), 20)
+        self.assertEqual(len(calls), 22)
         self.assertIn('TIMEOUT', output)
         self.assertIn('partial-out', output)
         self.assertIn('partial-err', output)
@@ -97,23 +112,23 @@ class CheckTests(unittest.TestCase):
     def test_launch_error_is_failure_and_runs_later_checks(self):
         code, output, calls = self.invoke(first=FileNotFoundError('missing test executable'))
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(calls), 20)
+        self.assertEqual(len(calls), 22)
         self.assertIn('ERROR', output)
         self.assertIn('missing test executable', output)
 
     def test_nonzero_exit_never_turns_green(self):
         code, output, calls = self.invoke(first=subprocess.CompletedProcess([], 7, '', 'bad check'))
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(calls), 20)
+        self.assertEqual(len(calls), 22)
         self.assertIn('bad check', output)
-        self.assertNotIn('PASS: 20', output)
+        self.assertNotIn('PASS: 22', output)
 
     def test_selected_rerun_is_partial_and_uses_original_deadline(self):
         code, output, calls = self.invoke(['--only', 'test_tieitup'])
         self.assertEqual(code, 0, output)
         self.assertEqual(calls, [(['Harness/tests/test_tieitup.py'], 900)])
         self.assertIn('PARTIAL', output)
-        self.assertNotIn('PASS: 20', output)
+        self.assertNotIn('PASS: 22', output)
 
     def test_failed_selection_remains_partial_and_nonzero(self):
         code, output, calls = self.invoke(['--only', 'test_tieitup'],

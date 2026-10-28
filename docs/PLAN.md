@@ -1,6 +1,6 @@
 # Devarness starts with a small core and tracks verified changes
 
-> **2026-10-26** · Aster · `current`
+> **2026-10-29** · Aster · `current`
 >
 > Start with the portable core, add library capabilities for a demonstrated
 > task, and record the checks before expanding. The public source now omits
@@ -17,6 +17,7 @@
 - [Legacy onboarding shares the core and updater cleanup stays bounded](#legacy-onboarding-shares-the-core-and-updater-cleanup-stays-bounded)
 - [A fresh public clone must finish the documented setup](#a-fresh-public-clone-must-finish-the-documented-setup)
 - [Native client checks verify the Devarness environment first](#native-client-checks-verify-the-devarness-environment-first)
+- [Default release checks retain the Codex setup regressions](#default-release-checks-retain-the-codex-setup-regressions)
 - [Further expansion waits for a concrete task and evidence](#further-expansion-waits-for-a-concrete-task-and-evidence)
 
 ## One task record carries the objective, checks and next action
@@ -348,6 +349,47 @@ hosted jobs pass the default 20 commands at that source commit:
 [main acceptance](https://github.com/edmundhui03-debug/Devarness/actions/runs/40278463538)
 and [verification acceptance](https://github.com/edmundhui03-debug/Devarness/actions/runs/40278463497).
 This follow-up records the results only; its runtime source matches 8f7a10b.
+
+## Default release checks retain the Codex setup regressions
+
+`fixed` · both Codex suites now run in the passing 22-command acceptance
+
+The release command omitted the two existing Codex specialist suites after
+the client setup repairs. A synthetic failure in either suite still allowed
+the reference runner to report success because it never invoked that suite.
+The standard list now includes both suites, using disposable homes and a
+fake app-server; client installation, login and model calls are unnecessary
+(`tools/check.py:20`, `Harness/tests/test_codex_setup.py:31`,
+`Harness/tests/test_codex_hook_trust.py:5`).
+
+The frozen task is to reject either Codex regression through the default
+release command and continue the remaining checks. A documentation-only
+candidate leaves that failure undetected; adding the existing suites makes
+both failing controls return nonzero. The runner's 11 selection and failure
+tests pass after failing against the reference. This keeps the existing
+runner, timeouts and optional-source skip instead of adding a framework
+(`tests/test_check.py:77`). No model-quality or performance claim is made.
+
+The actual release CLI also runs against an isolated synthetic repository.
+For each failing Codex suite, the reference exits 0 after 20 commands;
+the candidate exits 1 after all 22 commands and names the failing suite.
+These controls verify invocation and failure propagation, while the real
+specialist suites verify the client helpers separately.
+
+Full local acceptance passes all 22 commands on Python 3.12.10, including
+39 core tests, the 25 Codex tests with one absent optional-source skip,
+140 updater tests in 575.442 seconds and 80 TieItUp tests in 139.139 seconds.
+Core-only and named reruns remain explicitly partial. Existing source and
+platform skips stay visible; deterministic checks do not certify native
+client authentication or model behavior. Source review, Markdown and
+changed-line checks pass (`tools/check.py:99`, `tests/test_check.py:72`).
+
+The current-tree and retained-history scans report no findings. Public
+repository metadata has no actionable personal value; the 328 tracked paths
+are unchanged. History is retained. Both public branches use the same
+[portable workflow](https://github.com/edmundhui03-debug/Devarness/actions/workflows/portable.yml)
+for hosted acceptance after publication. Further changes still need a
+concrete failure or task; this run adds no new helper, service or dependency.
 
 ## Further expansion waits for a concrete task and evidence
 
