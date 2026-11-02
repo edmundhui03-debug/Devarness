@@ -394,7 +394,7 @@ concrete failure or task; this run adds no new helper, service or dependency.
 
 ## Weekly upkeep isolates installer timing from Git preparation
 
-`partial` · controls pass; local timeout requires hosted verification
+`fixed` · three hosted platforms pass; local updater timeout remains
 
 Both public branches started at `a94d72f`, with clean tracked trees. The
 current public blob and metadata audit found no actionable personal value.
@@ -430,12 +430,37 @@ evidence; their remaining checks are incomplete. The final candidate run
 is serialized, with the same source code and unchanged limits. These earlier
 outcomes remain failures, rather than being replaced by the focused controls.
 
-The serialized run passes all 39 core tests and retained-history scanning
-in 363.81 seconds, but its updater suite reaches the unchanged 600-second
-limit again. Full local acceptance is therefore not passing. The reviewed
-candidate goes to the existing verification branch for the same full hosted
-Linux, macOS and Windows matrix; main waits for that result. No extra local
-full run, timeout increase or test omission substitutes for this failure.
+The serialized local run exits 1 after 1665.55 seconds: 21 of 22 commands
+pass, but the updater suite reaches the unchanged 600-second limit again.
+All 39 core tests and retained-history scanning pass; the latter takes
+363.81 seconds. TieItUp passes 80 tests with one optional-source skip in
+269.027 seconds. Runtime source hashes stay unchanged throughout. Full local
+acceptance is therefore not passing. The reviewed candidate was published
+to the existing verification branch while main waited for the full hosted
+matrix. No extra local full run, timeout increase or test omission
+substitutes for this failure.
+
+The [verification matrix](https://github.com/edmundhui03-debug/Devarness/actions/runs/41385391578)
+passes at `7d7ee23`. Each job log confirms all 22 portable commands passed:
+
+| Hosted OS | Full commands | Updater tests | Updater seconds | Skips |
+| --- | --- | --- | --- | --- |
+| Linux | 22 pass | 140 | 47.940 | 3 |
+| macOS | 22 pass | 140 | 105.990 | 3 |
+| Windows | 22 pass | 140 | 275.925 | 0 |
+
+Updater skips above are platform-specific. TieItUp runs 80 tests on every
+hosted OS, with one absent optional-source skip each. Other existing source
+and platform skips remain explicit in the job logs. Authenticated native
+client behavior is not certified by these deterministic checks.
+
+The verified runtime now advances to both public branches with a result-only
+documentation follow-up. Source review, changed-line checks, Markdown,
+citations and the changed-file privacy scan pass. The bounded retrospective
+keeps the existing controls and serial local acceptance; no new shared rule,
+service or paid probe is added. The local updater timeout's cause remains
+unverified. Next action: diagnose that local runtime in bounded disposable
+fixtures before claiming this device passes full acceptance.
 
 The prior public main workflow passed Linux, Windows and macOS at `a94d72f`.
 The verification branch's macOS job was cancelled with no recorded steps;
