@@ -1062,30 +1062,32 @@ class AdvanceTests(unittest.TestCase):
         self.assertEqual(moves, [])
         self.assertIn("Harness/a\t%s\t%s\n" % (url, old), self.manifest_text())
 
-    def test_a_slow_installer_gets_the_budget_left_and_is_retried_with_more(self):
+    def test_a_timed_out_installer_is_rolled_back_then_retried_with_more_time(self):
         # A runtime rebuild can outlast a session start's budget; that attempt
         # is rolled back and held, and a run with more time tries again.
         url = self.fx.upstream("a")
         old = self.fx.head("a")
         self.fx.clone("Harness/a", "a", old)
         self.fx.manifest([("Harness/a", url, old)])
-        # The tool gives an installer at least 5 s however small the budget,
-        # so the sleep must outlast that floor to be cut off; at the old pin
-        # the installer is quick, so the restore itself succeeds.
+        # The first installer is capped at 5 s; the old pin restores quickly.
         self.fx.script("setup-a.py", "import os, time\nif 'second' in open(os.path.join(%r, 'README.md')).read(): time.sleep(8)"
                        % str(self.fx.dev / "Harness" / "a"))
         self.fx.policy("Harness/a\tauto\tsetup-a.py --install\t-\n")
         new = self.fx.push_commit("a", "second")
-        self.mod.INSTALL_MINIMUM = 1          # let a short budget reach the installer here
-        self.mod.MOVE_MARGIN = 0
+        self.mod.INSTALL_MINIMUM = 1          # this fixture does not need the 300 s reserve
         started = time.monotonic()
-        results, moves = self.advance(budget=2)
+        # Give real Git preparation room; bound only the installer on this try.
+        with mock.patch.object(self.mod, "COMMAND_TIMEOUT", 5):
+            results, moves = self.advance(budget=60)
         self.assertLess(time.monotonic() - started, 40)
         self.assertEqual(results[0].state, "rolled back", results)
         self.assertIn("timed out", results[0].note)
         self.assertEqual(moves, [])
         self.assertEqual(git("rev-parse", "HEAD", cwd=self.fx.dev / "Harness" / "a").stdout.strip(), old)
-        results, moves = self.advance(budget=60)
+        with mock.patch.object(self.mod, "run_command", wraps=self.mod.run_command) as installer:
+            results, moves = self.advance(budget=60)
+        self.assertGreater(installer.call_args.kwargs["timeout"], 5)
+        self.assertLessEqual(installer.call_args.kwargs["timeout"], 60)
         self.assertEqual(results[0].state, "advanced", results)
         self.assertEqual(moves[0][2], new)
 

@@ -1,6 +1,6 @@
 # Devarness starts with a small core and tracks verified changes
 
-> **2026-10-29** · Aster · `current`
+> **2026-11-02** · Aster · `current`
 >
 > Start with the portable core, add library capabilities for a demonstrated
 > task, and record the checks before expanding. The public source now omits
@@ -18,6 +18,7 @@
 - [A fresh public clone must finish the documented setup](#a-fresh-public-clone-must-finish-the-documented-setup)
 - [Native client checks verify the Devarness environment first](#native-client-checks-verify-the-devarness-environment-first)
 - [Default release checks retain the Codex setup regressions](#default-release-checks-retain-the-codex-setup-regressions)
+- [Weekly upkeep isolates installer timing from Git preparation](#weekly-upkeep-isolates-installer-timing-from-git-preparation)
 - [Further expansion waits for a concrete task and evidence](#further-expansion-waits-for-a-concrete-task-and-evidence)
 
 ## One task record carries the objective, checks and next action
@@ -390,6 +391,56 @@ are unchanged. History is retained. Both public branches use the same
 [portable workflow](https://github.com/edmundhui03-debug/Devarness/actions/workflows/portable.yml)
 for hosted acceptance after publication. Further changes still need a
 concrete failure or task; this run adds no new helper, service or dependency.
+
+## Weekly upkeep isolates installer timing from Git preparation
+
+`partial` · controls pass; local timeout requires hosted verification
+
+Both public branches started at `a94d72f`, with clean tracked trees. The
+current public blob and metadata audit found no actionable personal value.
+Reviewed configuration destinations remain checkout-relative, generic or
+explicitly opt-in; upstream URLs and legal attribution are retained.
+Synthetic paths and credential controls remain test fixtures. No private
+profile, transcript, project content or personal dependency manifest supplies
+public content, and earlier Git history stays intact.
+
+One existing updater regression gave real Git preparation only two seconds.
+A three-second delay at the first checkout helper makes the reference fail
+with an exhausted fetch budget before it reaches the installer. The smallest
+fixture repair allows 60 seconds for preparation and caps only the first
+installer at five seconds. Its real eight-second installer must still time
+out, restore the old pin and succeed on a retry with more time. The original
+40-second first-attempt bound stays in place. Production deadlines, policy
+and security gates are unchanged (`Harness/tests/test_update_tools.py:1065`).
+
+The frozen task is to exercise timeout, rollback and retry despite delayed
+Git preparation. A documentation-only candidate cannot make that control
+reach the installer. The fixture candidate passes the same delayed control
+in 37.794 seconds. A defective-budget control returning 900 seconds fails the
+new upper-budget assertion, as required. This is one test-only
+improvement using existing helpers, with author self-review; no model,
+dependency, service, hook or shared rule is added. Raw controls and full-run
+logs remain ignored. Full local and hosted outcomes are recorded below when
+available; a partial control is not full acceptance.
+
+Two overlapping full attempts reached existing 600-second limits: updater
+tests in the reference and retained-history scanning in the first candidate.
+Both attempts were intentionally stopped after retaining their timeout
+evidence; their remaining checks are incomplete. The final candidate run
+is serialized, with the same source code and unchanged limits. These earlier
+outcomes remain failures, rather than being replaced by the focused controls.
+
+The serialized run passes all 39 core tests and retained-history scanning
+in 363.81 seconds, but its updater suite reaches the unchanged 600-second
+limit again. Full local acceptance is therefore not passing. The reviewed
+candidate goes to the existing verification branch for the same full hosted
+Linux, macOS and Windows matrix; main waits for that result. No extra local
+full run, timeout increase or test omission substitutes for this failure.
+
+The prior public main workflow passed Linux, Windows and macOS at `a94d72f`.
+The verification branch's macOS job was cancelled with no recorded steps;
+its other two jobs passed. That older cancellation is preserved as evidence,
+not reported as a successful job. Further changes require a concrete failure.
 
 ## Further expansion waits for a concrete task and evidence
 
